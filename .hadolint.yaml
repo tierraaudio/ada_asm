@@ -1,0 +1,13 @@
+# Hadolint configuration.
+# Rule references: https://github.com/hadolint/hadolint/wiki
+
+ignored:
+  # Pinning apt versions in dev images creates more churn than safety. We
+  # pin language and base-image versions; apt deps follow the base image.
+  - DL3008
+
+  # The nginx config is written via a printf heredoc that intentionally
+  # passes literal $uri / $args to nginx — single-quoting is correct here.
+  - SC2016
+
+failure-threshold: warning

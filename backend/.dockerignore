@@ -18,6 +18,5 @@ build/
 .env.*
 !.env.example
 node_modules/
-README.md
 docs/
 ai-specs/

@@ -63,7 +63,7 @@ Reference: <issue key/url or notion url/id or "N/A">
 
 Figma File: (URLs)
 
-Node(s): 
+Node(s):
 - (URL)
 - ...
 
