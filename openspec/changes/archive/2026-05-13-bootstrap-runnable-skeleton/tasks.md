@@ -59,7 +59,7 @@
 
 - [x] 8.1 Create `.github/workflows/backend.yml` triggered on `pull_request` with `paths: ['backend/**', '.github/workflows/backend.yml']` and on `push: { branches: [main] }`. Steps: checkout, setup-python 3.12, install uv, restore cache (`uv-${{ hashFiles('backend/uv.lock') }}`), `uv sync --frozen`, `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy app`, `uv run pytest --cov=app --cov-fail-under=80`
 - [x] 8.2 Create `.github/workflows/frontend.yml` triggered on `pull_request` with `paths: ['frontend/**', '.github/workflows/frontend.yml']` and on `push: { branches: [main] }`. Steps: checkout, setup-node 20, corepack enable, `pnpm install --frozen-lockfile`, cache pnpm store keyed on `pnpm-lock.yaml`, cache Playwright browsers, `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage`, `pnpm build`, `pnpm exec playwright install --with-deps chromium`, `pnpm e2e --project=chromium --grep @smoke`
-- [ ] 8.3 Push the change branch and verify both workflows run green on the PR before requesting review
+- [x] 8.3 Push the change branch and verify both workflows run green on the PR before requesting review
 
 ## 9. Documentation
 
@@ -73,5 +73,5 @@
 - [x] 10.2 Confirm `curl -fsS http://localhost:8000/api/v1/health` returns HTTP 200 with the documented body
 - [x] 10.3 Open `http://localhost:5173` and confirm the placeholder shell renders
 - [x] 10.4 Run `pre-commit install && pre-commit run --all-files` — all hooks pass
-- [ ] 10.5 Open a draft PR against `main`; confirm both `backend.yml` and `frontend.yml` workflows run and pass
-- [ ] 10.6 After PR is green, archive the change with `/opsx:archive bootstrap-runnable-skeleton`
+- [x] 10.5 Open a draft PR against `main`; confirm both `backend.yml` and `frontend.yml` workflows run and pass
+- [x] 10.6 After PR is green, archive the change with `/opsx:archive bootstrap-runnable-skeleton`
