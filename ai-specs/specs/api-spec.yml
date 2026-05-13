@@ -7,10 +7,6 @@ info:
     contract and is regenerated from the FastAPI app's `/openapi.json`
     on every PR that changes `backend/app/api/**`.
 
-    In this revision, only the unauthenticated health endpoint is defined.
-    Business endpoints (auth, projects, modules, components, pricing) will
-    be added by their respective User Stories.
-
 servers:
   - url: http://localhost:8000
     description: Local development
@@ -18,40 +14,238 @@ servers:
 tags:
   - name: health
     description: Liveness / readiness probes
+  - name: auth
+    description: Authentication, refresh, password reset, current user
 
 paths:
   /api/v1/health:
     get:
       tags: [health]
       summary: Service health check
-      description: |
-        Unauthenticated probe. Returns 200 with the service version and the
-        current UTC timestamp as long as the FastAPI process is reachable.
+      description: Unauthenticated probe. Always 200 when reachable.
       operationId: health_health
       responses:
         "200":
           description: Service is healthy
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/HealthResponse"
+              schema: { $ref: "#/components/schemas/HealthResponse" }
+
+  /api/v1/auth/login:
+    post:
+      tags: [auth]
+      summary: Issue access + refresh tokens for valid credentials
+      description: |
+        Returns a uniform 401 (`code: INVALID_CREDENTIALS`) for unknown email,
+        wrong password, or inactive user — body is byte-identical across the
+        three cases.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenResponse" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Validation"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [auth]
+      summary: Rotate refresh + access tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RefreshRequest" }
+      responses:
+        "200":
+          description: New token pair
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenResponse" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [auth]
+      summary: Revoke the supplied refresh token (idempotent)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LogoutRequest" }
+      responses:
+        "204":
+          description: Logged out (or no-op for unknown tokens)
+
+  /api/v1/auth/password-recovery:
+    post:
+      tags: [auth]
+      summary: Send a password-reset link (anti-enumeration)
+      description: |
+        Always returns 202. Sends an email only if the address matches an
+        active user; the response body is identical either way.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordRecoveryRequest" }
+      responses:
+        "202":
+          description: Request accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PasswordRecoveryResponse" }
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /api/v1/auth/password-reset:
+    post:
+      tags: [auth]
+      summary: Redeem a password-reset token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordResetRequest" }
+      responses:
+        "204":
+          description: Password updated; all active refresh tokens for the user are revoked.
+        "400":
+          $ref: "#/components/responses/ResetTokenInvalid"
+        "422":
+          $ref: "#/components/responses/Validation"
+
+  /api/v1/auth/me:
+    get:
+      tags: [auth]
+      summary: Return the currently authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MeResponse" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthResponse:
       type: object
       required: [status, version, timestamp]
       properties:
-        status:
-          type: string
-          enum: [ok]
-          description: Constant string indicating the service is up
-        version:
-          type: string
-          description: Semantic version of the running service
-          example: "0.1.0"
-        timestamp:
-          type: string
-          format: date-time
-          description: Current UTC time in ISO 8601 format with a Z suffix
-          example: "2026-05-13T08:00:00Z"
+        status: { type: string, enum: [ok] }
+        version: { type: string, example: "0.1.0" }
+        timestamp: { type: string, format: date-time }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    TokenResponse:
+      type: object
+      required: [access_token, refresh_token, token_type, expires_in]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, enum: [bearer] }
+        expires_in: { type: integer, description: Seconds until access_token expires }
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    LogoutRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token: { type: string }
+    PasswordRecoveryRequest:
+      type: object
+      required: [email]
+      properties:
+        email: { type: string, format: email }
+    PasswordRecoveryResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [accepted] }
+    PasswordResetRequest:
+      type: object
+      required: [token, new_password]
+      properties:
+        token: { type: string }
+        new_password: { type: string }
+    MeResponse:
+      type: object
+      required: [id, email, full_name, global_role, is_active, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        full_name: { type: string }
+        global_role: { type: string, enum: [admin, user] }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+    Problem:
+      type: object
+      description: RFC 7807 Problem Details with a stable `code` discriminator.
+      required: [title, status, code]
+      properties:
+        type: { type: string, format: uri }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { type: string }
+
+  responses:
+    Unauthorized:
+      description: |
+        Authentication failed. `code` is one of:
+        `INVALID_CREDENTIALS`, `UNAUTHENTICATED`, `ACCESS_TOKEN_EXPIRED`,
+        `ACCESS_TOKEN_WRONG_TYPE`, `ACCESS_TOKEN_MALFORMED`,
+        `REFRESH_TOKEN_EXPIRED`, `REFRESH_TOKEN_REVOKED`,
+        `REFRESH_TOKEN_MALFORMED`.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Validation:
+      description: Pydantic validation error.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    RateLimited:
+      description: Per-IP rate limit exceeded.
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ResetTokenInvalid:
+      description: |
+        Reset failed. `code` is one of `RESET_TOKEN_EXPIRED`,
+        `RESET_TOKEN_ALREADY_USED`, `RESET_TOKEN_INVALID`.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }

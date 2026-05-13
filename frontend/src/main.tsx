@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import { App } from "@/App";
+import { AuthBootstrap } from "@/features/auth/AuthBootstrap";
 import "@/styles/globals.css";
 
 const queryClient = new QueryClient({
@@ -24,7 +25,9 @@ createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <AuthBootstrap>
+          <App />
+        </AuthBootstrap>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

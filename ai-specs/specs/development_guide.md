@@ -46,6 +46,32 @@ The first run builds two images (backend + frontend) and pulls Postgres/Redis. S
 2. `migrate` runs `alembic upgrade head` once (one-shot service).
 3. `backend`, `celery_worker`, `celery_beat`, and `frontend` start after migrations finish.
 
+## 3b. First-run: seed an administrator
+
+Until a sign-up endpoint exists, the first user is created by a one-shot script. While the stack is up:
+
+```bash
+docker compose run --rm backend python -m app.scripts.seed_admin \
+  --email founder@yourcompany.com \
+  --password 'pick a long, unguessable passphrase'
+```
+
+The command refuses with a non-zero exit when any admin already exists. The user can then sign in at `http://localhost:5173`.
+
+### Password recovery in development
+
+`SMTP_HOST` is empty by default, so the backend uses the `ConsoleEmailSender`: instead of dispatching a real email, it emits a structured log line tagged `email.console.delivery` with `dev_only=true`. To find the reset link locally, watch the backend logs:
+
+```bash
+docker compose logs -f backend | grep email.console.delivery
+```
+
+The reset URL is built from `FRONTEND_BASE_URL` (default `http://localhost:5173`).
+
+### Refresh-token storage trade-off
+
+The frontend stores the refresh token in `localStorage` so hard reloads can recover a session. The access token lives in memory only (15-min TTL). This is XSS-attractive; the assumption today is that the app does not render untrusted HTML. Revisit when we deploy publicly: HttpOnly cookies + CSRF protection is the next stop.
+
 ## 4. Verify
 
 | Service        | URL                                                | Expected                                |

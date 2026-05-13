@@ -6,10 +6,19 @@ This document is the **forward-looking catalogue** of entities planned for the A
 
 ### 1. User
 
-Represents an authenticated person who can access the ADA ASM application. Carries the global role (`admin` or `user`) and is referenced by `RefreshToken` and by per-project membership rows.
+Represents an authenticated person who can access the ADA ASM application.
 
-- **Status**: Not yet implemented.
-- **Introduced by**: User Story `Login en ASM 1.0`.
+- **Status**: ✅ Implemented in migration `20260513_1200_login_en_asm__users_refresh_reset.py` (introduced by `login-en-asm`).
+- **Table**: `users`.
+- **Columns**:
+  - `id` UUIDv4, PK, `server_default gen_random_uuid()`
+  - `email` `citext`, unique, not null
+  - `password_hash` `varchar(255)`, not null — Argon2id digest
+  - `full_name` `varchar(200)`, not null, default `''`
+  - `global_role` `varchar(16)`, not null, default `'user'` — one of `'admin' | 'user'`
+  - `is_active` `boolean`, not null, default `true`
+  - `created_at` / `updated_at` `timestamptz`, server-defaulted to `now()`
+- **Indexes**: unique on `email` (via the `uq_users_email` constraint).
 
 ### 2. Project
 
@@ -41,10 +50,35 @@ Append-only time-series record of the price of one Component (or rolled-up Modul
 
 ### 6. RefreshToken
 
-Hashed (Argon2id) refresh tokens issued to a User upon login. Allow a new access token to be minted without re-prompting credentials, and provide a revocation surface for logout / forced sign-out.
+Allows minting new access tokens without re-prompting credentials, and is the surface used by logout and forced sign-out.
 
-- **Status**: Not yet implemented.
-- **Introduced by**: User Story `Login en ASM 1.0`.
+- **Status**: ✅ Implemented in `login-en-asm`.
+- **Table**: `refresh_tokens`.
+- **Columns**:
+  - `id` UUIDv4, PK
+  - `user_id` UUIDv4, FK → `users.id` ON DELETE CASCADE
+  - `jti_hash` `varchar(64)`, unique, not null — SHA-256 hex of the JWT's `jti` claim (the `jti` is itself 128-bit CSPRNG, so SHA-256 is sufficient)
+  - `expires_at` `timestamptz`, not null
+  - `revoked_at` `timestamptz`, nullable — set on rotation, logout, password reset
+  - `created_from_ip` `inet`, nullable
+  - `user_agent` `varchar(500)`, nullable
+  - `created_at` / `updated_at`
+- **Indexes**: `ix_refresh_tokens_user_id`, unique `ix_refresh_tokens_jti_hash`.
+
+### 7. PasswordResetToken
+
+Single-use token redeemable to set a new password. The token itself never travels through the DB — only its Argon2id hash.
+
+- **Status**: ✅ Implemented in `login-en-asm`.
+- **Table**: `password_reset_tokens`.
+- **Columns**:
+  - `id` UUIDv4, PK
+  - `user_id` UUIDv4, FK → `users.id` ON DELETE CASCADE
+  - `token_hash` `varchar(255)`, unique, not null — Argon2id
+  - `expires_at` `timestamptz`, not null (default TTL 1 hour, configurable)
+  - `used_at` `timestamptz`, nullable
+  - `created_at` / `updated_at`
+- **Indexes**: `ix_password_reset_tokens_user_id`, unique `ix_password_reset_tokens_token_hash`.
 
 ## Conventions to apply in each upcoming migration
 
