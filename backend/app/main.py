@@ -14,7 +14,9 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.api import errors as api_errors
 from app.api.v1 import api_v1_router
+from app.api.v1.routers.auth import limiter as auth_limiter
 from app.core.config import Settings, get_settings
 from app.infrastructure.logging import configure_logging, request_id_ctx
 
@@ -65,6 +67,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(RequestIdMiddleware)
 
+    # Rate limiting (slowapi). The limiter is attached to the auth router; the
+    # FastAPI app needs the state hook + exception handler installed.
+    app.state.limiter = auth_limiter
+
+    api_errors.install(app)
     app.include_router(api_v1_router)
     return app
 

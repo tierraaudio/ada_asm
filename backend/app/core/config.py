@@ -33,6 +33,22 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(..., min_length=8, description="Secret used to sign JWTs")
     jwt_access_token_ttl_seconds: int = Field(default=900)
     jwt_refresh_token_ttl_seconds: int = Field(default=14 * 24 * 3600)
+    password_reset_token_ttl_seconds: int = Field(default=3600)
+    login_rate_limit_per_minute: int = Field(default=10)
+    password_min_length: int = Field(default=12)
+    password_max_length: int = Field(default=128)
+
+    frontend_base_url: str = Field(
+        default="http://localhost:5173",
+        description="Base URL of the frontend, used to build password-reset links",
+    )
+
+    smtp_host: str | None = Field(default=None)
+    smtp_port: int = Field(default=587)
+    smtp_username: str | None = Field(default=None)
+    smtp_password: str | None = Field(default=None)
+    smtp_from: str | None = Field(default=None)
+    smtp_use_tls: bool = Field(default=True)
 
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=list,
