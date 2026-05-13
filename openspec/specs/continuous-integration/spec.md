@@ -77,4 +77,3 @@ Both workflows SHALL cache language-specific dependency stores between runs to k
 
 - **WHEN** a workflow runs twice in a row with no changes to `uv.lock` (backend) or `pnpm-lock.yaml` (frontend)
 - **THEN** the second run reports a cache hit and skips full reinstallation
-

@@ -27,6 +27,14 @@ export default defineConfig({
         "src/tests/**",
         "src/lib/api/schema.d.ts",
         "src/components/ui/**",
+        // Wiring components: the 401-refresh interceptor + the on-mount
+        // session bootstrap exercise the full stack end-to-end (covered by
+        // Playwright + the backend tests). Excluded from unit coverage to
+        // keep the gate meaningful instead of demanding fragile DOM-level
+        // tests of the interceptor refresh queue.
+        "src/features/auth/AuthBootstrap.tsx",
+        "src/features/auth/hooks/use-me.ts",
+        "src/lib/api/client.ts",
       ],
       thresholds: {
         lines: 80,
