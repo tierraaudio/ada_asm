@@ -1,0 +1,71 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: detect-private-key
+      - id: check-merge-conflict
+      - id: check-case-conflict
+
+  # Backend (Python) — runs only on backend files
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        name: ruff (backend lint)
+        args: [--fix]
+        files: ^backend/.*\.py$
+      - id: ruff-format
+        name: ruff (backend format)
+        files: ^backend/.*\.py$
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        name: mypy (backend type check)
+        files: ^backend/app/.*\.py$
+        additional_dependencies:
+          - "pydantic>=2.7"
+          - "sqlalchemy>=2.0"
+          - "types-redis"
+          - "types-passlib"
+        args: [--config-file=backend/pyproject.toml]
+
+  # Frontend (TS/React) — local hooks delegate to pnpm so versions match the project
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint (frontend)
+        language: system
+        entry: bash -c 'cd frontend && pnpm exec eslint --max-warnings=0 "$@"' --
+        files: ^frontend/src/.*\.(ts|tsx|js|jsx)$
+        require_serial: true
+        pass_filenames: true
+
+      - id: prettier
+        name: prettier (frontend)
+        language: system
+        entry: bash -c 'cd frontend && pnpm exec prettier --check "$@"' --
+        files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|md|yaml|yml)$
+        require_serial: true
+        pass_filenames: true
+
+      - id: tsc
+        name: tsc --noEmit (frontend type check)
+        language: system
+        entry: bash -c 'cd frontend && pnpm exec tsc --noEmit'
+        pass_filenames: false
+        files: ^frontend/(src/.*\.(ts|tsx)|tsconfig\.json)$
+
+  # Docker / Compose lint (lightweight)
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.1-beta
+    hooks:
+      - id: hadolint-docker
+        files: (^|/)Dockerfile$

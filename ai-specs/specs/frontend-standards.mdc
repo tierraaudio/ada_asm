@@ -1,0 +1,491 @@
+---
+description: Frontend development standards for the ADA ASM web app (React 18 + Vite + TypeScript + Tailwind + shadcn/ui + TanStack Query + Zustand + react-hook-form + zod + React Router + Vitest + Playwright). Covers structure, component patterns, state, styling, a11y, testing, and Definition of Done.
+globs: ["frontend/src/**/*.{ts,tsx}", "frontend/index.html", "frontend/vite.config.ts", "frontend/tailwind.config.ts", "frontend/tsconfig.json", "frontend/playwright.config.ts"]
+alwaysApply: true
+---
+
+# Frontend Project Standards and Best Practices
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Technology Stack](#technology-stack)
+- [Project Structure](#project-structure)
+- [Coding Standards](#coding-standards)
+- [Component Conventions](#component-conventions)
+- [State Management](#state-management)
+- [Service Layer (API Client)](#service-layer-api-client)
+- [Forms and Validation](#forms-and-validation)
+- [Styling Conventions (Tailwind + shadcn/ui)](#styling-conventions-tailwind--shadcnui)
+- [Accessibility Baseline](#accessibility-baseline)
+- [Testing Standards](#testing-standards)
+- [Configuration Standards](#configuration-standards)
+- [Performance Best Practices](#performance-best-practices)
+- [Development Workflow](#development-workflow)
+- [Definition of Done (Frontend)](#definition-of-done-frontend)
+
+---
+
+## Overview
+
+This document defines the conventions for the ADA ASM web app: a TypeScript SPA built with React + Vite that consumes the ADA ASM REST API to manage Proyectos / Módulos / Componentes, displays daily price series, and triggers actions against Holded / KiCAT.
+
+## Technology Stack
+
+### Core Technologies
+- **React**: 18.x with functional components and hooks
+- **TypeScript**: 5.x, `strict` mode on
+- **Vite**: 5.x — dev server + production bundler
+- **React Router**: 6.x
+
+### UI / Styling
+- **Tailwind CSS**: 3.x — utility-first styling
+- **shadcn/ui**: copy-paste components stored under `src/components/ui/`. Owned by the repo (not an npm dependency).
+- **Radix UI primitives**: indirect dependency via shadcn (accessible primitives)
+- **lucide-react**: icon library
+- **class-variance-authority** + **tailwind-merge**: variant composition
+
+### State & Data
+- **TanStack Query (React Query)**: 5.x — server state, caching, mutations
+- **Zustand**: 4.x — global client state (session, UI flags, ephemeral cross-page state)
+- **Axios**: HTTP client (configured once with interceptors for auth + error normalisation)
+- **openapi-typescript**: generates TS types from the backend's `/openapi.json` into `src/lib/api/schema.d.ts`
+
+### Forms
+- **react-hook-form**: 7.x
+- **zod**: schemas reused for validation and (when shared) type inference
+
+### Testing
+- **Vitest**: unit + component tests
+- **React Testing Library**: component testing utilities
+- **MSW** (Mock Service Worker): mocks the API at the network layer
+- **Playwright**: end-to-end tests
+- **@axe-core/playwright**: a11y checks in e2e
+
+### Tooling
+- **ESLint**: TypeScript + React + react-hooks + tailwindcss + jsx-a11y rules
+- **Prettier**: formatting (no opinions in code reviews)
+- **pre-commit**: hooks driven by `.pre-commit-config.yaml`
+- **Package manager**: `pnpm` (lockfile committed)
+
+## Project Structure
+
+Feature-first organisation. Cross-cutting code goes under `src/lib/` or `src/components/`.
+
+```
+frontend/
+├── public/                      # Static assets served as-is
+├── src/
+│   ├── app/                     # App shell, providers, router setup
+│   │   ├── providers.tsx        # QueryClient, ThemeProvider, Router, ZustandStore providers
+│   │   ├── router.tsx           # Route definitions
+│   │   └── layout/
+│   │       ├── DashboardLayout.tsx
+│   │       ├── Header.tsx
+│   │       └── Sidebar.tsx
+│   ├── features/
+│   │   ├── projects/
+│   │   │   ├── api/             # React Query hooks + axios calls for this feature
+│   │   │   ├── components/      # Feature-local components
+│   │   │   ├── pages/           # Route-level components
+│   │   │   ├── schemas.ts       # zod schemas for forms
+│   │   │   └── types.ts         # Local types (extended from generated)
+│   │   ├── modules/
+│   │   ├── components/          # The asset 'Componente' (not React components)
+│   │   ├── auth/
+│   │   └── pricing/             # Price series, alerts UI
+│   ├── components/
+│   │   └── ui/                  # shadcn/ui copy-paste primitives (button, input, dialog, ...)
+│   ├── lib/
+│   │   ├── api/
+│   │   │   ├── client.ts        # axios instance with interceptors
+│   │   │   ├── query-client.ts  # TanStack QueryClient factory
+│   │   │   └── schema.d.ts      # generated from /openapi.json (do not edit)
+│   │   ├── stores/              # Zustand stores
+│   │   ├── hooks/               # Shared hooks
+│   │   ├── utils/               # cn(), formatters, date helpers
+│   │   └── auth/                # token storage, refresh logic
+│   ├── styles/
+│   │   └── globals.css          # Tailwind layers + CSS variables
+│   ├── tests/
+│   │   ├── setup.ts             # Vitest setup (MSW server, RTL cleanup)
+│   │   └── mocks/               # MSW handlers
+│   ├── main.tsx                 # Entry point
+│   └── vite-env.d.ts
+├── e2e/                         # Playwright tests
+│   ├── fixtures/
+│   ├── helpers/
+│   └── *.spec.ts
+├── index.html
+├── vite.config.ts
+├── tailwind.config.ts
+├── tsconfig.json
+├── playwright.config.ts
+├── package.json
+├── pnpm-lock.yaml
+├── Dockerfile
+└── .dockerignore
+```
+
+## Coding Standards
+
+### Language and Naming Conventions
+
+- **All identifiers, strings, comments and console messages are in English.** UI copy that the user sees is the only exception — it can be in Spanish where the design requires it.
+- Components: `PascalCase` (`ProjectListPage.tsx`).
+- Hooks: `camelCase` starting with `use` (`useProjectList`).
+- Utility files: `kebab-case` (`format-currency.ts`) or `camelCase` (`formatCurrency.ts`) — pick one convention per directory and stick with it; we standardise on `kebab-case` for non-component files.
+- TypeScript types/interfaces: `PascalCase`. Prefer `type` over `interface` unless declaration merging is needed.
+- Boolean variables: `isX`, `hasX`, `canX`, `shouldX`.
+- Constants: `UPPER_SNAKE_CASE` only for true compile-time constants. Configuration values from env: `import.meta.env.VITE_*`.
+
+### TypeScript Usage
+
+- `strict: true` in `tsconfig.json`. `noUncheckedIndexedAccess: true`. `exactOptionalPropertyTypes: true`.
+- No `any`. Use `unknown` and narrow.
+- Use generated types from `src/lib/api/schema.d.ts` as the source of truth for API shapes. Feature-local extensions go in the feature's `types.ts`.
+- Discriminated unions for state machines (loading / success / error).
+
+### Path Aliases
+
+```ts
+// tsconfig.json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}
+```
+
+Always import via `@/...` from `src/`.
+
+## Component Conventions
+
+### Functional Components Only
+
+- Class components are forbidden.
+- One component per file. File name matches component name.
+- Default exports are forbidden — always named exports for easier refactoring.
+
+### Component Anatomy
+
+```tsx
+// src/features/projects/components/ProjectCard.tsx
+import { type FC } from "react";
+import { Card } from "@/components/ui/card";
+import type { Project } from "../types";
+
+type ProjectCardProps = {
+  project: Project;
+  onSelect: (projectId: string) => void;
+};
+
+export const ProjectCard: FC<ProjectCardProps> = ({ project, onSelect }) => {
+  return (
+    <Card onClick={() => onSelect(project.id)} className="p-4">
+      <h3 className="text-lg font-semibold">{project.name}</h3>
+    </Card>
+  );
+};
+```
+
+### Splitting
+
+- A component file > 200 lines is a smell — split.
+- Page components live in `features/<feature>/pages/` and orchestrate; they do not own heavy markup.
+- Pure presentational components are stateless and receive everything via props.
+
+### Container vs Presentation
+
+We do NOT enforce a separate "container" layer. Data fetching happens inside route-level components or via hooks (`useProjects()`); presentational components receive data already shaped.
+
+## State Management
+
+### Decision Matrix
+
+| State kind                                  | Where it lives                         |
+| ------------------------------------------- | -------------------------------------- |
+| Server data (anything returned by the API)  | **TanStack Query** (`useQuery` / `useMutation`) |
+| Authenticated user, session, token          | **Zustand** (`useAuthStore`)           |
+| Theme, sidebar collapsed, modal open        | **Zustand** (`useUiStore`)             |
+| Form values                                 | **react-hook-form** (component-local)  |
+| Truly local UI state (hover, focus, toggle) | `useState` / `useReducer`              |
+
+### TanStack Query Conventions
+
+- One hook file per resource: `src/features/projects/api/use-projects.ts`.
+- Query keys are always tuples and live in a single file per feature: `src/features/projects/api/keys.ts`.
+
+```ts
+export const projectKeys = {
+  all: ["projects"] as const,
+  list: (filters?: ProjectFilters) => [...projectKeys.all, "list", filters ?? {}] as const,
+  detail: (id: string) => [...projectKeys.all, "detail", id] as const,
+};
+```
+
+- `staleTime` default at QueryClient level: `30_000` (30s). Override per query when justified.
+- Mutations invalidate the most specific key possible after success.
+- Error handling: thrown by axios interceptor → caught by global `QueryClient` error handler → surfaced via toast + boundary.
+
+### Zustand Conventions
+
+- One store per concern (`useAuthStore`, `useUiStore`, `usePricingFiltersStore`).
+- Selectors used at call sites to avoid unnecessary re-renders:
+
+```tsx
+const user = useAuthStore((s) => s.user);
+```
+
+- Persisted slices use the `persist` middleware with explicit `partialize`. Never persist tokens to `localStorage` unsanitised — see `lib/auth/`.
+
+## Service Layer (API Client)
+
+### Axios Instance
+
+```ts
+// src/lib/api/client.ts
+import axios from "axios";
+
+export const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL, // backend base URL only; "/api/v1" is appended in feature calls
+  withCredentials: false,
+});
+
+api.interceptors.request.use(attachAccessToken);
+api.interceptors.response.use(undefined, refreshOnUnauthorized);
+```
+
+- `VITE_API_URL` points to the backend **base URL only** (e.g. `http://localhost:8000`). The `/api/v1` prefix lives in the feature's API hooks.
+- A single 401 triggers a token refresh attempt; a second 401 logs the user out.
+- Network/HTTP errors are normalised to `ApiError` (matching the backend's RFC 7807 shape) before being thrown.
+
+### Feature API Modules
+
+```ts
+// src/features/projects/api/projects-api.ts
+import { api } from "@/lib/api/client";
+import type { components } from "@/lib/api/schema";
+
+type Project = components["schemas"]["Project"];
+
+export const projectsApi = {
+  list: () => api.get<Project[]>("/api/v1/projects").then((r) => r.data),
+  get: (id: string) => api.get<Project>(`/api/v1/projects/${id}`).then((r) => r.data),
+  create: (body: components["schemas"]["ProjectCreate"]) =>
+    api.post<Project>("/api/v1/projects", body).then((r) => r.data),
+};
+```
+
+## Forms and Validation
+
+- **react-hook-form** for state.
+- **zod** for schema validation. Schemas live in `src/features/<feature>/schemas.ts`.
+- `zodResolver` glues them together.
+
+```ts
+// src/features/modules/schemas.ts
+import { z } from "zod";
+
+export const moduleCreateSchema = z.object({
+  name: z.string().min(1).max(120),
+  parentModuleId: z.string().uuid().optional(),
+  description: z.string().max(2000).optional(),
+});
+
+export type ModuleCreateInput = z.infer<typeof moduleCreateSchema>;
+```
+
+- Submit handlers disable the button while pending. Use the mutation's `isPending`.
+- Server-side validation errors (422) are mapped onto the form via `setError(field, { message })`.
+
+## Styling Conventions (Tailwind + shadcn/ui)
+
+### Tailwind
+
+- Utility classes inline on the JSX. No CSS files outside `globals.css` and component-scoped CSS modules (only when a CSS feature has no Tailwind equivalent).
+- Class merging: `cn(...)` helper in `@/lib/utils/cn.ts` (uses `clsx` + `tailwind-merge`).
+- Design tokens (colour, spacing, radius) declared as CSS variables in `globals.css` and referenced from `tailwind.config.ts` `theme.extend`. Pull tokens from Figma when available; never hardcode hex colours in components — extend the Tailwind theme.
+
+### shadcn/ui
+
+- Components are **owned by the repo**. Run `pnpm dlx shadcn-ui@latest add <component>` to scaffold; commit the file under `src/components/ui/` and customise as needed.
+- Variants live in the component itself via `class-variance-authority` (the shadcn pattern).
+- Do not re-export shadcn primitives untouched as the project's "Button" — feature-level components compose them.
+
+### Responsive
+
+- Mobile-first. Default styles target the smallest viewport; use Tailwind breakpoints (`sm:`, `md:`, `lg:`, `xl:`) for larger.
+- The Figma is desktop-led (1459×1043). Acceptance: pixel-faithful at `lg` (1024+); usable layout at `sm` (640+); list/detail screens degrade gracefully below.
+
+## Accessibility Baseline
+
+- Every interactive element is keyboard reachable and operable.
+- Visible focus states on every interactive element (`focus-visible:ring-*`).
+- Labels for every form input via `<Label htmlFor>` or `aria-label`.
+- Use semantic HTML: `<button>` for actions, `<a>` for navigation, `<form>` for submissions.
+- Lists use `<ul>` / `<ol>`. Tables use `<table>` with `<thead>`/`<tbody>`.
+- Icons that convey meaning have `aria-label`; decorative icons have `aria-hidden="true"`.
+- Colour contrast meets WCAG AA (4.5:1 for body text, 3:1 for large text).
+- All `<img>` have `alt`. Decorative images: `alt=""`.
+- Playwright e2e runs `@axe-core/playwright` checks; new violations fail the build.
+
+## Testing Standards
+
+### Pyramid
+
+- **Unit / component tests (Vitest + RTL + MSW)** — the bulk of coverage.
+- **End-to-end tests (Playwright)** — critical user flows only (login, create project, create module, view price history).
+
+### Coverage
+
+- **80% global threshold** in Vitest (branches, functions, lines, statements).
+- Configured via `vitest.config.ts`:
+
+```ts
+test: {
+  coverage: {
+    provider: "v8",
+    reporter: ["text", "html", "lcov"],
+    thresholds: { lines: 80, functions: 80, branches: 80, statements: 80 },
+  },
+}
+```
+
+### Vitest + RTL
+
+- Test files colocated: `Foo.test.tsx` next to `Foo.tsx`.
+- Naming: `describe("<UnitOfBehaviour>", ...)` + `it("does X when Y", ...)`.
+- Always render with the providers needed (a custom `renderWithProviders` helper wraps `QueryClientProvider`, `MemoryRouter`, `ThemeProvider`).
+- Query the DOM via accessible queries (`getByRole`, `getByLabelText`). Never use `getByTestId` unless no a11y locator works.
+- Network calls intercepted by **MSW** handlers; never mock `axios` itself.
+
+```tsx
+it("submits a new project", async () => {
+  renderWithProviders(<NewProjectForm />);
+  await userEvent.type(screen.getByLabelText(/name/i), "Project Alpha");
+  await userEvent.click(screen.getByRole("button", { name: /create/i }));
+  expect(await screen.findByText(/created successfully/i)).toBeInTheDocument();
+});
+```
+
+### Playwright
+
+- Tests under `frontend/e2e/`.
+- Use the Page Object pattern under `e2e/pages/` for non-trivial flows.
+- Each test starts from a known seeded state (`POST /api/v1/test/reset` only available in test envs).
+- Tag tests with `@smoke` for the minimal pre-deploy set.
+
+### Coverage Categories (per component / feature)
+
+1. Happy path
+2. Loading state
+3. Error state (network failure, 4xx, 5xx)
+4. Validation errors (forms)
+5. Empty state (no data)
+6. Authorisation / forbidden state
+
+## Configuration Standards
+
+### TypeScript
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
+  }
+}
+```
+
+### ESLint
+
+- Plugins: `@typescript-eslint`, `eslint-plugin-react`, `eslint-plugin-react-hooks`, `eslint-plugin-tailwindcss`, `eslint-plugin-jsx-a11y`.
+- `eslint-config-prettier` last in the chain so Prettier rules don't conflict.
+
+### Environment
+
+- `VITE_API_URL` — backend base URL (no trailing slash, no `/api/v1`).
+- `VITE_ENV` — `development | staging | production`.
+- All env vars exposed to the browser MUST be prefixed `VITE_`. Anything else is unsafe to embed.
+
+### Vite
+
+- Path alias `@` → `src` set both in `tsconfig.json` and `vite.config.ts`.
+- Strict mode dev server. HMR on.
+
+## Performance Best Practices
+
+- Code-split at route level via `React.lazy()` + `<Suspense>`.
+- Memoise expensive derived values with `useMemo`; memoise stable callbacks passed to memoised children with `useCallback`. Don't memoise everything.
+- Use TanStack Query's `select` option to subscribe to slices of the query data.
+- Virtualise large lists (>200 items): `@tanstack/react-virtual`.
+- Image assets: prefer SVG or compressed WebP; lazy-load below-the-fold images.
+- Bundle budget: warn if `dist/assets/index*.js` exceeds 350 KB gzipped — investigate before merging.
+
+## Development Workflow
+
+### Branching
+
+- Feature branches: `feat/<area>-<short-desc>-frontend`.
+- One concern per branch.
+
+### Scripts
+
+```bash
+pnpm install
+pnpm dev                 # Vite dev server
+pnpm build               # Production build
+pnpm preview             # Serve the production build locally
+pnpm test                # Vitest watch
+pnpm test:run            # Vitest single run
+pnpm test:coverage       # Vitest with coverage gate
+pnpm lint                # ESLint
+pnpm format              # Prettier write
+pnpm typecheck           # tsc --noEmit
+pnpm e2e                 # Playwright
+pnpm gen:api             # openapi-typescript ./openapi.json -o src/lib/api/schema.d.ts
+```
+
+### CI (GitHub Actions)
+
+- `frontend.yml` workflow runs on PRs touching `frontend/**`:
+  1. `pnpm install --frozen-lockfile`
+  2. `pnpm lint`
+  3. `pnpm typecheck`
+  4. `pnpm test:coverage`
+  5. `pnpm build`
+  6. `pnpm e2e --project=chromium` (smoke set)
+
+## Definition of Done (Frontend)
+
+A frontend change is "Done" only when ALL of the following are true:
+
+- [ ] Feature is fully implemented and matches the Figma design at `lg` breakpoint.
+- [ ] All API calls go through the feature's `api/` module (no direct `axios` calls scattered).
+- [ ] Server state managed via TanStack Query; client state via Zustand or local state per the decision matrix.
+- [ ] Forms use react-hook-form + zod. Server validation errors surfaced in-place.
+- [ ] Loading, error and empty states implemented for every async UI.
+- [ ] Accessibility checklist passes: keyboard navigation, visible focus, labels, contrast.
+- [ ] Unit/component tests added; coverage ≥ 80%.
+- [ ] If a critical flow changed: Playwright e2e updated.
+- [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test:run`, `pnpm build` all pass.
+- [ ] `axe` reports no new violations.
+- [ ] No `console.log` left in production code.
+- [ ] `pnpm gen:api` re-run if the backend's OpenAPI changed; generated `schema.d.ts` committed.
+- [ ] PR description references the originating Notion task or user story.

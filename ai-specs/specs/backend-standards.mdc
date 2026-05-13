@@ -1,0 +1,588 @@
+---
+description: Backend development standards for the ADA ASM service (Python 3.12 + FastAPI + SQLAlchemy 2 + Alembic + PostgreSQL + Celery + Redis). Covers project layout, API conventions, persistence, auth, jobs, logging, testing and Definition of Done.
+globs: ["backend/**/*.py", "backend/alembic.ini", "backend/pyproject.toml", "backend/Dockerfile"]
+alwaysApply: true
+---
+
+# Backend Project Standards and Best Practices
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Technology Stack](#technology-stack)
+- [Architecture Overview](#architecture-overview)
+- [Domain-Driven Design Principles](#domain-driven-design-principles)
+- [SOLID and DRY Principles](#solid-and-dry-principles)
+- [Coding Standards](#coding-standards)
+- [API Design Standards](#api-design-standards)
+- [Database Patterns](#database-patterns)
+- [Background Jobs (Celery)](#background-jobs-celery)
+- [Authentication and Authorization](#authentication-and-authorization)
+- [Logging](#logging)
+- [Testing Standards](#testing-standards)
+- [Performance Best Practices](#performance-best-practices)
+- [Security Best Practices](#security-best-practices)
+- [Development Workflow](#development-workflow)
+- [Definition of Done (Backend)](#definition-of-done-backend)
+
+---
+
+## Overview
+
+This document defines the conventions for the ADA ASM backend: a Python service that exposes a REST API for managing Proyectos / Módulos / Componentes, integrates with Holded and KiCAT, runs daily price-scraping jobs against multiple suppliers, and persists time-series data for historical prices and alerts.
+
+## Technology Stack
+
+### Core Technologies
+- **Python**: 3.12 (`pyproject.toml` pins `requires-python = ">=3.12,<3.13"`)
+- **FastAPI**: latest stable; async-first request handling
+- **Pydantic v2**: request/response models, settings, validation
+- **Uvicorn**: ASGI server in dev; **Gunicorn + Uvicorn workers** in prod
+- **Package manager**: `uv` (lockfile committed: `uv.lock`)
+
+### Database & ORM
+- **PostgreSQL**: 16-alpine (Docker)
+- **SQLAlchemy**: 2.0 (declarative, `Mapped[...]` style)
+- **Alembic**: schema migrations
+- **psycopg**: 3.x (sync driver for Alembic; `psycopg[binary]`)
+- **asyncpg**: async driver for the runtime app
+
+### Background Jobs
+- **Celery**: 5.x (worker for async/long tasks: price scraping, Holded sync, alerts)
+- **Celery Beat**: scheduled tasks (daily price update, Holded polling)
+- **Redis**: 7-alpine — broker + result backend
+
+### Testing Framework
+- **pytest**: test runner
+- **pytest-asyncio**: async tests
+- **httpx**: `AsyncClient` for API integration tests
+- **factory_boy**: data fixtures
+- **pytest-cov**: coverage; **80% global threshold**
+
+### Development Tools
+- **ruff**: linting + formatting (replaces black, isort, flake8)
+- **mypy**: type checking in `strict` mode
+- **pre-commit**: hooks (see `.pre-commit-config.yaml`)
+
+## Architecture Overview
+
+### Layered DDD-lite
+
+The backend uses a four-layer architecture. Domain knows nothing about FastAPI, SQLAlchemy or Celery.
+
+- **API (`app/api/`)** — FastAPI routers, dependencies, request/response schemas (Pydantic), error handlers.
+- **Application (`app/application/`)** — use cases / services. Orchestrates domain + repositories + integrations. No HTTP concerns. No SQLAlchemy session leakage.
+- **Domain (`app/domain/`)** — entities, value objects, repository **interfaces** (Protocols), domain services, domain events. Pure Python.
+- **Infrastructure (`app/infrastructure/`)** — SQLAlchemy models, repository implementations, Alembic env, Celery tasks, external HTTP clients (Holded, KiCAT, suppliers), logging setup.
+
+Dependencies always point inward: `api → application → domain`, and `infrastructure → domain` (implements interfaces).
+
+### Project Structure
+
+```
+backend/
+├── app/
+│   ├── api/
+│   │   ├── v1/
+│   │   │   ├── routers/
+│   │   │   │   ├── projects.py
+│   │   │   │   ├── modules.py
+│   │   │   │   ├── components.py
+│   │   │   │   └── auth.py
+│   │   │   ├── schemas/         # Pydantic request/response models
+│   │   │   └── dependencies.py  # FastAPI Depends (db session, current user, ...)
+│   │   ├── errors.py            # Exception → HTTP mapping
+│   │   └── __init__.py          # APIRouter aggregation
+│   ├── application/
+│   │   ├── services/            # Use cases (one class per use case family)
+│   │   └── dto.py               # Application-layer DTOs (not Pydantic-bound to HTTP)
+│   ├── domain/
+│   │   ├── entities/            # Project, Module, Component, User, PriceSnapshot
+│   │   ├── value_objects/       # Money, Quantity, AssetPath
+│   │   ├── repositories/        # Protocol interfaces
+│   │   ├── services/            # Domain services (e.g. ModulePricingService)
+│   │   └── events/              # Domain events (e.g. PriceChanged)
+│   ├── infrastructure/
+│   │   ├── db/
+│   │   │   ├── base.py          # DeclarativeBase
+│   │   │   ├── session.py       # async_session_factory
+│   │   │   └── models/          # SQLAlchemy ORM models
+│   │   ├── repositories/        # Concrete repository implementations
+│   │   ├── integrations/
+│   │   │   ├── holded/          # Holded API client + adapters
+│   │   │   ├── kicat/
+│   │   │   └── suppliers/       # One module per supplier
+│   │   ├── tasks/               # Celery tasks
+│   │   ├── celery_app.py        # Celery factory + Beat schedule
+│   │   ├── logging.py           # structlog config
+│   │   └── security.py          # JWT + password hashing
+│   ├── core/
+│   │   ├── config.py            # Pydantic Settings (env-driven)
+│   │   └── exceptions.py        # Domain/application exception types
+│   ├── main.py                  # FastAPI app factory: create_app()
+│   └── __init__.py
+├── migrations/                  # Alembic env + versions/
+├── tests/
+│   ├── unit/
+│   ├── integration/
+│   ├── e2e/
+│   └── factories/
+├── alembic.ini
+├── pyproject.toml
+├── uv.lock
+├── Dockerfile
+└── .dockerignore
+```
+
+## Domain-Driven Design Principles
+
+### Entities
+
+Each entity has stable identity, encapsulates invariants, and exposes intent-revealing methods. Forbidden: anaemic objects that are just attribute bags.
+
+```python
+# app/domain/entities/module.py
+from dataclasses import dataclass, field
+from uuid import UUID
+
+@dataclass
+class Module:
+    id: UUID
+    project_id: UUID
+    name: str
+    parent_module_id: UUID | None = None
+    children: list["Module" | "Component"] = field(default_factory=list)
+
+    def total_price(self) -> "Money":
+        return sum((child.current_price() for child in self.children), Money.zero())
+```
+
+### Value Objects
+
+Immutable, identity-by-value. Use `dataclass(frozen=True)` or Pydantic `BaseModel` with `model_config = ConfigDict(frozen=True)`.
+
+```python
+@dataclass(frozen=True)
+class Money:
+    amount: Decimal
+    currency: str
+    def __add__(self, other: "Money") -> "Money": ...
+```
+
+### Aggregates
+
+`Project` is the aggregate root for the asset tree (`Project → Module → Component`). Mutations to the tree go through the project aggregate; repositories load and save the whole aggregate or a documented subtree only.
+
+### Repositories
+
+Defined as `typing.Protocol` in `domain/repositories/`, implemented in `infrastructure/repositories/`.
+
+```python
+# app/domain/repositories/project_repository.py
+from typing import Protocol
+from uuid import UUID
+
+class ProjectRepository(Protocol):
+    async def get(self, project_id: UUID) -> "Project | None": ...
+    async def list(self) -> list["Project"]: ...
+    async def save(self, project: "Project") -> None: ...
+```
+
+Concrete implementations live in `infrastructure/repositories/` and receive an `AsyncSession` via constructor.
+
+### Domain Services
+
+Stateless operations that don't fit on one entity. Example: `ModulePricingService` (rolls up component prices through the tree).
+
+### Domain Events
+
+Use simple frozen dataclasses. Dispatched via a `DomainEventBus` (in-memory in unit tests, Celery-backed in production).
+
+## SOLID and DRY Principles
+
+### Single Responsibility
+- API routers route. Services orchestrate. Domain holds rules. Repositories persist. No mixing.
+
+### Open/Closed
+- New supplier? Add a new module under `infrastructure/integrations/suppliers/` implementing `SupplierPriceClient` (Protocol). Do not modify existing supplier modules.
+
+### Liskov Substitution
+- Repository implementations must respect the Protocol's contract — same exceptions, same null semantics.
+
+### Interface Segregation
+- Prefer small Protocols per capability over one fat repository interface.
+
+### Dependency Inversion
+- FastAPI `Depends` provides concrete implementations to application services. Application services accept Protocol parameters in their constructors. Never `import sqlalchemy` from `application/` or `domain/`.
+
+### DRY
+- One source of truth per concept. Pydantic schemas in `api/v1/schemas/` are HTTP-facing; never reuse SQLAlchemy models as response models.
+
+## Coding Standards
+
+### Language and Naming Conventions
+
+- **All identifiers, docstrings, error messages and log messages are in English.**
+- `snake_case` for modules, functions, variables.
+- `PascalCase` for classes.
+- `UPPER_SNAKE_CASE` for constants.
+- File names: `snake_case.py`.
+- Test files: `test_<module>.py`.
+
+### Python Usage
+
+- `from __future__ import annotations` at the top of every module.
+- Full type annotations on every public function and method. `mypy --strict` must pass.
+- Prefer `pydantic.BaseModel` for HTTP schemas and `dataclass`(`frozen=True`) for value objects.
+- No `Any` unless boundary-justified and commented.
+- Use `async def` for all I/O paths. Synchronous code lives in domain logic and pure functions.
+
+### Error Handling
+
+- Define application-specific exceptions in `app/core/exceptions.py`:
+  - `DomainError` (base)
+  - `EntityNotFoundError`, `ValidationError`, `ConflictError`, `IntegrationError`, `AuthError`
+- API layer maps them to HTTP via a single global exception handler in `app/api/errors.py` using **RFC 7807 Problem Details** format.
+- Never `except Exception:` without re-raising or logging with full context.
+
+### Validation Patterns
+
+- All HTTP input validation: Pydantic models in `api/v1/schemas/`.
+- Application services receive validated DTOs, never raw `dict`s.
+- Domain invariants enforced in entity constructors/methods (raise `DomainError` subclasses).
+
+## API Design Standards
+
+### REST Endpoints
+
+- Versioning: URL prefix `/api/v1`. Bump major prefix on breaking changes.
+- Resource-oriented: nouns, plural, kebab-case only if multi-word (prefer single words).
+
+```
+GET    /api/v1/projects
+POST   /api/v1/projects
+GET    /api/v1/projects/{project_id}
+PATCH  /api/v1/projects/{project_id}
+DELETE /api/v1/projects/{project_id}
+
+GET    /api/v1/projects/{project_id}/modules
+POST   /api/v1/projects/{project_id}/modules
+GET    /api/v1/modules/{module_id}
+GET    /api/v1/components
+```
+
+- HTTP methods: `GET` (read), `POST` (create), `PATCH` (partial update), `PUT` (full replace; rare), `DELETE`.
+- 200 / 201 / 204 / 400 / 401 / 403 / 404 / 409 / 422 / 500. No 200 for errors.
+
+### Request/Response Patterns
+
+- JSON only.
+- Response body for collections: `{ "items": [...], "total": N, "page": ..., "page_size": ... }`.
+- Response body for a single resource: the resource object directly.
+- Dates: ISO 8601 with timezone (`2026-05-12T08:00:00Z`).
+- IDs: UUIDv4 as strings.
+
+### Error Response Format (RFC 7807)
+
+```json
+{
+  "type": "https://ada-asm/errors/entity-not-found",
+  "title": "Entity not found",
+  "status": 404,
+  "detail": "Project 7c2d... not found",
+  "instance": "/api/v1/projects/7c2d...",
+  "code": "PROJECT_NOT_FOUND"
+}
+```
+
+`code` is a stable machine-readable identifier. `detail` is human-readable.
+
+### OpenAPI
+
+- FastAPI auto-generates `/openapi.json` and `/docs` (Swagger UI). In production `/docs` is disabled; `/openapi.json` is served behind auth.
+- The committed `ai-specs/specs/api-spec.yml` is regenerated from the running app (`scripts/export_openapi.py`) on every PR that touches `app/api/`.
+
+### CORS
+
+Configured via env var `CORS_ORIGINS` (comma-separated). Must include both `http://localhost:<frontend-port>` and the LAN hostname pattern (`http://*.local:<frontend-port>`) for development.
+
+## Database Patterns
+
+### SQLAlchemy Models
+
+- Declarative, 2.0-style with `Mapped[...]` annotations.
+- One model per file under `infrastructure/db/models/`.
+- Tables named in snake_case plural (`projects`, `modules`, `components`, `price_snapshots`).
+- PKs are UUIDv4 (`server_default=text("gen_random_uuid()")`).
+- Timestamps: `created_at`, `updated_at` (UTC, set by SQL `now()` and `onupdate=func.now()`).
+
+### Hierarchical Asset Tree
+
+Use `LTREE` (PostgreSQL extension) or a `materialized_path` text column to represent the `Project → Module → Component` tree. Recursive CTEs in repository queries when traversing.
+
+### Time Series for Prices
+
+`price_snapshots` is append-only:
+- `(component_id, supplier_id, quantity_tier, captured_at)` composite index
+- `quantity_tier` ∈ {10, 100, 1000}
+- Partitioned by month (`PARTITION BY RANGE (captured_at)`).
+
+### Migrations (Alembic)
+
+- Every schema change is a migration. No exceptions.
+- Migration files committed under `backend/migrations/versions/`.
+- Naming: `YYYYMMDD_HHMM_<descriptive_slug>.py`.
+- Review the autogenerated diff before committing — `--autogenerate` is a starting point, not a deliverable.
+- Down-revisions must be implemented and tested locally.
+
+```bash
+uv run alembic revision --autogenerate -m "add_module_parent_path"
+uv run alembic upgrade head
+uv run alembic downgrade -1
+```
+
+### Repository Pattern
+
+- Protocols in `domain/repositories/`.
+- Implementations in `infrastructure/repositories/` take an `AsyncSession` and translate between SQLAlchemy models and domain entities.
+- The application layer **never** sees SQLAlchemy models.
+
+## Background Jobs (Celery)
+
+### Task Categories
+
+| Category            | Schedule          | Where defined                             |
+| ------------------- | ----------------- | ----------------------------------------- |
+| Daily price scrape  | Beat — `0 4 * * *` (UTC) | `infrastructure/tasks/prices.py`   |
+| Holded poll         | Beat — every 10 min      | `infrastructure/tasks/holded.py`   |
+| Push to Holded      | On-demand                | `infrastructure/tasks/holded.py`   |
+| Push to KiCAT       | On-demand                | `infrastructure/tasks/kicat.py`    |
+| Alert evaluation    | After each price ingest  | `infrastructure/tasks/alerts.py`   |
+
+### Conventions
+
+- Tasks are thin: parse args, call an application service, return a serialisable result.
+- All tasks are idempotent (use a logical key + DB upsert).
+- Retry policy on transient errors only: `autoretry_for=(IntegrationError,)`, `retry_backoff=True`, `max_retries=5`.
+- Task names are namespaced: `prices.scrape_supplier`, `holded.push_component`.
+- Beat schedule is declared in `infrastructure/celery_app.py` (single source of truth).
+
+### Local Dev
+
+The Docker Compose stack runs:
+- `backend` (FastAPI)
+- `celery_worker`
+- `celery_beat`
+- `redis`
+- `postgres`
+
+## Authentication and Authorization
+
+### Auth Strategy
+
+- **JWT with refresh tokens.** Access token TTL: 15 min. Refresh token TTL: 14 days.
+- Signing: HS256 (single service) or RS256 if/when an auth server is split out — choose HS256 for v1.
+- Library: `python-jose[cryptography]`.
+- Password hashing: `passlib[argon2]` with Argon2id.
+
+### Token Payload
+
+```json
+{
+  "sub": "<user_uuid>",
+  "exp": 1746000000,
+  "iat": 1745999100,
+  "type": "access",
+  "roles": ["project:viewer", "project:editor"],
+  "project_scopes": ["<project_uuid>", "*"]
+}
+```
+
+### Authorisation Model
+
+- RBAC at two levels:
+  - **Global roles**: `admin`, `user`.
+  - **Per-project roles**: `viewer`, `editor`, `owner` — stored in `project_memberships`.
+- API endpoints declare requirements via FastAPI dependencies:
+
+```python
+@router.delete("/projects/{project_id}")
+async def delete_project(
+    project_id: UUID,
+    _user: User = Depends(require_project_role(project_id, "owner")),
+): ...
+```
+
+### Endpoints
+
+- `POST /api/v1/auth/login` — email + password → access + refresh tokens.
+- `POST /api/v1/auth/refresh` — refresh token → new access token.
+- `POST /api/v1/auth/logout` — invalidate refresh token (DB allow-list / revocation table).
+- `POST /api/v1/auth/password-recovery` — request reset email.
+- `POST /api/v1/auth/password-reset` — submit new password with reset token.
+
+### Storage
+
+- Refresh tokens stored hashed (Argon2id) in `refresh_tokens` table with `user_id`, `expires_at`, `revoked_at`.
+- Access tokens are NOT stored.
+
+## Logging
+
+- **structlog** with JSON output in production, console renderer in dev.
+- Required context on every log line: `request_id`, `user_id` (if authenticated), `path`, `method`, `status_code` (response logs).
+- Use levels: `DEBUG` (dev only), `INFO` (business events), `WARNING` (recoverable), `ERROR` (exceptions caught and handled), `CRITICAL` (data loss / unrecoverable).
+- Never log secrets, full tokens, full request bodies of auth endpoints, or PII without redaction.
+- Correlation ID: middleware injects `X-Request-ID` (generate if missing) and binds it to structlog context.
+
+## Testing Standards
+
+### Coverage
+
+- **80% global threshold** (branches, functions, lines, statements).
+- Configured in `pyproject.toml`:
+
+```toml
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+```
+
+### Test Layout
+
+```
+tests/
+├── unit/            # No I/O. Domain + application + pure functions.
+├── integration/     # Real DB (Testcontainers postgres), real repos.
+├── e2e/             # AsyncClient against the full FastAPI app.
+└── factories/       # factory_boy factories per entity.
+```
+
+### Test Naming
+
+- File: `test_<unit_under_test>.py`.
+- Function: `test_<what>__<condition>__<expected>` (double underscore separators).
+  - Example: `test_module_price__when_children_in_multiple_currencies__raises_validation_error`.
+
+### Arrange / Act / Assert
+
+```python
+@pytest.mark.asyncio
+async def test_create_project__with_valid_payload__returns_201(
+    api_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    # Arrange
+    payload = {"name": "Project Alpha"}
+
+    # Act
+    response = await api_client.post("/api/v1/projects", json=payload, headers=auth_headers)
+
+    # Assert
+    assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "Project Alpha"
+```
+
+### Mocking
+
+- Mock at the **boundary** only: HTTP clients (Holded, KiCAT, suppliers), Celery enqueue, time (`freezegun`).
+- Never mock SQLAlchemy. Use Testcontainers postgres for integration tests.
+- Never mock domain entities in their own unit tests — instantiate them directly.
+
+### Coverage Categories (per use case)
+
+1. Happy path (valid input → expected output)
+2. Validation errors (invalid input)
+3. Authorisation (forbidden / unauthenticated)
+4. Edge cases (empty collections, nulls, boundary values)
+5. Integration failures (HTTP 5xx, timeouts) for external clients
+
+### Async Tests
+
+- `pytest-asyncio` with `asyncio_mode = "auto"`.
+- One event loop per test (default).
+
+## Performance Best Practices
+
+### Database
+
+- Selective columns via `select(Model.col_a, Model.col_b)`. Avoid `select(Model)` when not needed.
+- Avoid N+1: use `selectinload()` or explicit joins.
+- Use composite indexes for time-series queries on `price_snapshots`.
+
+### Async Patterns
+
+- All I/O paths are async. Never block the event loop with sync DB drivers, `requests`, or `time.sleep`.
+- Use `httpx.AsyncClient` for outbound HTTP. Share a single client per integration with connection pooling.
+- Parallelise independent operations with `asyncio.gather`.
+
+### Caching
+
+- Redis cache for: supplier exchange rates, Holded session tokens.
+- Cache invalidation: TTL-based; explicit invalidation only when correctness requires it.
+
+## Security Best Practices
+
+- **All secrets via environment variables.** No secret literal in code or committed config. `.env.example` only.
+- Pydantic Settings validates required env at startup; the service refuses to boot if a required var is missing.
+- Rate limiting on `/auth/*` endpoints (slowapi or starlette-limiter).
+- HTTPS required in any non-local environment (terminated upstream).
+- CSP/CORS strictly scoped via env.
+- Dependency audit: `uv pip list --outdated`, `pip-audit` in CI weekly.
+
+## Development Workflow
+
+### Branching
+
+- Feature branches: `feat/<area>-<short-desc>-backend`.
+- One concern per branch. Small, reviewable PRs.
+
+### Commit Messages
+
+- English. Imperative mood.
+- Convention: `<area>: <verb> <object>` (e.g. `auth: add password recovery flow`).
+
+### Scripts (run with `uv`)
+
+```bash
+uv run uvicorn app.main:app --reload --port 8000   # dev server
+uv run alembic upgrade head                        # apply migrations
+uv run alembic revision --autogenerate -m "<msg>"  # new migration
+uv run pytest                                      # tests
+uv run pytest --cov=app --cov-report=term-missing  # coverage
+uv run ruff check .                                # lint
+uv run ruff format .                               # format
+uv run mypy app                                    # type check
+uv run celery -A app.infrastructure.celery_app worker -l info
+uv run celery -A app.infrastructure.celery_app beat -l info
+```
+
+### CI (GitHub Actions)
+
+- `backend.yml` workflow runs on PRs touching `backend/**`:
+  1. `uv sync`
+  2. `ruff check .`
+  3. `ruff format --check .`
+  4. `mypy app`
+  5. `pytest --cov=app --cov-fail-under=80`
+- Required before merge.
+
+## Definition of Done (Backend)
+
+A backend change is "Done" only when ALL of the following are true:
+
+- [ ] Feature is fully implemented and matches the spec / user story acceptance criteria.
+- [ ] Domain invariants enforced in the entity layer, not only in the API layer.
+- [ ] Pydantic schemas exist for every request/response shape (no raw dicts).
+- [ ] Errors map to RFC 7807 with stable `code` strings.
+- [ ] Alembic migration generated and reviewed if the schema changed.
+- [ ] `ai-specs/specs/api-spec.yml` regenerated if an endpoint signature changed.
+- [ ] `ai-specs/specs/data-model.md` updated if entities/tables changed.
+- [ ] Unit tests for domain + application layers (happy path + validation + edge cases).
+- [ ] Integration tests for any new repository or external integration.
+- [ ] E2E test for any new endpoint.
+- [ ] Coverage ≥ 80% globally.
+- [ ] `ruff check`, `ruff format --check`, `mypy` all pass.
+- [ ] Pre-commit hooks pass on every commit.
+- [ ] No secrets, PII or full tokens in logs.
+- [ ] If a Celery task was added: idempotency verified, retry policy declared, Beat schedule updated (if scheduled), documented in this file's task table.
+- [ ] PR description references the originating Notion task or user story.

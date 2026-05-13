@@ -1,0 +1,17 @@
+.git
+.gitignore
+node_modules/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+.vite/
+.cache/
+.env
+.env.*
+!.env.example
+*.log
+README.md
+docs/
+ai-specs/
