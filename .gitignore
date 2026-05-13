@@ -38,6 +38,20 @@ node_modules/
 dist/
 build/
 coverage/
+htmlcov/
+.coverage
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =========================
+# Playwright artifacts
+# =========================
+playwright-report/
+test-results/
 
 # =========================
 # OpenSpec temp artifacts (future-proof)

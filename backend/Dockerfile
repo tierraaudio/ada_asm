@@ -14,6 +14,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential libpq-dev curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
     && mv /root/.local/bin/uv /usr/local/bin/uv
 

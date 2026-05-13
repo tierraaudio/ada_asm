@@ -187,7 +187,7 @@ export class Candidate {
     firstName: string;
     lastName: string;
     email: string;
-    
+
     // Constructor and methods that encapsulate business logic
     constructor(data: any) {
         this.id = data.id;
@@ -224,7 +224,7 @@ export class Education {
     title: string;
     startDate: Date;
     endDate?: Date;
-    
+
     constructor(data: any) {
         this.institution = data.institution;
         this.title = data.title;
@@ -257,7 +257,7 @@ export class Candidate {
     lastName: string;
     email: string;
     educations: Education[];
-    
+
     constructor(data: any) {
         this.id = data.id;
         this.firstName = data.firstName;
@@ -297,7 +297,7 @@ export class CandidateRepository implements ICandidateRepository {
         const data = await prisma.candidate.findUnique({ where: { id } });
         return data ? new Candidate(data) : null;
     }
-    
+
     async save(candidate: Candidate): Promise<Candidate> {
         // Implementation with Prisma
     }
@@ -306,7 +306,7 @@ export class CandidateRepository implements ICandidateRepository {
 
 **Explanation**: `CandidateRepository` provides a clear interface for accessing candidate data, encapsulating database access logic.
 
-**Recommendation**: 
+**Recommendation**:
 - Develop complete repository interfaces for each entity and aggregate, ensuring all database interactions for those entities pass through the repository
 - Implement repository methods that handle collections of entities, such as lists of Candidates, that can be filtered or modified in bulk
 - Use dependency injection to inject Prisma client into repositories
@@ -520,7 +520,7 @@ class Candidate implements SaveOperation, EmailOperations {
     save() {
         // implementation
     }
-    
+
     sendEmail() {
         // implementation
     }
@@ -542,7 +542,7 @@ High-level modules should not depend on low-level modules; both should depend on
 // Direct dependency on a concrete implementation
 class Candidate {
     private database = new PrismaClient();
-    
+
     save() {
         this.database.candidate.create({ data: this });
     }
@@ -557,11 +557,11 @@ interface Database {
 
 class Candidate {
     private database: Database;
-    
+
     constructor(database: Database) {
         this.database = database;
     }
-    
+
     async save(): Promise<Candidate> {
         return await this.database.save(this);
     }
@@ -604,12 +604,12 @@ export class Candidate {
             throw new Error('Invalid email');
         }
     }
-    
+
     async save(): Promise<Candidate> {
         this.validateEmail();
         // save logic
     }
-    
+
     async update(): Promise<Candidate> {
         this.validateEmail();
         // update logic
@@ -873,7 +873,7 @@ export interface ICandidateRepository {
 // Infrastructure layer implementation
 export class CandidateRepository implements ICandidateRepository {
     constructor(private prisma: PrismaClient) {}
-    
+
     async findById(id: number): Promise<Candidate | null> {
         const data = await this.prisma.candidate.findUnique({ where: { id } });
         return data ? new Candidate(data) : null;
@@ -883,7 +883,7 @@ export class CandidateRepository implements ICandidateRepository {
 
 ## Testing Standards
 
-The project has strict requirements for code quality and maintainability. These are the unit testing standards and best practices that must be applied. 
+The project has strict requirements for code quality and maintainability. These are the unit testing standards and best practices that must be applied.
 
 ### Test File Structure
 - Use descriptive test file names: `[componentName].test.ts`
@@ -903,7 +903,7 @@ describe('[ComponentName] - [methodName]', () => {
   describe('should_[expected_behavior]_when_[condition]', () => {
     it('should [specific test case]', async () => {
       // Arrange
-      // Act  
+      // Act
       // Assert
     });
   });
@@ -948,10 +948,10 @@ it('should update candidate stage successfully when valid data provided', async 
   const candidateId = 1;
   const applicationId = 1;
   const newInterviewStep = 2;
-  
+
   // Act - Execute the function under test
   const result = await updateCandidateStage(candidateId, applicationId, newInterviewStep);
-  
+
   // Assert - Verify the expected behavior
   expect(result).toEqual(expectedResult);
 });

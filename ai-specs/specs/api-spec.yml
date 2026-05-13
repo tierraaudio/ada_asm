@@ -1,0 +1,57 @@
+openapi: 3.1.0
+info:
+  title: ADA ASM API
+  version: 0.1.0
+  description: |
+    REST API for ADA ASM. This file is the source of truth for the API
+    contract and is regenerated from the FastAPI app's `/openapi.json`
+    on every PR that changes `backend/app/api/**`.
+
+    In this revision, only the unauthenticated health endpoint is defined.
+    Business endpoints (auth, projects, modules, components, pricing) will
+    be added by their respective User Stories.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+tags:
+  - name: health
+    description: Liveness / readiness probes
+
+paths:
+  /api/v1/health:
+    get:
+      tags: [health]
+      summary: Service health check
+      description: |
+        Unauthenticated probe. Returns 200 with the service version and the
+        current UTC timestamp as long as the FastAPI process is reachable.
+      operationId: health_health
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, version, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          description: Constant string indicating the service is up
+        version:
+          type: string
+          description: Semantic version of the running service
+          example: "0.1.0"
+        timestamp:
+          type: string
+          format: date-time
+          description: Current UTC time in ISO 8601 format with a Z suffix
+          example: "2026-05-13T08:00:00Z"

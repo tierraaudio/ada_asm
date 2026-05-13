@@ -46,7 +46,7 @@ The following tools can be connected optionally:
 - [ ] Jira (Issue management via Atlassian)
 - [ ] Figma (Design system / UI components)
 
-These integrations are not required.  
+These integrations are not required.
 If none are authenticated, the project will continue operating in manual mode without disruption.
 
 Authentication (per user):
