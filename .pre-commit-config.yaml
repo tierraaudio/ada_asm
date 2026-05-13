@@ -24,26 +24,29 @@ repos:
         name: ruff (backend format)
         files: ^backend/.*\.py$
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.2
+  # Run mypy via the backend's own uv-managed venv (which has fastapi,
+  # pydantic, structlog, etc. installed) so it sees the same packages as
+  # local dev and CI.
+  - repo: local
     hooks:
       - id: mypy
         name: mypy (backend type check)
-        files: ^backend/app/.*\.py$
-        additional_dependencies:
-          - "pydantic>=2.7"
-          - "sqlalchemy>=2.0"
-          - "types-redis"
-          - "types-passlib"
-        args: [--config-file=backend/pyproject.toml]
+        language: system
+        entry: bash -c 'cd backend && uv run --extra dev mypy app'
+        pass_filenames: false
+        files: ^backend/(app/.*\.py|pyproject\.toml|uv\.lock)$
 
-  # Frontend (TS/React) — local hooks delegate to pnpm so versions match the project
+  # Frontend (TS/React) — invoke the project's own pnpm + node_modules so
+  # versions and plugin resolution match `frontend/package.json`. Pre-commit
+  # passes paths relative to the repo root; we strip the `frontend/` prefix
+  # before chdir into `frontend/` so eslint/prettier find their plugins via
+  # the project's own node_modules.
   - repo: local
     hooks:
       - id: eslint
         name: eslint (frontend)
         language: system
-        entry: bash -c 'cd frontend && pnpm exec eslint --max-warnings=0 "$@"' --
+        entry: scripts/pre-commit/run-in-frontend.sh node_modules/.bin/eslint --max-warnings=0
         files: ^frontend/src/.*\.(ts|tsx|js|jsx)$
         require_serial: true
         pass_filenames: true
@@ -51,15 +54,16 @@ repos:
       - id: prettier
         name: prettier (frontend)
         language: system
-        entry: bash -c 'cd frontend && pnpm exec prettier --check "$@"' --
+        entry: scripts/pre-commit/run-in-frontend.sh node_modules/.bin/prettier --check
         files: ^frontend/.*\.(ts|tsx|js|jsx|json|css|md|yaml|yml)$
+        exclude: ^frontend/pnpm-lock\.yaml$
         require_serial: true
         pass_filenames: true
 
       - id: tsc
         name: tsc --noEmit (frontend type check)
         language: system
-        entry: bash -c 'cd frontend && pnpm exec tsc --noEmit'
+        entry: bash -c 'cd frontend && node_modules/.bin/tsc --noEmit'
         pass_filenames: false
         files: ^frontend/(src/.*\.(ts|tsx)|tsconfig\.json)$
 

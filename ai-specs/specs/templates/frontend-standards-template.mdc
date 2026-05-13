@@ -126,12 +126,12 @@ type CandidateCardProps = {
 
 const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, index, onClick }) => {
     const [isLoading, setIsLoading] = useState(false);
-    
+
     // Handle candidate card click event
     const handleCardClick = () => {
         onClick(candidate);
     };
-    
+
     return (
         <div className="candidate-card" onClick={handleCardClick}>
             {/* Component JSX */}
@@ -142,12 +142,12 @@ const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, index, onClick
 // Avoid: Non-English comments or names
 const TarjetaCandidato: React.FC<PropsTarjetaCandidato> = ({ candidato, indice, alHacerClic }) => {
     const [estaCargando, setEstaCargando] = useState(false);
-    
+
     // Manejar evento de clic en la tarjeta de candidato
     const manejarClicTarjeta = () => {
         alHacerClic(candidato);
     };
-    
+
     return (
         <div className="tarjeta-candidato" onClick={manejarClicTarjeta}>
             {/* JSX del componente */}
@@ -310,7 +310,7 @@ export const positionService = {
             throw error;
         }
     },
-    
+
     updatePosition: async (id, positionData) => {
         try {
             const response = await axios.put(`${API_BASE_URL}/positions/${id}`, positionData);
@@ -381,9 +381,9 @@ const navigate = useNavigate();
 - Provide **alternative text** for images
 
 ```javascript
-<Form.Control 
-    type="text" 
-    placeholder="Search by title" 
+<Form.Control
+    type="text"
+    placeholder="Search by title"
     aria-label="Search positions by title"
 />
 ```

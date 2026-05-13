@@ -334,20 +334,20 @@ erDiagram
     Candidate ||--o{ WorkExperience : "has"
     Candidate ||--o{ Resume : "has"
     Candidate ||--o{ Application : "submits"
-    
+
     Company ||--o{ Employee : "employs"
     Company ||--o{ Position : "offers"
-    
+
     InterviewType ||--o{ InterviewStep : "defines"
     InterviewFlow ||--o{ InterviewStep : "includes"
     InterviewFlow ||--o{ Position : "guides"
-    
+
     Position ||--o{ Application : "receives"
     Application ||--o{ Interview : "includes"
-    
+
     InterviewStep ||--o{ Application : "current_step"
     InterviewStep ||--o{ Interview : "conducted_at"
-    
+
     Employee ||--o{ Interview : "conducts"
 ```
 
@@ -369,4 +369,4 @@ erDiagram
 - Foreign key relationships maintain referential integrity
 - Optional fields allow for flexible data entry while maintaining required core information
 - The interview system supports multi-step hiring processes with different types of interviews
-- Email fields have unique constraints to prevent duplicate accounts 
+- Email fields have unique constraints to prevent duplicate accounts

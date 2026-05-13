@@ -150,4 +150,3 @@ npm run cypress:run
 # Open Cypress Test Runner
 npm run cypress:open
 ```
-
