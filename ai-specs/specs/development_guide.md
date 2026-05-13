@@ -118,13 +118,9 @@ Two workflows live under `.github/workflows/`:
 - **`backend.yml`** — runs on PRs touching `backend/**`. Lints, type-checks, runs `pytest` with an 80 % coverage gate.
 - **`frontend.yml`** — runs on PRs touching `frontend/**`. Lints, type-checks, runs `vitest` with an 80 % coverage gate, builds, runs the Playwright `@smoke` set.
 
-### Branch protection (operator action)
+### Branch protection
 
-Set both workflows as **required status checks** for `main` via the GitHub UI:
-
-`Settings → Branches → Add classic rule → Branch name pattern: main → Require status checks to pass → search and select "backend" and "frontend"`.
-
-Without this rule the workflows still run, but failing runs do not block merges.
+Intentionally **not** enabled. The project follows a direct-to-`main` workflow: commits and merges land on `main` without a required PR review or required status checks. CI still runs on every push to `main` (and on any PR that does get opened), and red CI is treated as a strong signal to revert or hotfix — but it does not mechanically block merges. Revisit if the team grows beyond direct trusted contributors.
 
 ## 9. Where the rest of the documentation lives
 
