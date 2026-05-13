@@ -18,9 +18,14 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# No SQLAlchemy models are tracked in this baseline. Add ``target_metadata =
-# Base.metadata`` here once the first models land in app.infrastructure.db.
-target_metadata = None
+from app.infrastructure.db.base import Base  # noqa: E402
+from app.infrastructure.db.models import (  # noqa: F401, E402  registers models on Base
+    PasswordResetTokenModel,
+    RefreshTokenModel,
+    UserModel,
+)
+
+target_metadata = Base.metadata
 
 
 def _resolve_sync_url() -> str:
