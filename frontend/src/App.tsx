@@ -6,10 +6,16 @@ import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 
-const PlaceholderPage = () => (
+const PlaceholderPage = ({ label = "ADA ASM placeholder" }: { label?: string }) => (
   <div className="flex h-full items-center justify-center">
-    <p className="text-base text-text-secondary">ADA ASM placeholder</p>
+    <p className="text-base text-text-secondary">{label}</p>
   </div>
+);
+
+const DashboardPlaceholder = ({ label }: { label?: string }) => (
+  <DashboardLayout>
+    {label ? <PlaceholderPage label={label} /> : <PlaceholderPage />}
+  </DashboardLayout>
 );
 
 export const App = () => {
@@ -20,15 +26,21 @@ export const App = () => {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      {/* Protected routes */}
+      {/* Protected routes — destination pages land in their respective USs */}
       <Route element={<RequireAuth />}>
+        <Route path="/" element={<DashboardPlaceholder />} />
         <Route
-          path="/"
-          element={
-            <DashboardLayout>
-              <PlaceholderPage />
-            </DashboardLayout>
-          }
+          path="/projects"
+          element={<DashboardPlaceholder label="Proyectos · próximamente" />}
+        />
+        <Route path="/modules" element={<DashboardPlaceholder label="Módulos · próximamente" />} />
+        <Route
+          path="/components"
+          element={<DashboardPlaceholder label="Componentes · próximamente" />}
+        />
+        <Route
+          path="/notifications"
+          element={<DashboardPlaceholder label="Notificaciones · próximamente" />}
         />
       </Route>
     </Routes>

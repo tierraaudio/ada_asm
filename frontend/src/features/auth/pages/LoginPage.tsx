@@ -41,9 +41,7 @@ export const LoginPage: FC = () => {
       if (isAxiosError(err) && err.response?.status === 401) {
         setSubmitError("El email o la contraseña no son correctos");
       } else {
-        setSubmitError(
-          "No se ha podido iniciar sesión. Inténtalo de nuevo en unos segundos.",
-        );
+        setSubmitError("No se ha podido iniciar sesión. Inténtalo de nuevo en unos segundos.");
       }
       resetField("password");
     }

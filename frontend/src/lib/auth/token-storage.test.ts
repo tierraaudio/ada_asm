@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { REFRESH_TOKEN_KEY, clearRefreshToken, readRefreshToken, writeRefreshToken } from "./token-storage";
+import {
+  REFRESH_TOKEN_KEY,
+  clearRefreshToken,
+  readRefreshToken,
+  writeRefreshToken,
+} from "./token-storage";
 
 describe("token-storage", () => {
   beforeEach(() => window.localStorage.clear());

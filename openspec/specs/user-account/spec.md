@@ -93,4 +93,3 @@ The system SHALL reject any password shorter than 12 characters or longer than 1
 - **WHEN** a password of length 11 is submitted to any password-setting flow
 - **THEN** the request is rejected with HTTP 422 and code `PASSWORD_TOO_SHORT`
 - **AND** no password hash is computed or stored
-

@@ -130,4 +130,3 @@ The system SHALL apply per-IP rate limiting to `POST /api/v1/auth/login` and `PO
 - **WHEN** the same source IP issues 11 login requests within 60 seconds
 - **THEN** the 11th response is HTTP 429
 - **AND** the response includes a `Retry-After` header with an integer number of seconds
-

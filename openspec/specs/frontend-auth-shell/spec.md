@@ -156,4 +156,3 @@ The frontend SHALL provide a "Forgot password?" link on `/login` that routes to 
 - **WHEN** the user opens `/reset-password` with no `?token=` query
 - **THEN** the page renders an error state telling the user the reset link is invalid or expired
 - **AND** the form is not displayed
-

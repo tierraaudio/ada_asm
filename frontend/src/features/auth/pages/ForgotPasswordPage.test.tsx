@@ -27,9 +27,7 @@ describe("<ForgotPasswordPage>", () => {
   });
 
   it("shows the same confirmation when the API errors", async () => {
-    server.use(
-      http.post(`${API}/api/v1/auth/password-recovery`, () => HttpResponse.error()),
-    );
+    server.use(http.post(`${API}/api/v1/auth/password-recovery`, () => HttpResponse.error()));
 
     renderWithProviders(<ForgotPasswordPage />, { route: "/forgot-password" });
     await userEvent.type(screen.getByLabelText(/email/i), "anyone@example.com");

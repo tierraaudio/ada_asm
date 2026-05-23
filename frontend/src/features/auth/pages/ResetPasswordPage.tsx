@@ -32,8 +32,14 @@ export const ResetPasswordPage: FC = () => {
     } catch (err) {
       if (isAxiosError(err)) {
         const code = err.response?.data?.code;
-        if (code === "RESET_TOKEN_EXPIRED" || code === "RESET_TOKEN_ALREADY_USED" || code === "RESET_TOKEN_INVALID") {
-          setSubmitError("El enlace ya no es válido. Solicita uno nuevo desde 'Recuperar contraseña'.");
+        if (
+          code === "RESET_TOKEN_EXPIRED" ||
+          code === "RESET_TOKEN_ALREADY_USED" ||
+          code === "RESET_TOKEN_INVALID"
+        ) {
+          setSubmitError(
+            "El enlace ya no es válido. Solicita uno nuevo desde 'Recuperar contraseña'.",
+          );
           return;
         }
         if (code === "PASSWORD_TOO_SHORT") {
@@ -113,7 +119,10 @@ export const ResetPasswordPage: FC = () => {
               </div>
 
               {submitError && (
-                <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <p
+                  role="alert"
+                  className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                >
                   {submitError}
                 </p>
               )}
