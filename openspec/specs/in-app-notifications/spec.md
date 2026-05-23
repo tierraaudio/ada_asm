@@ -97,4 +97,3 @@ The panel SHALL be keyboard-reachable end-to-end:
 - **THEN** focus moves to the "Ver todas las notificaciones" footer link
 - **WHEN** the user presses Escape
 - **THEN** the panel closes and focus is back on the bell
-

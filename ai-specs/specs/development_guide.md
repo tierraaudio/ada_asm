@@ -58,6 +58,16 @@ docker compose run --rm backend python -m app.scripts.seed_admin \
 
 The command refuses with a non-zero exit when any admin already exists. The user can then sign in at `http://localhost:5173`.
 
+### Seed sample components (optional, dev only)
+
+To get a populated `/components` catalogue on a fresh clone — useful for designing against real data and for the Playwright `@smoke` flows:
+
+```bash
+docker compose run --rm backend python -m app.scripts.seed_components
+```
+
+Inserts ten Figma-flavoured components (ACS712, BME280, ESP32-WROOM-32E, …) plus 3–6 `ComponentPurchase` rows per component so the chart and history views render. The script refuses with exit 2 if the `components` table is non-empty; pass `--reset` to truncate `component_purchases` + `components` first. Random values are deterministically seeded (`random.seed(42)`) so repeated runs produce the same data.
+
 ### Password recovery in development
 
 `SMTP_HOST` is empty by default, so the backend uses the `ConsoleEmailSender`: instead of dispatching a real email, it emits a structured log line tagged `email.console.delivery` with `dev_only=true`. To find the reset link locally, watch the backend logs:

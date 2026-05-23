@@ -132,4 +132,3 @@ The system SHALL provide a `data-model.md` under `ai-specs/specs/` that lists th
 
 - **WHEN** `ai-specs/specs/data-model.md` is read
 - **THEN** every entity in the planned catalogue has its own heading, a description, and a "Introduced by:" pointer to a future User Story or `TBD`
-

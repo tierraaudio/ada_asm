@@ -27,6 +27,9 @@ export default defineConfig({
         "src/tests/**",
         "src/lib/api/schema.d.ts",
         "src/components/ui/**",
+        // Type-only modules (no runtime code). v8 reports them as 0/0 and
+        // drags the global ratios without giving the gate any signal.
+        "src/**/types.ts",
         // Wiring components: the 401-refresh interceptor + the on-mount
         // session bootstrap exercise the full stack end-to-end (covered by
         // Playwright + the backend tests). Excluded from unit coverage to

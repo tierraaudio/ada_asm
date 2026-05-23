@@ -96,4 +96,3 @@ When focus enters the Header via Tab, focus SHALL move through the controls in t
 
 - **WHEN** the page is focused on the document body and the user presses Tab repeatedly
 - **THEN** focus visits the sidebar toggle, then the notification bell trigger, then the user menu pill trigger, in that order
-

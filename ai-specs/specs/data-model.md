@@ -36,17 +36,45 @@ A grouping node in the asset tree. Can contain other Modules or Components. The 
 
 ### 4. Component
 
-A leaf in the asset tree representing a single electronic part. Carries identifying metadata (name, description, datasheet URL), warehouse `location`, and the supplier that supplies it. Its current price is the latest entry for the component in `PriceSnapshot`.
+A leaf in the asset tree representing a single electronic part. Carries identifying metadata (name, description, datasheet URL), warehouse `location`, supplier, and the two classification fields the workshop operates on: `tier` (criticality A+/A/B/C/D) and `nato_score` (geopolitical origin scoring).
 
-- **Status**: Not yet implemented.
-- **Introduced by**: User Story `Creación de Componentes en ASM`.
+- **Status**: ✅ Implemented in migration `20260523_1800_component_management__components_and_purchases.py` (introduced by `component-management`).
+- **Table**: `components`.
+- **Columns**:
+  - `id` UUIDv4, PK, `server_default gen_random_uuid()`
+  - `mpn` `varchar(100)`, not null — manufacturer part number; case-insensitive unique via functional index on `lower(mpn)`
+  - `sku` `varchar(100)`, nullable
+  - `name` `varchar(200)`, not null
+  - `family` `varchar(100)`, not null — e.g. `Sensores`, `Microcontroladores`
+  - `description` `text`, nullable
+  - `datasheet_url` `text`, nullable
+  - `location` `varchar(100)`, nullable — warehouse slot
+  - `supplier` `varchar(100)`, nullable
+  - `price_per_100` `numeric(12,4)`, nullable — last known unit price for a 100-unit purchase
+  - `stock` `integer`, not null, default `0` — current on-hand quantity
+  - `tier` `varchar(8)`, not null — CHECK in `('A+','A','B','C','D')`
+  - `nato_score` `varchar(16)`, not null — CHECK in `('100_otan','otan','allied_otan','neutral','high_risk','no_otan')`
+  - `country_of_origin` `varchar(2)`, nullable — ISO 3166-1 alpha-2
+  - `created_at` / `updated_at` `timestamptz`, server-defaulted to `now()`
+- **Indexes**: unique functional `uq_components_mpn_lower`, plus per-column `lower(...)` indexes on `sku`, `name`, `family` for case-insensitive search.
 
-### 5. PriceSnapshot
+### 5. ComponentPurchase
 
-Append-only time-series record of the price of one Component (or rolled-up Module) at one supplier, at one quantity tier (10 / 100 / 1000 units), at one point in time. The basis for historical price charts and alert evaluation.
+Append-only purchase history for a Component — one row per restock event. Drives the cost-trend chart and the per-component history view. Renamed from the original `PriceSnapshot` concept once we realised the team thinks in concrete "purchases" rather than abstract snapshots; a future `PriceSnapshot` may still ship to unify across suppliers + quantity tiers.
 
-- **Status**: Not yet implemented.
-- **Introduced by**: User Story `Bulk update diario de precios de componentes y módulos`.
+- **Status**: ✅ Implemented in `component-management`.
+- **Table**: `component_purchases`.
+- **Columns**:
+  - `id` UUIDv4, PK
+  - `component_id` UUIDv4, FK → `components.id` ON DELETE CASCADE
+  - `purchased_at` `date`, not null
+  - `quantity` `integer`, not null — CHECK `> 0`
+  - `supplier` `varchar(100)`, not null
+  - `unit_cost` `numeric(12,4)`, not null
+  - `total_cost` `numeric(14,4)`, not null
+  - `currency` `varchar(3)`, not null, default `'EUR'`
+  - `created_at` / `updated_at` `timestamptz`, server-defaulted to `now()`
+- **Indexes**: composite `(component_id, purchased_at DESC)` for paginated history listings.
 
 ### 6. RefreshToken
 

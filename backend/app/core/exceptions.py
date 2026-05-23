@@ -111,6 +111,19 @@ class ForbiddenError(DomainError):
     http_status = 403
 
 
+# ---------- Components ----------
+
+
+class ComponentNotFoundError(DomainError):
+    code = "COMPONENT_NOT_FOUND"
+    http_status = 404
+
+
+class ComponentMpnAlreadyRegisteredError(DomainError):
+    code = "MPN_ALREADY_REGISTERED"
+    http_status = 409
+
+
 # ---------- Misc ----------
 
 

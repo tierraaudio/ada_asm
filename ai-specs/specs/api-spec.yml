@@ -16,6 +16,8 @@ tags:
     description: Liveness / readiness probes
   - name: auth
     description: Authentication, refresh, password reset, current user
+  - name: components
+    description: Component catalogue — CRUD, search, purchases, sync placeholder
 
 paths:
   /api/v1/health:
@@ -141,6 +143,177 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  /api/v1/components:
+    get:
+      tags: [components]
+      summary: List components (paginated, searchable)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Case-insensitive search over mpn / sku / name / family.
+        - in: query
+          name: family
+          schema: { type: string }
+        - in: query
+          name: supplier
+          schema: { type: string }
+        - in: query
+          name: tier
+          schema: { type: string, enum: ["A+", A, B, C, D] }
+        - in: query
+          name: nato_score
+          schema:
+            type: string
+            enum: [100_otan, otan, allied_otan, neutral, high_risk, no_otan]
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        "200":
+          description: Paginated catalogue
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedComponents" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "422":
+          $ref: "#/components/responses/Validation"
+    post:
+      tags: [components]
+      summary: Create a component
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComponentCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Component" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: "MPN already registered (code: MPN_ALREADY_REGISTERED)"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "422":
+          $ref: "#/components/responses/Validation"
+
+  /api/v1/components/{component_id}:
+    parameters:
+      - in: path
+        name: component_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [components]
+      summary: Get one component
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Component
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Component" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ComponentNotFound"
+    patch:
+      tags: [components]
+      summary: Partially update a component (mpn is immutable)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ComponentUpdate" }
+      responses:
+        "200":
+          description: Updated component
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Component" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ComponentNotFound"
+        "422":
+          $ref: "#/components/responses/Validation"
+    delete:
+      tags: [components]
+      summary: Delete a component (idempotent on missing)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted (or already absent)
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/v1/components/{component_id}/purchases:
+    parameters:
+      - in: path
+        name: component_id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: query
+        name: page
+        schema: { type: integer, minimum: 1, default: 1 }
+      - in: query
+        name: page_size
+        schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    get:
+      tags: [components]
+      summary: List the component's purchase history (newest first)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Paginated purchases ordered by `purchased_at DESC`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedComponentPurchases" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ComponentNotFound"
+
+  /api/v1/components/{component_id}/sync:
+    parameters:
+      - in: path
+        name: component_id
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [components]
+      summary: Enqueue a placeholder sync (real KiCAT / Holded sync lands later)
+      security:
+        - bearerAuth: []
+      responses:
+        "202":
+          description: Accepted — emits an info log line in this US
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ComponentSyncResponse" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ComponentNotFound"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -218,6 +391,120 @@ components:
         instance: { type: string }
         code: { type: string }
 
+    Component:
+      type: object
+      required: [id, mpn, name, family, stock, tier, nato_score, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        mpn: { type: string, maxLength: 100 }
+        sku: { type: string, nullable: true, maxLength: 100 }
+        name: { type: string, maxLength: 200 }
+        family: { type: string, maxLength: 100 }
+        description: { type: string, nullable: true }
+        datasheet_url: { type: string, nullable: true }
+        location: { type: string, nullable: true, maxLength: 100 }
+        supplier: { type: string, nullable: true, maxLength: 100 }
+        price_per_100:
+          type: string
+          nullable: true
+          description: Decimal-as-string (12,4 precision).
+        stock: { type: integer, minimum: 0 }
+        tier: { type: string, enum: ["A+", A, B, C, D] }
+        nato_score:
+          type: string
+          enum: [100_otan, otan, allied_otan, neutral, high_risk, no_otan]
+        country_of_origin:
+          type: string
+          nullable: true
+          pattern: "^[A-Z]{2}$"
+          description: ISO 3166-1 alpha-2.
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ComponentCreate:
+      type: object
+      required: [mpn, name, family, tier, nato_score]
+      properties:
+        mpn: { type: string, minLength: 1, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        family: { type: string, minLength: 1, maxLength: 100 }
+        sku: { type: string, nullable: true, maxLength: 100 }
+        description: { type: string, nullable: true }
+        datasheet_url: { type: string, nullable: true }
+        location: { type: string, nullable: true, maxLength: 100 }
+        supplier: { type: string, nullable: true, maxLength: 100 }
+        price_per_100: { type: string, nullable: true }
+        stock: { type: integer, minimum: 0, default: 0 }
+        tier: { type: string, enum: ["A+", A, B, C, D] }
+        nato_score:
+          type: string
+          enum: [100_otan, otan, allied_otan, neutral, high_risk, no_otan]
+        country_of_origin: { type: string, nullable: true, pattern: "^[A-Z]{2}$" }
+
+    ComponentUpdate:
+      type: object
+      description: |
+        All fields optional. `mpn`, `id`, `created_at`, `updated_at` are
+        immutable and silently ignored if provided.
+      properties:
+        sku: { type: string, nullable: true, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        family: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, nullable: true }
+        datasheet_url: { type: string, nullable: true }
+        location: { type: string, nullable: true, maxLength: 100 }
+        supplier: { type: string, nullable: true, maxLength: 100 }
+        price_per_100: { type: string, nullable: true }
+        stock: { type: integer, minimum: 0 }
+        tier: { type: string, enum: ["A+", A, B, C, D] }
+        nato_score:
+          type: string
+          enum: [100_otan, otan, allied_otan, neutral, high_risk, no_otan]
+        country_of_origin: { type: string, nullable: true, pattern: "^[A-Z]{2}$" }
+
+    ComponentPurchase:
+      type: object
+      required:
+        [id, component_id, purchased_at, quantity, supplier, unit_cost, total_cost, currency, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        component_id: { type: string, format: uuid }
+        purchased_at: { type: string, format: date }
+        quantity: { type: integer, minimum: 1 }
+        supplier: { type: string }
+        unit_cost: { type: string, description: Decimal-as-string. }
+        total_cost: { type: string, description: Decimal-as-string. }
+        currency: { type: string, example: EUR }
+        created_at: { type: string, format: date-time }
+
+    PaginatedComponents:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Component" }
+        total: { type: integer, minimum: 0 }
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1 }
+
+    PaginatedComponentPurchases:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ComponentPurchase" }
+        total: { type: integer, minimum: 0 }
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1 }
+
+    ComponentSyncResponse:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [queued] }
+
   responses:
     Unauthorized:
       description: |
@@ -246,6 +533,11 @@ components:
       description: |
         Reset failed. `code` is one of `RESET_TOKEN_EXPIRED`,
         `RESET_TOKEN_ALREADY_USED`, `RESET_TOKEN_INVALID`.
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    ComponentNotFound:
+      description: "Component not found (code: COMPONENT_NOT_FOUND)."
       content:
         application/problem+json:
           schema: { $ref: "#/components/schemas/Problem" }
