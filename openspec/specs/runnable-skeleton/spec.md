@@ -49,7 +49,7 @@ The system SHALL provide an Alembic configuration with one baseline migration th
 
 ### Requirement: Frontend serves a placeholder application shell
 
-The frontend SHALL serve a Vite-built React + TypeScript application that renders a placeholder `DashboardLayout` (header, sidebar, content area) with no business content. The bundle MUST include Tailwind CSS, the shadcn/ui base components used by the layout, and routing wired through React Router. The placeholder route `/` MUST be protected — anonymous visitors are redirected to `/login` (see capability `frontend-auth-shell`). The public routes `/login`, `/forgot-password` and `/reset-password` MUST be reachable without authentication. The Header MUST host a `UserMenuPill` (avatar pill + notification bell + dropdown with logout) per the spec in capability `frontend-auth-shell`; the placeholder "ADA ASM" plain-text header copy is replaced by this component.
+The frontend SHALL serve a Vite-built React + TypeScript application that renders a placeholder `DashboardLayout` (header, sidebar, content area) with no business content. The bundle MUST include Tailwind CSS, the shadcn/ui base components used by the layout, and routing wired through React Router. The placeholder route `/` MUST be protected — anonymous visitors are redirected to `/login` (see capability `frontend-auth-shell`). The public routes `/login`, `/forgot-password` and `/reset-password` MUST be reachable without authentication. The Header MUST host: (1) a sidebar toggle button on the left, (2) a notification bell + panel pair, and (3) a user menu pill. The Header's left toggle and the sidebar contract are defined in capability `dashboard-shell`; the notification bell + panel contract is defined in capability `in-app-notifications`; the user menu pill contract is defined in capability `frontend-auth-shell`. The placeholder "ADA ASM" plain-text header copy that was used during bootstrap is no longer rendered.
 
 #### Scenario: Frontend container serves the application
 
@@ -73,10 +73,11 @@ The frontend SHALL serve a Vite-built React + TypeScript application that render
 - **THEN** the browser ends on `http://localhost:5173/login` with `?next=/`
 - **AND** the response is HTTP 200 with the login form markup
 
-#### Scenario: Authenticated dashboard renders the user menu pill in the header
+#### Scenario: Authenticated dashboard renders the sidebar toggle, bell and user pill in the header
 
 - **WHEN** an authenticated user opens `/`
-- **THEN** the Header renders the `UserMenuPill` component (avatar pill + bell + chevron) instead of the plain "ADA ASM" placeholder copy
+- **THEN** the Header renders the sidebar toggle on the left (per `dashboard-shell`), the notification bell + panel trigger (per `in-app-notifications`), and the `UserMenuPill` on the right (per `frontend-auth-shell`)
+- **AND** the placeholder plain-text "ADA ASM" header copy is not rendered anywhere
 
 ### Requirement: Celery worker and beat connect to the broker without errors
 
@@ -131,3 +132,4 @@ The system SHALL provide a `data-model.md` under `ai-specs/specs/` that lists th
 
 - **WHEN** `ai-specs/specs/data-model.md` is read
 - **THEN** every entity in the planned catalogue has its own heading, a description, and a "Introduced by:" pointer to a future User Story or `TBD`
+

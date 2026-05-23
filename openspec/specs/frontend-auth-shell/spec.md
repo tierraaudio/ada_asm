@@ -81,7 +81,7 @@ The frontend's axios client SHALL:
 
 ### Requirement: The Header hosts a user menu pill matching the Figma design
 
-The Header SHALL render a `UserMenuPill` component on the right side, pixel-faithful to Figma node `37:45` at the `lg` breakpoint. The pill consists of, in this order from left to right: a 36 px notification bell button with an 8 px red status dot at its top-right; a clickable pill (52 px tall) containing a 32 px magenta avatar circle with a person icon, two stacked text lines (`full_name` in 14 px medium `#1a1a1a`, then `Administrator` / `User` in 12 px medium `#6b6b6b`), and a 16 px chevron-down icon. The avatar circle MUST use the brand magenta token. The pill is keyboard reachable; activating it toggles the dropdown.
+The Header SHALL render a `UserMenuPill` component on the right side, pixel-faithful to Figma node `37:45` at the `lg` breakpoint. The pill consists of, in this order from left to right: a 36 px notification bell button with an 8 px red status dot at its top-right (the bell now opens a notification panel — see capability `in-app-notifications`); a clickable pill (52 px tall) containing a 32 px magenta avatar circle with a person icon, two stacked text lines (`full_name` in 14 px medium `#1a1a1a`, then `Administrator` / `User` in 12 px medium `#6b6b6b`), and a 16 px chevron-down icon. The avatar circle MUST use the brand magenta token. The pill is keyboard reachable; activating it toggles the dropdown.
 
 #### Scenario: Pill renders the authenticated user's identity
 
@@ -94,6 +94,12 @@ The Header SHALL render a `UserMenuPill` component on the right side, pixel-fait
 
 - **WHEN** the authenticated user has `global_role = "user"`
 - **THEN** the secondary line of the pill displays "User" (capitalised) instead of "Administrator"
+
+#### Scenario: Bell is interactive and opens the notification panel
+
+- **WHEN** the user clicks the notification bell adjacent to the pill
+- **THEN** the notification panel from capability `in-app-notifications` opens
+- **AND** the user menu dropdown is NOT opened
 
 ### Requirement: The user menu dropdown exposes the logout action
 
@@ -156,3 +162,4 @@ The frontend SHALL provide a "Forgot password?" link on `/login` that routes to 
 - **WHEN** the user opens `/reset-password` with no `?token=` query
 - **THEN** the page renders an error state telling the user the reset link is invalid or expired
 - **AND** the form is not displayed
+
