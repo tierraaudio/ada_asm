@@ -19,6 +19,40 @@ Proyecto
 - A `Módulo` price is computed as the sum of the current prices of its children.
 - Both `Componente` and `Módulo` are mirrored as products in the external ERP (see Integrations).
 
+### Component classification — Tier
+
+Every `Componente` carries a **Tier** that reflects the complexity of the part and the risk of using a non-NATO source for it. The Tier is a leaf property; `Módulo` and `Proyecto` aggregate the worst (highest-risk) Tier of their descendants.
+
+| Tier   | Typology                              | Risk      |
+| ------ | ------------------------------------- | --------- |
+| Tier 1 | Chips and microcontrollers            | Very high |
+| Tier 2 | Sensors                               | High      |
+| Tier 3 | Passive components                    | Medium    |
+| Tier 4 | Plastics, boards, connectors          | Low       |
+
+### Component classification — NATO Scoring
+
+In parallel, every `Componente` carries a **NATO Scoring** that captures whether the part has been manufactured under NATO supply-chain rules. The score doubles as the audit trail when a `Proyecto` declares itself NATO-compliant: the project's worst component score becomes the project's score.
+
+| Score | Label                                              | Meaning                                |
+| ----- | -------------------------------------------------- | -------------------------------------- |
+| A+    | 100 % OTAN — all components verified               | Best case                              |
+| A     | OTAN — components from OTAN countries              |                                        |
+| B     | Allied OTAN — components from allied countries     |                                        |
+| C     | Neutral — review required                          |                                        |
+| D     | High risk — component origin not verified          |                                        |
+| F     | Not OTAN — components from non-OTAN countries      | Blocks NATO-compliant projects         |
+
+`Módulo` and `Proyecto` aggregate the worst NATO score of their descendants, mirroring the Tier rule.
+
+### Roadmap properties — to spec when the entities land
+
+Captured here so they are not forgotten when we draft the US that introduces each entity:
+
+- **`Componente`** will also store `tier`, `nato_score`, plus per-supplier history.
+- **`Módulo`** and **`Proyecto`** will surface a `rolled_up_tier` and a `rolled_up_nato_score` derived from their tree.
+- **Supplier-side time series** — beyond the daily price snapshot already planned (US 8), we will also keep a **daily stock snapshot per supplier per component** (for availability alerts and lead-time analytics). Same shape as `PriceSnapshot` (append-only, partitioned by month).
+
 ## External integrations
 
 | System  | Role                                                                                                                                         |
