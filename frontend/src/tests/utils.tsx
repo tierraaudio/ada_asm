@@ -3,6 +3,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
 
+import { TooltipProvider } from "@/components/ui/tooltip";
 import type { AuthUser } from "@/features/auth/types";
 import { useAuthStore } from "@/lib/stores/auth-store";
 
@@ -10,7 +11,10 @@ export function renderWithProviders(ui: ReactElement, options?: { route?: string
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[options?.route ?? "/"]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[options?.route ?? "/"]}>
+        {/* delayDuration=0 so userEvent.hover() flushes synchronously in tests. */}
+        <TooltipProvider delayDuration={0}>{ui}</TooltipProvider>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

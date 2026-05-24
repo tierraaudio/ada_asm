@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { App } from "@/App";
 import { AuthBootstrap } from "@/features/auth/AuthBootstrap";
 import "@/styles/globals.css";
@@ -25,9 +26,11 @@ createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AuthBootstrap>
-          <App />
-        </AuthBootstrap>
+        <TooltipProvider delayDuration={150}>
+          <AuthBootstrap>
+            <App />
+          </AuthBootstrap>
+        </TooltipProvider>
       </BrowserRouter>
     </QueryClientProvider>
   </StrictMode>,

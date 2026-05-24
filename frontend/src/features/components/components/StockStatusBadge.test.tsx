@@ -1,8 +1,17 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { act, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
+import { renderWithProviders } from "@/tests/utils";
+
 import { computeStockStatus, StockStatusBadge } from "./StockStatusBadge";
+
+async function focusBadge(label: RegExp) {
+  // jsdom doesn't fire pointer events reliably for Radix Tooltip; focus opens
+  // the same tooltip with the same content.
+  await act(async () => {
+    screen.getByLabelText(label).focus();
+  });
+}
 
 describe("computeStockStatus", () => {
   it("returns 'ok' when stock >= stockMin", () => {
@@ -23,40 +32,45 @@ describe("computeStockStatus", () => {
     expect(computeStockStatus(0, 5, [])).toBe("critical");
   });
 
-  it("returns 'warning' when stock = 0 but supplier has stock", () => {
+  it("returns 'warning' when stock = 0 but some supplier has stock", () => {
     expect(computeStockStatus(0, 5, [{ supplier: "DigiKey", quantity: 100 }])).toBe("warning");
   });
 });
 
 describe("<StockStatusBadge>", () => {
   it("renders the number of units", () => {
-    render(<StockStatusBadge stock={145} stockMin={5} />);
+    renderWithProviders(<StockStatusBadge stock={145} stockMin={5} />);
     expect(screen.getByText("145 uds")).toBeInTheDocument();
   });
 
-  it("shows the hover popover with supplier detail on 'warning'", async () => {
-    render(
+  it("shows the warning tooltip with supplier detail on focus", async () => {
+    renderWithProviders(
       <StockStatusBadge
         stock={3}
         stockMin={10}
         supplierStock={[{ supplier: "DigiKey", quantity: 240 }]}
       />,
     );
-    await userEvent.click(screen.getByRole("button"));
-    expect(await screen.findByText("Detalle de alertas:")).toBeInTheDocument();
-    expect(screen.getByText(/DigiKey: 240 uds disponibles/)).toBeInTheDocument();
+    await focusBadge(/Stock: 3 uds \(warning\)/);
+    // Radix renders the tooltip content twice (visible + visually-hidden
+    // for screen readers); both copies match — assert >= 1.
+    expect((await screen.findAllByText("Detalle de alertas:")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/DigiKey: 240 uds disponibles/).length).toBeGreaterThan(0);
   });
 
-  it("shows 'sin stock' lines on 'critical'", async () => {
-    render(<StockStatusBadge stock={0} stockMin={5} />);
-    await userEvent.click(screen.getByRole("button"));
-    expect(await screen.findByText("Detalle de alertas:")).toBeInTheDocument();
-    expect(screen.getByText(/Sin stock interno/)).toBeInTheDocument();
-    expect(screen.getByText(/Sin disponibilidad en proveedores de confianza/)).toBeInTheDocument();
+  it("shows the critical tooltip on focus when stock=0 and suppliers empty", async () => {
+    renderWithProviders(<StockStatusBadge stock={0} stockMin={5} />);
+    await focusBadge(/Stock: 0 uds \(critical\)/);
+    expect((await screen.findAllByText("Detalle de alertas:")).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Sin stock interno/).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(/Sin disponibilidad en proveedores de confianza/).length,
+    ).toBeGreaterThan(0);
   });
 
-  it("does not render a popover trigger on 'ok'", () => {
-    render(<StockStatusBadge stock={100} stockMin={5} />);
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  it("shows the ok tooltip when stock is sufficient", async () => {
+    renderWithProviders(<StockStatusBadge stock={100} stockMin={5} />);
+    await focusBadge(/Stock: 100 uds \(ok\)/);
+    expect((await screen.findAllByText("Stock suficiente")).length).toBeGreaterThan(0);
   });
 });

@@ -1,7 +1,7 @@
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import type { HTMLAttributes } from "react";
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils/cn";
 
 export type StockStatus = "ok" | "warning" | "critical";
@@ -49,23 +49,29 @@ function buildHoverContent(
   status: StockStatus,
   stock: number,
   supplierStock: SupplierStockInfo[],
-): { title: string; lines: string[] } | null {
-  if (status === "ok") return null;
+): { title: string; titleClass: string; lines: string[] } {
+  if (status === "ok") {
+    return {
+      title: "Stock suficiente",
+      titleClass: "text-emerald-700",
+      lines: [`Tienes ${stock} uds en almacén.`],
+    };
+  }
   if (status === "warning") {
     const available = supplierStock.filter((s) => s.quantity > 0);
     const lines =
       available.length > 0
-        ? available.map((s) => `• ${s.supplier}: ${s.quantity} uds disponibles`)
-        : [`• Stock interno bajo (${stock} uds)`];
-    return { title: "Detalle de alertas:", lines };
+        ? [
+            `Tienes ${stock} uds en almacén, pero:`,
+            ...available.map((s) => `• ${s.supplier}: ${s.quantity} uds disponibles`),
+          ]
+        : [`Stock interno bajo (${stock} uds).`];
+    return { title: "Detalle de alertas:", titleClass: "text-amber-700", lines };
   }
-  // critical
   return {
     title: "Detalle de alertas:",
-    lines: [
-      `• Sin stock interno (${stock} uds)`,
-      "• Sin disponibilidad en proveedores de confianza",
-    ],
+    titleClass: "text-red-700",
+    lines: [`Sin stock interno (${stock} uds).`, "Sin disponibilidad en proveedores de confianza."],
   };
 }
 
@@ -80,44 +86,33 @@ export function StockStatusBadge({
   const { Icon, classes } = STATUS_META[status];
   const hover = buildHoverContent(status, stock, supplierStock);
 
-  const badge = (
-    <span
-      aria-label={`Stock: ${stock} uds (${status})`}
-      className={cn(
-        "inline-flex items-center gap-1.5 text-sm font-medium text-text-primary",
-        className,
-      )}
-      {...props}
-    >
-      <span>{stock} uds</span>
-      <Icon className={cn("size-4", classes)} aria-hidden />
-    </span>
-  );
-
-  if (hover === null) return badge;
-
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button type="button" className="inline-flex">
-          {badge}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-64 p-3 text-xs" align="end">
-        <p
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          // Passive info trigger — focus also opens the tooltip for keyboard users.
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+          tabIndex={0}
+          aria-label={`Stock: ${stock} uds (${status})`}
           className={cn(
-            "mb-1 font-semibold",
-            status === "warning" ? "text-amber-700" : "text-red-700",
+            "inline-flex cursor-help items-center gap-1.5 text-sm font-medium text-text-primary",
+            "outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            className,
           )}
+          {...props}
         >
-          {hover.title}
-        </p>
+          <span>{stock} uds</span>
+          <Icon className={cn("size-4", classes)} aria-hidden />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent align="end" className="w-64">
+        <p className={cn("mb-1 font-semibold", hover.titleClass)}>{hover.title}</p>
         <ul className="space-y-0.5 text-text-secondary">
           {hover.lines.map((line) => (
             <li key={line}>{line}</li>
           ))}
         </ul>
-      </PopoverContent>
-    </Popover>
+      </TooltipContent>
+    </Tooltip>
   );
 }

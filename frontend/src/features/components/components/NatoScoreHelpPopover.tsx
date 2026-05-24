@@ -23,7 +23,7 @@ export function NatoScoreHelpPopover() {
         <ul className="space-y-2">
           {NATO_SCORE_VALUES.map((value) => (
             <li key={value} className="grid grid-cols-[3.5rem_1fr] items-start gap-2">
-              <NatoScoreBadge value={value} showIcon={false} />
+              <NatoScoreBadge value={value} showIcon={false} withTooltip={false} />
               <span className="text-xs text-text-secondary">{NATO_SCORE_RUBRIC[value]}</span>
             </li>
           ))}

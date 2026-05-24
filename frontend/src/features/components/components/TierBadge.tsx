@@ -1,8 +1,9 @@
 import type { HTMLAttributes } from "react";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils/cn";
 
-import { TIER_LABELS } from "../rubrics";
+import { TIER_LABELS, TIER_RUBRIC } from "../rubrics";
 import type { TierValue } from "../types";
 
 /**
@@ -23,20 +24,41 @@ const TIER_CLASSES: Record<TierValue, string> = {
 
 export interface TierBadgeProps extends HTMLAttributes<HTMLSpanElement> {
   value: TierValue;
+  /** When true (default), wraps in a Tooltip showing the rubric on hover. */
+  withTooltip?: boolean;
 }
 
-export function TierBadge({ value, className, ...props }: TierBadgeProps) {
-  return (
+export function TierBadge({ value, withTooltip = true, className, ...props }: TierBadgeProps) {
+  const badge = (
     <span
       aria-label={`Tier ${value}`}
       className={cn(
         "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold",
+        withTooltip && "cursor-help",
         TIER_CLASSES[value],
         className,
       )}
+      // tabIndex makes the badge focusable so keyboard users also get the
+      // tooltip (Radix opens it on focus). The badge itself isn't interactive
+      // — it's a passive info trigger — so the a11y rule is intentional here.
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={withTooltip ? 0 : undefined}
       {...props}
     >
       {TIER_LABELS[value]}
     </span>
+  );
+
+  if (!withTooltip) return badge;
+
+  const rubric = TIER_RUBRIC[value];
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent>
+        <p className="font-semibold text-text-primary">{rubric.category}</p>
+        <p className="text-text-secondary">Riesgo: {rubric.risk}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

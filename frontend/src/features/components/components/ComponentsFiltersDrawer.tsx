@@ -90,7 +90,7 @@ export function ComponentsFiltersDrawer({
           </p>
         </div>
 
-        <div className="max-h-[24rem] overflow-y-auto px-4 py-3 text-sm">
+        <div className="max-h-96 overflow-y-auto px-4 py-3 text-sm">
           <FilterSection title="Familia">
             <ChipGrid
               options={familyOptions.map((f) => ({ value: f, label: f }))}

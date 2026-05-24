@@ -23,7 +23,7 @@ export function TierHelpPopover() {
         <ul className="space-y-2">
           {TIER_VALUES.map((value) => (
             <li key={value} className="grid grid-cols-[4rem_1fr] items-start gap-3">
-              <TierBadge value={value} />
+              <TierBadge value={value} withTooltip={false} />
               <span className="text-xs text-text-secondary">
                 <span className="block font-medium text-text-primary">
                   {TIER_RUBRIC[value].category}

@@ -45,14 +45,12 @@ class SqlAlchemyStockEventRepository:
     ) -> StockEventPage:
         base = select(StockEventModel).where(StockEventModel.component_id == component_id)
         total = int(
-            (await self._session.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
+            (
+                await self._session.execute(select(func.count()).select_from(base.subquery()))
+            ).scalar_one()
         )
         offset = (page - 1) * page_size
-        stmt = (
-            base.order_by(StockEventModel.occurred_at.desc())
-            .limit(page_size)
-            .offset(offset)
-        )
+        stmt = base.order_by(StockEventModel.occurred_at.desc()).limit(page_size).offset(offset)
         result = await self._session.execute(stmt)
         items = [_to_entity(row) for row in result.scalars().all()]
         return StockEventPage(items=items, total=total, page=page, page_size=page_size)

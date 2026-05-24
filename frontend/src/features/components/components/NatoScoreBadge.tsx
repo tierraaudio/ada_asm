@@ -1,9 +1,10 @@
 import { Shield } from "lucide-react";
 import type { HTMLAttributes } from "react";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils/cn";
 
-import { NATO_SCORE_LABELS } from "../rubrics";
+import { NATO_SCORE_LABELS, NATO_SCORE_RUBRIC } from "../rubrics";
 import type { NatoScoreValue } from "../types";
 
 /**
@@ -27,26 +28,42 @@ const NATO_CLASSES: Record<NatoScoreValue, string> = {
 export interface NatoScoreBadgeProps extends HTMLAttributes<HTMLSpanElement> {
   value: NatoScoreValue;
   showIcon?: boolean;
+  /** When true (default), wraps in a Tooltip showing the rubric on hover. */
+  withTooltip?: boolean;
 }
 
 export function NatoScoreBadge({
   value,
   showIcon = true,
+  withTooltip = true,
   className,
   ...props
 }: NatoScoreBadgeProps) {
-  return (
+  const badge = (
     <span
       aria-label={`Scoring OTAN ${NATO_SCORE_LABELS[value]}`}
       className={cn(
         "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold",
+        withTooltip && "cursor-help",
         NATO_CLASSES[value],
         className,
       )}
+      // Passive info trigger — focus also opens the tooltip for keyboard users.
+      // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={withTooltip ? 0 : undefined}
       {...props}
     >
       {showIcon && <Shield className="size-3" aria-hidden />}
       {NATO_SCORE_LABELS[value]}
     </span>
+  );
+
+  if (!withTooltip) return badge;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{badge}</TooltipTrigger>
+      <TooltipContent>{NATO_SCORE_RUBRIC[value]}</TooltipContent>
+    </Tooltip>
   );
 }
