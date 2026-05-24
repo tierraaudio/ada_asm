@@ -28,23 +28,24 @@ def _to_entity(row: ComponentModel) -> Component:
         description=row.description,
         datasheet_url=row.datasheet_url,
         location=row.location,
-        supplier=row.supplier,
-        price_per_100=row.price_per_100,
+        fabricante=row.fabricante,
+        tipo_almacenamiento=row.tipo_almacenamiento,
+        holded_id=row.holded_id,
+        fecha_creacion=row.fecha_creacion,
+        verificado=row.verificado,
+        notas=row.notas,
         stock=row.stock,
+        stock_min=row.stock_min,
         tier=cast(TierValue, row.tier),
         nato_score=cast(NatoScoreValue, row.nato_score),
         country_of_origin=row.country_of_origin,
+        proveedor_preferente_id=row.proveedor_preferente_id,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
 
 
 def _is_mpn_unique_violation(exc: IntegrityError) -> bool:
-    """The unique index is `uq_components_mpn_lower` (functional, see migration).
-
-    Postgres surfaces it in the orig message; we also accept the table-level
-    constraint name as a fallback.
-    """
     msg = str(exc.orig).lower()
     return "uq_components_mpn_lower" in msg or "components_mpn" in msg
 
@@ -62,14 +63,16 @@ class SqlAlchemyComponentRepository:
     ) -> ComponentPage:
         stmt = select(ComponentModel)
 
-        if filters.family is not None:
-            stmt = stmt.where(ComponentModel.family == filters.family)
-        if filters.supplier is not None:
-            stmt = stmt.where(ComponentModel.supplier == filters.supplier)
-        if filters.tier is not None:
-            stmt = stmt.where(ComponentModel.tier == filters.tier)
-        if filters.nato_score is not None:
-            stmt = stmt.where(ComponentModel.nato_score == filters.nato_score)
+        if filters.families:
+            stmt = stmt.where(ComponentModel.family.in_(filters.families))
+        if filters.supplier_ids:
+            stmt = stmt.where(ComponentModel.proveedor_preferente_id.in_(filters.supplier_ids))
+        if filters.tiers:
+            stmt = stmt.where(ComponentModel.tier.in_(filters.tiers))
+        if filters.nato_scores:
+            stmt = stmt.where(ComponentModel.nato_score.in_(filters.nato_scores))
+        if filters.locations:
+            stmt = stmt.where(ComponentModel.location.in_(filters.locations))
         if filters.q is not None and filters.q.strip():
             needle = f"%{filters.q.strip().lower()}%"
             stmt = stmt.where(
@@ -81,7 +84,6 @@ class SqlAlchemyComponentRepository:
                 )
             )
 
-        # Count BEFORE applying limit/offset.
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = int((await self._session.execute(count_stmt)).scalar_one())
 
@@ -98,8 +100,7 @@ class SqlAlchemyComponentRepository:
 
     async def get_by_mpn(self, mpn: str) -> Component | None:
         stmt = select(ComponentModel).where(func.lower(ComponentModel.mpn) == mpn.lower())
-        result = await self._session.execute(stmt)
-        row = result.scalar_one_or_none()
+        row = (await self._session.execute(stmt)).scalar_one_or_none()
         return _to_entity(row) if row else None
 
     async def save(self, component: Component) -> Component:
@@ -112,12 +113,18 @@ class SqlAlchemyComponentRepository:
             description=component.description,
             datasheet_url=component.datasheet_url,
             location=component.location,
-            supplier=component.supplier,
-            price_per_100=component.price_per_100,
+            fabricante=component.fabricante,
+            tipo_almacenamiento=component.tipo_almacenamiento,
+            holded_id=component.holded_id,
+            fecha_creacion=component.fecha_creacion,
+            verificado=component.verificado,
+            notas=component.notas,
             stock=component.stock,
+            stock_min=component.stock_min,
             tier=component.tier,
             nato_score=component.nato_score,
             country_of_origin=component.country_of_origin,
+            proveedor_preferente_id=component.proveedor_preferente_id,
         )
         self._session.add(row)
         try:
@@ -136,19 +143,25 @@ class SqlAlchemyComponentRepository:
         row = await self._session.get(ComponentModel, component.id)
         if row is None:
             return component
-        # mpn is intentionally NOT copied — it is immutable in this US.
+        # `mpn` is intentionally NOT copied — it is immutable in this US.
         row.sku = component.sku
         row.name = component.name
         row.family = component.family
         row.description = component.description
         row.datasheet_url = component.datasheet_url
         row.location = component.location
-        row.supplier = component.supplier
-        row.price_per_100 = component.price_per_100
+        row.fabricante = component.fabricante
+        row.tipo_almacenamiento = component.tipo_almacenamiento
+        row.holded_id = component.holded_id
+        row.fecha_creacion = component.fecha_creacion
+        row.verificado = component.verificado
+        row.notas = component.notas
         row.stock = component.stock
+        row.stock_min = component.stock_min
         row.tier = component.tier
         row.nato_score = component.nato_score
         row.country_of_origin = component.country_of_origin
+        row.proveedor_preferente_id = component.proveedor_preferente_id
         await self._session.flush()
         await self._session.refresh(row)
         return _to_entity(row)

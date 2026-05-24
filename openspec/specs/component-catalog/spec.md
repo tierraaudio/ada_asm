@@ -166,4 +166,3 @@ The system SHALL provide a one-shot command `python -m app.scripts.seed_componen
 - **WHEN** components and purchases already exist and the operator runs `python -m app.scripts.seed_components --reset`
 - **THEN** existing rows are truncated and the sample set is re-inserted
 - **AND** the command exits with code 0
-

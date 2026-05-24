@@ -58,12 +58,7 @@ export function ConfirmDeleteDialog({
           >
             {cancelLabel}
           </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={handleConfirm}
-            disabled={submitting}
-          >
+          <Button type="button" variant="destructive" onClick={handleConfirm} disabled={submitting}>
             {confirmLabel}
           </Button>
         </DialogFooter>

@@ -16,7 +16,7 @@ export const DialogOverlay = forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out",
+      "data-[state=open]:animate-in data-[state=closed]:animate-out fixed inset-0 z-50 bg-black/50",
       className,
     )}
     {...props}
@@ -55,9 +55,7 @@ export function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLD
 }
 
 export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div className={cn("flex flex-row justify-end gap-2", className)} {...props} />
-  );
+  return <div className={cn("flex flex-row justify-end gap-2", className)} {...props} />;
 }
 
 export const DialogTitle = forwardRef<

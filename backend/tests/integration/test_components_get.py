@@ -36,9 +36,7 @@ async def test_get_requires_authentication(
 async def test_get_returns_404_when_missing(
     api_client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
-    response = await api_client.get(
-        f"/api/v1/components/{uuid4()}", headers=auth_headers
-    )
+    response = await api_client.get(f"/api/v1/components/{uuid4()}", headers=auth_headers)
     assert response.status_code == 404
     assert response.json()["code"] == "COMPONENT_NOT_FOUND"
 
@@ -46,7 +44,5 @@ async def test_get_returns_404_when_missing(
 async def test_get_with_garbage_id_returns_422(
     api_client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
-    response = await api_client.get(
-        "/api/v1/components/not-a-uuid", headers=auth_headers
-    )
+    response = await api_client.get("/api/v1/components/not-a-uuid", headers=auth_headers)
     assert response.status_code == 422

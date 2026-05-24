@@ -11,13 +11,20 @@ from app.domain.entities.component import Component, NatoScoreValue, TierValue
 
 @dataclass
 class ComponentFilters:
-    """Query filters for `list`. All optional; combine with AND, search with OR."""
+    """Query filters for `list`. All optional; combined with AND.
+
+    `q` matches case-insensitively against mpn / sku / name / family.
+    `families`, `suppliers`, `tiers`, `nato_scores` are multi-value: an entry
+    matches when its column is one of the provided values. `supplier` here
+    refers to the preferred supplier id (`proveedor_preferente_id`).
+    """
 
     q: str | None = None
-    family: str | None = None
-    supplier: str | None = None
-    tier: TierValue | None = None
-    nato_score: NatoScoreValue | None = None
+    families: list[str] | None = None
+    supplier_ids: list[UUID] | None = None
+    tiers: list[TierValue] | None = None
+    nato_scores: list[NatoScoreValue] | None = None
+    locations: list[str] | None = None
 
 
 @dataclass

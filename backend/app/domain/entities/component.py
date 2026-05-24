@@ -1,27 +1,19 @@
 """Component domain entity — the leaf of the asset tree.
 
-The `mpn` (manufacturer part number) is the business key. Persistence enforces
-case-insensitive uniqueness on it. `tier` and `nato_score` are constrained to
-their allowed enum values at the storage and API layers.
+`mpn` is the natural business key (case-insensitive unique). `tier` maps to
+the criticality rubric (1=critical chips/MCUs, 4=commodity plastics/PCBs).
+`nato_score` is the geopolitical-origin rubric (A+..F per the design).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
-from decimal import Decimal
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
-TierValue = Literal["A+", "A", "B", "C", "D"]
-NatoScoreValue = Literal[
-    "100_otan",
-    "otan",
-    "allied_otan",
-    "neutral",
-    "high_risk",
-    "no_otan",
-]
+TierValue = Literal[1, 2, 3, 4]
+NatoScoreValue = Literal["A+", "A", "B", "C", "D", "F"]
 
 
 @dataclass
@@ -34,11 +26,21 @@ class Component:
     description: str | None = None
     datasheet_url: str | None = None
     location: str | None = None
-    supplier: str | None = None
-    price_per_100: Decimal | None = None
+    fabricante: str | None = None
+    tipo_almacenamiento: str | None = None
+    holded_id: str | None = None
+    fecha_creacion: date | None = None
+    verificado: bool = False
+    notas: str | None = None
     stock: int = 0
-    tier: TierValue = "C"
-    nato_score: NatoScoreValue = "neutral"
+    stock_min: int | None = None
+    tier: TierValue = 3
+    nato_score: NatoScoreValue = "C"
     country_of_origin: str | None = None
+    proveedor_preferente_id: UUID | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+
+    def effective_stock_min(self) -> int:
+        """Default threshold is `tier * 5` when not explicitly set."""
+        return self.stock_min if self.stock_min is not None else self.tier * 5

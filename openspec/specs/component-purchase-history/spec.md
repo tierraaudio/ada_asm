@@ -74,4 +74,3 @@ The frontend SHALL provide a page at `/components/{id}/purchases` (pixel-faithfu
 - **WHEN** the page loads a component with purchases
 - **THEN** the rendered `LineChart` has one data point per purchase, with `x` = `purchased_at` and `y` = `unit_cost`
 - **AND** hovering a point renders the tooltip with the date, quantity, supplier, unit cost and total cost of that row
-

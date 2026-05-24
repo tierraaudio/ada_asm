@@ -9,15 +9,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-TierLiteral = Literal["A+", "A", "B", "C", "D"]
-NatoScoreLiteral = Literal[
-    "100_otan",
-    "otan",
-    "allied_otan",
-    "neutral",
-    "high_risk",
-    "no_otan",
-]
+TierLiteral = Literal[1, 2, 3, 4]
+NatoScoreLiteral = Literal["A+", "A", "B", "C", "D", "F"]
 
 # Common types
 NonNegativeInt = Annotated[int, Field(ge=0)]
@@ -36,12 +29,18 @@ class ComponentResponse(BaseModel):
     description: str | None = None
     datasheet_url: str | None = None
     location: str | None = None
-    supplier: str | None = None
-    price_per_100: Decimal | None = None
+    fabricante: str | None = None
+    tipo_almacenamiento: str | None = None
+    holded_id: str | None = None
+    fecha_creacion: date | None = None
+    verificado: bool = False
+    notas: str | None = None
     stock: int
+    stock_min: int | None = None
     tier: TierLiteral
     nato_score: NatoScoreLiteral
     country_of_origin: CountryCode | None = None
+    proveedor_preferente_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -56,10 +55,16 @@ class ComponentCreateRequest(BaseModel):
     description: str | None = None
     datasheet_url: str | None = None
     location: Annotated[str | None, Field(default=None, max_length=100)] = None
-    supplier: Annotated[str | None, Field(default=None, max_length=100)] = None
-    price_per_100: NonNegativeDecimal | None = None
+    fabricante: Annotated[str | None, Field(default=None, max_length=120)] = None
+    tipo_almacenamiento: Annotated[str | None, Field(default=None, max_length=80)] = None
+    holded_id: Annotated[str | None, Field(default=None, max_length=80)] = None
+    fecha_creacion: date | None = None
+    verificado: bool = False
+    notas: str | None = None
     stock: NonNegativeInt = 0
+    stock_min: NonNegativeInt | None = None
     country_of_origin: CountryCode | None = None
+    proveedor_preferente_id: UUID | None = None
 
 
 class ComponentUpdateRequest(BaseModel):
@@ -73,12 +78,18 @@ class ComponentUpdateRequest(BaseModel):
     description: str | None = None
     datasheet_url: str | None = None
     location: Annotated[str | None, Field(default=None, max_length=100)] = None
-    supplier: Annotated[str | None, Field(default=None, max_length=100)] = None
-    price_per_100: NonNegativeDecimal | None = None
+    fabricante: Annotated[str | None, Field(default=None, max_length=120)] = None
+    tipo_almacenamiento: Annotated[str | None, Field(default=None, max_length=80)] = None
+    holded_id: Annotated[str | None, Field(default=None, max_length=80)] = None
+    fecha_creacion: date | None = None
+    verificado: bool | None = None
+    notas: str | None = None
     stock: NonNegativeInt | None = None
+    stock_min: NonNegativeInt | None = None
     tier: TierLiteral | None = None
     nato_score: NatoScoreLiteral | None = None
     country_of_origin: CountryCode | None = None
+    proveedor_preferente_id: UUID | None = None
 
 
 class PaginatedComponents(BaseModel):
@@ -88,26 +99,8 @@ class PaginatedComponents(BaseModel):
     page_size: int
 
 
-class ComponentPurchaseResponse(BaseModel):
+class SupplierResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    component_id: UUID
-    purchased_at: date
-    quantity: int
-    supplier: str
-    unit_cost: Decimal
-    total_cost: Decimal
-    currency: str
-    created_at: datetime
-
-
-class PaginatedComponentPurchases(BaseModel):
-    items: list[ComponentPurchaseResponse]
-    total: int
-    page: int
-    page_size: int
-
-
-class ComponentSyncResponse(BaseModel):
-    status: Literal["queued"] = "queued"
+    name: str

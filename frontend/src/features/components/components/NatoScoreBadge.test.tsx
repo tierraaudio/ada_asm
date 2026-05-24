@@ -6,11 +6,8 @@ import { NATO_SCORE_VALUES } from "../types";
 import { NatoScoreBadge } from "./NatoScoreBadge";
 
 describe("<NatoScoreBadge>", () => {
-  it.each(NATO_SCORE_VALUES)(
-    "renders the Spanish label for value %s",
-    (value) => {
-      render(<NatoScoreBadge value={value} />);
-      expect(screen.getByText(NATO_SCORE_LABELS[value])).toBeInTheDocument();
-    },
-  );
+  it.each(NATO_SCORE_VALUES)("renders the letter '%s' as label", (value) => {
+    render(<NatoScoreBadge value={value} />);
+    expect(screen.getByText(NATO_SCORE_LABELS[value])).toBeInTheDocument();
+  });
 });

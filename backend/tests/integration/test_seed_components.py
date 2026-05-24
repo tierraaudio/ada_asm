@@ -5,77 +5,52 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import func, select
 
-from app.application.services.components_service import ComponentsService
-from app.domain.repositories.component_repository import ComponentFilters
 from app.infrastructure.db.models.component import ComponentModel
-from app.infrastructure.db.models.component_purchase import ComponentPurchaseModel
+from app.infrastructure.db.models.stock_event import StockEventModel
+from app.infrastructure.db.models.supplier import SupplierModel
+from app.infrastructure.db.models.supplier_price import SupplierPriceModel
+from app.infrastructure.db.models.supplier_stock import SupplierStockModel
 from app.infrastructure.db.session import get_session_factory
-from app.infrastructure.repositories.component_purchase_repository import (
-    SqlAlchemyComponentPurchaseRepository,
-)
-from app.infrastructure.repositories.component_repository import (
-    SqlAlchemyComponentRepository,
-)
 from app.scripts import seed_components as seed_module
 
 pytestmark = pytest.mark.integration
 
 
-async def _count_components() -> int:
+async def _count(table: type) -> int:
     factory = get_session_factory()
     async with factory() as session:
-        return int((await session.execute(select(func.count(ComponentModel.id)))).scalar_one())
+        return int((await session.execute(select(func.count(table.id)))).scalar_one())
 
 
-async def _count_purchases() -> int:
-    factory = get_session_factory()
-    async with factory() as session:
-        return int(
-            (await session.execute(select(func.count(ComponentPurchaseModel.id)))).scalar_one()
-        )
-
-
-async def test_seed_inserts_expected_number_of_components_and_purchases() -> None:
+async def test_seed_inserts_components_suppliers_prices_stock_events() -> None:
     exit_code = await seed_module._seed(reset=False)
     assert exit_code == 0
-    assert await _count_components() == len(seed_module.SAMPLE_COMPONENTS)
-    # Each component gets 3-6 purchases.
-    purchase_count = await _count_purchases()
-    assert purchase_count >= 3 * len(seed_module.SAMPLE_COMPONENTS)
-    assert purchase_count <= 6 * len(seed_module.SAMPLE_COMPONENTS)
+
+    expected_components = len(seed_module.SAMPLE_COMPONENTS)
+    expected_suppliers = len(seed_module.SUPPLIER_NAMES)
+
+    assert await _count(ComponentModel) == expected_components
+    assert await _count(SupplierModel) == expected_suppliers
+    # Each component gets 1 row per (supplier x qty_tier in {1,10,100,1000}).
+    assert await _count(SupplierPriceModel) == expected_components * expected_suppliers * 4
+    # One row per (component x supplier) snapshot.
+    assert await _count(SupplierStockModel) == expected_components * expected_suppliers
+    # Each component gets 3-5 stock events.
+    events = await _count(StockEventModel)
+    assert events >= 3 * expected_components
+    assert events <= 5 * expected_components
 
 
 async def test_seed_refuses_to_reseed_when_components_exist() -> None:
-    # First run succeeds.
     assert await seed_module._seed(reset=False) == 0
-    # Second run without --reset is refused.
     assert await seed_module._seed(reset=False) == 2
-    # No duplication occurred.
-    assert await _count_components() == len(seed_module.SAMPLE_COMPONENTS)
+    assert await _count(ComponentModel) == len(seed_module.SAMPLE_COMPONENTS)
 
 
 async def test_seed_with_reset_truncates_and_reseeds() -> None:
     assert await seed_module._seed(reset=False) == 0
-    first_count = await _count_purchases()
-    # Reset flag should truncate then succeed regardless of existing data.
+    first_events = await _count(StockEventModel)
     assert await seed_module._seed(reset=True) == 0
-    assert await _count_components() == len(seed_module.SAMPLE_COMPONENTS)
-    # Deterministic seed (`random.seed(42)`) means the new purchase count
-    # matches the previous run exactly.
-    assert await _count_purchases() == first_count
-
-
-async def test_seeded_components_are_filterable_through_service() -> None:
-    assert await seed_module._seed(reset=False) == 0
-    factory = get_session_factory()
-    async with factory() as session:
-        service = ComponentsService(
-            components=SqlAlchemyComponentRepository(session),
-            purchases=SqlAlchemyComponentPurchaseRepository(session),
-        )
-        result = await service.list(
-            filters=ComponentFilters(family="Sensores"), page=1, page_size=50
-        )
-        families = {c.family for c in result.items}
-        assert families == {"Sensores"}
-        assert result.total >= 1
+    assert await _count(ComponentModel) == len(seed_module.SAMPLE_COMPONENTS)
+    # Deterministic seed → same event count after reset.
+    assert await _count(StockEventModel) == first_events

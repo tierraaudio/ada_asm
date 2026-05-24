@@ -11,129 +11,97 @@ import { ComponentsListPage } from "./ComponentsListPage";
 const API = "http://localhost:8000";
 
 const SAMPLE_ROW = {
-  id: "00000000-0000-0000-0000-000000000abc",
-  mpn: "ACS712",
-  sku: "ACS712-30A",
-  name: "Sensor corriente Hall",
-  family: "Sensores",
+  id: "comp-1",
+  mpn: "STM32F407VGT6",
+  sku: "MCU-001",
+  name: "STM32F407VGT6 - ARM Cortex-M4 MCU",
+  family: "Microcontroladores",
   description: null,
   datasheet_url: null,
-  location: "A-12-3",
-  supplier: "DigiKey",
-  price_per_100: "8.4500",
+  location: "G-A-12",
+  fabricante: "STMicroelectronics",
+  tipo_almacenamiento: "Gaveta",
+  holded_id: null,
+  fecha_creacion: null,
+  verificado: true,
+  notas: null,
   stock: 145,
-  tier: "B" as const,
-  nato_score: "otan" as const,
-  country_of_origin: "US",
-  created_at: "2026-05-01T00:00:00Z",
-  updated_at: "2026-05-01T00:00:00Z",
+  stock_min: 5,
+  tier: 1 as const,
+  nato_score: "A+" as const,
+  country_of_origin: "FR",
+  proveedor_preferente_id: "sup-1",
+  created_at: "2026-05-24T00:00:00Z",
+  updated_at: "2026-05-24T00:00:00Z",
 };
 
+function stubEndpoints(rows = [SAMPLE_ROW]) {
+  server.use(
+    http.get(`${API}/api/v1/components`, () =>
+      HttpResponse.json({
+        items: rows,
+        total: rows.length,
+        page: 1,
+        page_size: 25,
+      }),
+    ),
+    http.get(`${API}/api/v1/suppliers`, () =>
+      HttpResponse.json([{ id: "sup-1", name: "DigiKey" }]),
+    ),
+  );
+}
+
 describe("<ComponentsListPage>", () => {
-  it("renders rows returned by the API", async () => {
+  it("renders the row with SKU + MPN + family icon + NATO badge + stock", async () => {
     loginInStore();
-    server.use(
-      http.get(`${API}/api/v1/components`, () =>
-        HttpResponse.json({
-          items: [SAMPLE_ROW],
-          total: 1,
-          page: 1,
-          page_size: 25,
-        }),
-      ),
-    );
+    stubEndpoints();
 
     renderWithProviders(<ComponentsListPage />, { route: "/components" });
 
-    expect(
-      await screen.findByText("Sensor corriente Hall"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("ACS712")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Tier B/)).toBeInTheDocument();
+    expect(await screen.findByText("MCU-001")).toBeInTheDocument();
+    expect(screen.getByText("STM32F407VGT6")).toBeInTheDocument();
+    expect(screen.getByText("STM32F407VGT6 - ARM Cortex-M4 MCU")).toBeInTheDocument();
+    expect(screen.getByText("Microcontroladores")).toBeInTheDocument();
+    expect(screen.getByText("G-A-12")).toBeInTheDocument();
+    expect(screen.getByText("DigiKey")).toBeInTheDocument();
+    expect(screen.getByText("145 uds")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Scoring OTAN A\+/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Ver componente/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Eliminar componente/i })).toBeInTheDocument();
   });
 
   it("shows the empty state when total is 0", async () => {
     loginInStore();
-    server.use(
-      http.get(`${API}/api/v1/components`, () =>
-        HttpResponse.json({ items: [], total: 0, page: 1, page_size: 25 }),
-      ),
-    );
-
+    stubEndpoints([]);
     renderWithProviders(<ComponentsListPage />, { route: "/components" });
-
-    expect(
-      await screen.findByText("Aún no hay componentes"),
-    ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /crea el primero/i })).toBeInTheDocument();
+    expect(await screen.findByText("Aún no hay componentes")).toBeInTheDocument();
   });
 
   it("debounces the search input and forwards q to the API", async () => {
     loginInStore();
-    let capturedQ: string | null | undefined;
+    let lastQ: string | null = null;
     server.use(
       http.get(`${API}/api/v1/components`, ({ request }) => {
-        capturedQ = new URL(request.url).searchParams.get("q");
+        lastQ = new URL(request.url).searchParams.get("q");
         return HttpResponse.json({ items: [], total: 0, page: 1, page_size: 25 });
       }),
+      http.get(`${API}/api/v1/suppliers`, () => HttpResponse.json([])),
     );
 
     renderWithProviders(<ComponentsListPage />, { route: "/components" });
     await screen.findByText("Aún no hay componentes");
 
-    await userEvent.type(
-      screen.getByLabelText(/buscar componentes/i),
-      "esp32",
-    );
-    await waitFor(() => expect(capturedQ).toBe("esp32"), { timeout: 1500 });
+    await userEvent.type(screen.getByLabelText(/Buscar componentes/i), "esp32");
+    await waitFor(() => expect(lastQ).toBe("esp32"), { timeout: 1500 });
   });
 
-  it("forwards the selected filter dropdown choice to the API as a query param", async () => {
+  it("opens the delete confirmation dialog when the trash button is clicked", async () => {
     loginInStore();
-    const capturedParams: URLSearchParams[] = [];
-    server.use(
-      http.get(`${API}/api/v1/components`, ({ request }) => {
-        capturedParams.push(new URL(request.url).searchParams);
-        return HttpResponse.json({ items: [], total: 0, page: 1, page_size: 25 });
-      }),
-    );
-
-    renderWithProviders(<ComponentsListPage />, { route: "/components" });
-    await screen.findByText("Aún no hay componentes");
-
-    await userEvent.click(screen.getByRole("button", { name: /Familia:/ }));
-    await userEvent.click(screen.getByText("Sensores"));
-
-    await waitFor(() =>
-      expect(
-        capturedParams.some((p) => p.get("family") === "Sensores"),
-      ).toBe(true),
-    );
-  });
-
-  it("opens the confirm dialog when the row 'Eliminar' action is selected", async () => {
-    loginInStore();
-    server.use(
-      http.get(`${API}/api/v1/components`, () =>
-        HttpResponse.json({
-          items: [SAMPLE_ROW],
-          total: 1,
-          page: 1,
-          page_size: 25,
-        }),
-      ),
-    );
-
+    stubEndpoints();
     renderWithProviders(<ComponentsListPage />, { route: "/components" });
 
-    await screen.findByText("Sensor corriente Hall");
-    await userEvent.click(
-      screen.getByRole("button", { name: /acciones del componente/i }),
-    );
-    await userEvent.click(screen.getByText("Eliminar"));
-
-    expect(
-      await screen.findByText("¿Eliminar componente?"),
-    ).toBeInTheDocument();
+    await screen.findByText("MCU-001");
+    await userEvent.click(screen.getByRole("button", { name: /Eliminar componente/i }));
+    expect(await screen.findByText("¿Eliminar componente?")).toBeInTheDocument();
   });
 });

@@ -132,4 +132,3 @@ The frontend SHALL provide a typed API module `src/features/components/api/compo
 
 - **WHEN** `useSyncComponent` mutation completes successfully for `id = X`
 - **THEN** the QueryClient invalidates `["components", "purchases", X]` so the next render fetches fresh data
-

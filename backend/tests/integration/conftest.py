@@ -1,27 +1,26 @@
 """Integration-test fixtures.
 
-Provides ``seeded_user`` and ``seeded_admin`` factory fixtures backed by the
-running PostgreSQL container.
+Provides ``seeded_user`` / ``seeded_admin`` / ``seeded_inactive`` users plus
+``auth_headers`` (bearer for the default user) and a small catalogue of
+seeded components for the list-page tests.
 """
 
 from __future__ import annotations
 
-from datetime import date, timedelta
-from decimal import Decimal
 from typing import Literal
 
 import pytest
 from httpx import AsyncClient
 
-from app.domain.entities.component import Component
-from app.domain.entities.component_purchase import ComponentPurchase
+from app.domain.entities.component import Component, NatoScoreValue, TierValue
+from app.domain.entities.supplier import Supplier
 from app.domain.entities.user import User
 from app.infrastructure.db.session import get_session_factory
-from app.infrastructure.repositories.component_purchase_repository import (
-    SqlAlchemyComponentPurchaseRepository,
-)
 from app.infrastructure.repositories.component_repository import (
     SqlAlchemyComponentRepository,
+)
+from app.infrastructure.repositories.supplier_repository import (
+    SqlAlchemySupplierRepository,
 )
 from app.infrastructure.repositories.user_repository import SqlAlchemyUserRepository
 from app.infrastructure.security import hash_password
@@ -94,40 +93,44 @@ async def auth_headers(api_client: AsyncClient, seeded_user: User) -> dict[str, 
 
 def _make_component(
     *,
-    mpn: str = "ACS712",
-    sku: str | None = "ACS712-30A",
-    name: str = "Sensor Hall",
-    family: str = "Sensores",
-    tier: str = "B",
-    nato_score: str = "otan",
-    supplier: str | None = "DigiKey",
-    location: str | None = "A-1",
-    description: str | None = "Sensor de corriente Hall",
-    price_per_100: Decimal | None = Decimal("8.4500"),
-    stock: int = 10,
-    country_of_origin: str | None = "US",
+    mpn: str = "STM32F407VGT6",
+    sku: str | None = "MCU-001",
+    name: str = "STM32F407VGT6 - ARM Cortex-M4 MCU",
+    family: str = "Microcontroladores",
+    tier: TierValue = 1,
+    nato_score: NatoScoreValue = "A+",
+    location: str | None = "G-A-12",
+    fabricante: str | None = "STMicroelectronics",
+    tipo_almacenamiento: str | None = "Gaveta",
+    description: str | None = "MCU 32-bit",
+    stock: int = 145,
+    stock_min: int | None = 5,
+    country_of_origin: str | None = "FR",
     datasheet_url: str | None = None,
+    proveedor_preferente_id: object | None = None,
 ) -> Component:
     return Component(
         mpn=mpn,
         sku=sku,
         name=name,
         family=family,
-        tier=tier,  # type: ignore[arg-type]
-        nato_score=nato_score,  # type: ignore[arg-type]
-        supplier=supplier,
+        tier=tier,
+        nato_score=nato_score,
         location=location,
+        fabricante=fabricante,
+        tipo_almacenamiento=tipo_almacenamiento,
         description=description,
         datasheet_url=datasheet_url,
-        price_per_100=price_per_100,
         stock=stock,
+        stock_min=stock_min,
         country_of_origin=country_of_origin,
+        proveedor_preferente_id=proveedor_preferente_id,  # type: ignore[arg-type]
     )
 
 
 @pytest.fixture
 async def seeded_component() -> Component:
-    """Persist a single Component and return its hydrated form."""
+    """Persist a single Component (no FK to suppliers — keeps the test scope tight)."""
     factory = get_session_factory()
     async with factory() as session:
         repo = SqlAlchemyComponentRepository(session)
@@ -137,53 +140,67 @@ async def seeded_component() -> Component:
 
 
 @pytest.fixture
-async def seeded_components_catalogue() -> list[Component]:
-    """Persist a small, deterministic catalogue used by list / filter tests."""
+async def seeded_suppliers() -> dict[str, Supplier]:
+    factory = get_session_factory()
+    async with factory() as session:
+        repo = SqlAlchemySupplierRepository(session)
+        suppliers = {}
+        for name in ("DigiKey", "Mouser", "Farnell", "RS", "TME"):
+            suppliers[name] = await repo.save(Supplier(name=name))
+        await session.commit()
+        return suppliers
+
+
+@pytest.fixture
+async def seeded_components_catalogue(
+    seeded_suppliers: dict[str, Supplier],
+) -> list[Component]:
+    """A deterministic 5-component catalogue used by list / filter tests."""
     samples = [
         _make_component(
-            mpn="ACS712",
-            sku="ACS712-30A",
-            name="Sensor corriente Hall",
-            family="Sensores",
-            supplier="DigiKey",
-            tier="B",
-            nato_score="otan",
+            mpn="STM32F407VGT6",
+            sku="MCU-001",
+            name="STM32F407VGT6 - ARM Cortex-M4 MCU",
+            family="Microcontroladores",
+            tier=1,
+            nato_score="A+",
+            proveedor_preferente_id=seeded_suppliers["DigiKey"].id,
         ),
         _make_component(
             mpn="BME280",
-            sku="BME280-ENV",
-            name="Sensor ambiental T/H/P",
+            sku="SEN-008",
+            name="BME280 - Sensor ambiental digital",
             family="Sensores",
-            supplier="DigiKey",
-            tier="B",
-            nato_score="allied_otan",
+            tier=2,
+            nato_score="A",
+            proveedor_preferente_id=seeded_suppliers["Mouser"].id,
         ),
         _make_component(
-            mpn="ESP32-WROOM-32E",
-            sku="ESP32-E",
-            name="Modulo WiFi + Bluetooth",
-            family="Microcontroladores",
-            supplier="Mouser",
-            tier="A",
-            nato_score="high_risk",
+            mpn="ESP32-WROOM-32",
+            sku="MOD-053",
+            name="ESP32-WROOM-32 - Módulo WiFi+BT",
+            family="Módulos",
+            tier=1,
+            nato_score="D",
+            proveedor_preferente_id=seeded_suppliers["TME"].id,
         ),
         _make_component(
-            mpn="STM32F407VGT6",
-            sku="STM32F407",
-            name="MCU ARM Cortex-M4",
-            family="Microcontroladores",
-            supplier="DigiKey",
-            tier="A+",
-            nato_score="allied_otan",
+            mpn="RC0805FR-0710K",
+            sku="RES-112",
+            name="Resistencia 10 kΩ 0805 1%",
+            family="Resistencias",
+            tier=3,
+            nato_score="A+",
+            proveedor_preferente_id=seeded_suppliers["TME"].id,
         ),
         _make_component(
             mpn="NE555",
-            sku="NE555-DIP",
-            name="Timer NE555",
-            family="Discretos",
-            supplier="Farnell",
-            tier="D",
-            nato_score="100_otan",
+            sku="IC-125",
+            name="NE555 - Timer SOIC-8",
+            family="Microcontroladores",
+            tier=1,
+            nato_score="A+",
+            proveedor_preferente_id=seeded_suppliers["TME"].id,
         ),
     ]
     factory = get_session_factory()
@@ -194,31 +211,3 @@ async def seeded_components_catalogue() -> list[Component]:
             saved.append(await repo.save(sample))
         await session.commit()
     return saved
-
-
-@pytest.fixture
-async def seeded_component_with_purchases() -> Component:
-    """Component plus three purchases on distinct dates (newest = today)."""
-    factory = get_session_factory()
-    today = date.today()
-    async with factory() as session:
-        component_repo = SqlAlchemyComponentRepository(session)
-        purchase_repo = SqlAlchemyComponentPurchaseRepository(session)
-        component = await component_repo.save(_make_component(mpn="BME280"))
-        for days_ago, qty, unit in (
-            (5, 100, Decimal("0.0480")),
-            (30, 250, Decimal("0.0475")),
-            (180, 500, Decimal("0.0490")),
-        ):
-            await purchase_repo.save(
-                ComponentPurchase(
-                    component_id=component.id,
-                    purchased_at=today - timedelta(days=days_ago),
-                    quantity=qty,
-                    supplier="DigiKey",
-                    unit_cost=unit,
-                    total_cost=(unit * Decimal(qty)).quantize(Decimal("0.0001")),
-                )
-            )
-        await session.commit()
-        return component

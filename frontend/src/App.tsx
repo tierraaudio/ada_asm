@@ -5,10 +5,6 @@ import { RequireAuth } from "@/features/auth/components/RequireAuth";
 import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
-import { ComponentDetailPage } from "@/features/components/pages/ComponentDetailPage";
-import { ComponentEditPage } from "@/features/components/pages/ComponentEditPage";
-import { ComponentNatoScoringPage } from "@/features/components/pages/ComponentNatoScoringPage";
-import { ComponentPurchaseHistoryPage } from "@/features/components/pages/ComponentPurchaseHistoryPage";
 import { ComponentsListPage } from "@/features/components/pages/ComponentsListPage";
 
 const PlaceholderPage = ({ label = "ADA ASM placeholder" }: { label?: string }) => (
@@ -40,11 +36,16 @@ export const App = () => {
         />
         <Route path="/modules" element={<DashboardPlaceholder label="Módulos · próximamente" />} />
         <Route path="/components" element={<ComponentsListPage />} />
-        <Route path="/components/new" element={<ComponentEditPage mode="create" />} />
-        <Route path="/components/:id" element={<ComponentDetailPage />} />
-        <Route path="/components/:id/purchases" element={<ComponentPurchaseHistoryPage />} />
-        <Route path="/components/:id/nato" element={<ComponentNatoScoringPage />} />
-        <Route path="/components/:id/edit" element={<ComponentEditPage mode="edit" />} />
+        {/* Detail / create / edit / purchases / NATO modal land in the next
+            iteration — placeholders keep the routes addressable. */}
+        <Route
+          path="/components/new"
+          element={<DashboardPlaceholder label="Nuevo componente · próximamente" />}
+        />
+        <Route
+          path="/components/:id"
+          element={<DashboardPlaceholder label="Detalle componente · próximamente" />}
+        />
         <Route
           path="/notifications"
           element={<DashboardPlaceholder label="Notificaciones · próximamente" />}

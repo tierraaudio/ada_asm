@@ -31,9 +31,7 @@ async def test_delete_returns_204_and_removes_the_component(
 async def test_delete_is_idempotent_on_missing_id(
     api_client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
-    response = await api_client.delete(
-        f"/api/v1/components/{uuid4()}", headers=auth_headers
-    )
+    response = await api_client.delete(f"/api/v1/components/{uuid4()}", headers=auth_headers)
     assert response.status_code == 204
 
 

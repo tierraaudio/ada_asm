@@ -2,22 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Any, cast
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_db_session, require_user
 from app.api.v1.schemas.components import (
     ComponentCreateRequest,
-    ComponentPurchaseResponse,
     ComponentResponse,
-    ComponentSyncResponse,
     ComponentUpdateRequest,
-    NatoScoreLiteral,
-    PaginatedComponentPurchases,
     PaginatedComponents,
-    TierLiteral,
 )
 from app.application.services.components_service import (
     _MISSING,
@@ -25,43 +21,47 @@ from app.application.services.components_service import (
     ComponentsService,
     ComponentUpdate,
 )
+from app.domain.entities.component import NatoScoreValue, TierValue
 from app.domain.entities.user import User
 from app.domain.repositories.component_repository import ComponentFilters
-from app.infrastructure.repositories.component_purchase_repository import (
-    SqlAlchemyComponentPurchaseRepository,
-)
 from app.infrastructure.repositories.component_repository import (
     SqlAlchemyComponentRepository,
 )
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/components", tags=["components"])
 
 
 def _service(session: AsyncSession) -> ComponentsService:
-    return ComponentsService(
-        components=SqlAlchemyComponentRepository(session),
-        purchases=SqlAlchemyComponentPurchaseRepository(session),
-    )
+    return ComponentsService(components=SqlAlchemyComponentRepository(session))
 
 
 def _payload_to_update(payload: ComponentUpdateRequest) -> ComponentUpdate:
-    """Translate a PATCH body into a ComponentUpdate, leaving omitted fields as MISSING."""
-    fields_set = payload.model_fields_set
-    dumped = payload.model_dump()
+    """Translate a PATCH body into a ComponentUpdate, omitted fields => MISSING."""
+    fs = payload.model_fields_set
+    d = payload.model_dump()
+
+    def pick(k: str) -> Any:
+        return d[k] if k in fs else _MISSING
+
     return ComponentUpdate(
-        sku=dumped["sku"] if "sku" in fields_set else _MISSING,
-        name=dumped["name"] if "name" in fields_set else _MISSING,
-        family=dumped["family"] if "family" in fields_set else _MISSING,
-        description=dumped["description"] if "description" in fields_set else _MISSING,
-        datasheet_url=dumped["datasheet_url"] if "datasheet_url" in fields_set else _MISSING,
-        location=dumped["location"] if "location" in fields_set else _MISSING,
-        supplier=dumped["supplier"] if "supplier" in fields_set else _MISSING,
-        price_per_100=dumped["price_per_100"] if "price_per_100" in fields_set else _MISSING,
-        stock=dumped["stock"] if "stock" in fields_set else _MISSING,
-        tier=dumped["tier"] if "tier" in fields_set else _MISSING,
-        nato_score=dumped["nato_score"] if "nato_score" in fields_set else _MISSING,
-        country_of_origin=dumped["country_of_origin"] if "country_of_origin" in fields_set else _MISSING,
+        sku=pick("sku"),
+        name=pick("name"),
+        family=pick("family"),
+        description=pick("description"),
+        datasheet_url=pick("datasheet_url"),
+        location=pick("location"),
+        fabricante=pick("fabricante"),
+        tipo_almacenamiento=pick("tipo_almacenamiento"),
+        holded_id=pick("holded_id"),
+        fecha_creacion=pick("fecha_creacion"),
+        verificado=pick("verificado"),
+        notas=pick("notas"),
+        stock=pick("stock"),
+        stock_min=pick("stock_min"),
+        tier=pick("tier"),
+        nato_score=pick("nato_score"),
+        country_of_origin=pick("country_of_origin"),
+        proveedor_preferente_id=pick("proveedor_preferente_id"),
     )
 
 
@@ -70,15 +70,29 @@ async def list_components(
     _user: Annotated[User, Depends(require_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     q: Annotated[str | None, Query()] = None,
-    family: Annotated[str | None, Query()] = None,
-    supplier: Annotated[str | None, Query()] = None,
-    tier: Annotated[TierLiteral | None, Query()] = None,
-    nato_score: Annotated[NatoScoreLiteral | None, Query()] = None,
+    family: Annotated[list[str] | None, Query()] = None,
+    supplier_id: Annotated[list[UUID] | None, Query()] = None,
+    tier: Annotated[list[int] | None, Query()] = None,
+    nato_score: Annotated[list[str] | None, Query()] = None,
+    location: Annotated[list[str] | None, Query()] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> PaginatedComponents:
+    if tier is not None:
+        for t in tier:
+            if t not in (1, 2, 3, 4):
+                raise HTTPException(status_code=422, detail=f"Invalid tier: {t}")
+    if nato_score is not None:
+        for s in nato_score:
+            if s not in ("A+", "A", "B", "C", "D", "F"):
+                raise HTTPException(status_code=422, detail=f"Invalid nato_score: {s}")
     filters = ComponentFilters(
-        q=q, family=family, supplier=supplier, tier=tier, nato_score=nato_score
+        q=q,
+        families=family,
+        supplier_ids=supplier_id,
+        tiers=cast(list[TierValue] | None, tier),
+        nato_scores=cast(list[NatoScoreValue] | None, nato_score),
+        locations=location,
     )
     result = await _service(session).list(filters=filters, page=page, page_size=page_size)
     return PaginatedComponents(
@@ -106,10 +120,16 @@ async def create_component(
             description=payload.description,
             datasheet_url=payload.datasheet_url,
             location=payload.location,
-            supplier=payload.supplier,
-            price_per_100=payload.price_per_100,
+            fabricante=payload.fabricante,
+            tipo_almacenamiento=payload.tipo_almacenamiento,
+            holded_id=payload.holded_id,
+            fecha_creacion=payload.fecha_creacion,
+            verificado=payload.verificado,
+            notas=payload.notas,
             stock=payload.stock,
+            stock_min=payload.stock_min,
             country_of_origin=payload.country_of_origin,
+            proveedor_preferente_id=payload.proveedor_preferente_id,
         )
     )
     return ComponentResponse.model_validate(created)
@@ -144,39 +164,3 @@ async def delete_component(
 ) -> Response:
     await _service(session).delete(component_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-
-@router.get(
-    "/{component_id}/purchases",
-    response_model=PaginatedComponentPurchases,
-)
-async def list_component_purchases(
-    component_id: UUID,
-    _user: Annotated[User, Depends(require_user)],
-    session: Annotated[AsyncSession, Depends(get_db_session)],
-    page: Annotated[int, Query(ge=1)] = 1,
-    page_size: Annotated[int, Query(ge=1, le=100)] = 25,
-) -> PaginatedComponentPurchases:
-    result = await _service(session).list_purchases(
-        component_id=component_id, page=page, page_size=page_size
-    )
-    return PaginatedComponentPurchases(
-        items=[ComponentPurchaseResponse.model_validate(p) for p in result.items],
-        total=result.total,
-        page=result.page,
-        page_size=result.page_size,
-    )
-
-
-@router.post(
-    "/{component_id}/sync",
-    response_model=ComponentSyncResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def sync_component(
-    component_id: UUID,
-    _user: Annotated[User, Depends(require_user)],
-    session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> ComponentSyncResponse:
-    await _service(session).enqueue_sync(component_id)
-    return ComponentSyncResponse()

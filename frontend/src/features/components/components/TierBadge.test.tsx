@@ -5,13 +5,13 @@ import { TIER_VALUES } from "../types";
 import { TierBadge } from "./TierBadge";
 
 describe("<TierBadge>", () => {
-  it.each(TIER_VALUES)("renders the literal label for value %s", (value) => {
+  it.each(TIER_VALUES)("renders 'Tier %s' as the literal label", (value) => {
     render(<TierBadge value={value} />);
-    expect(screen.getByText(value)).toBeInTheDocument();
+    expect(screen.getByText(`Tier ${value}`)).toBeInTheDocument();
   });
 
   it("sets an accessible aria-label", () => {
-    render(<TierBadge value="A+" />);
-    expect(screen.getByLabelText(/Tier A\+/)).toBeInTheDocument();
+    render(<TierBadge value={1} />);
+    expect(screen.getByLabelText(/Tier 1/)).toBeInTheDocument();
   });
 });

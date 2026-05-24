@@ -16,17 +16,12 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 describe("useComponents", () => {
-  it("forwards filters and pagination to the API as query params", async () => {
-    let capturedUrl: URL | null = null;
+  it("appends multi-value filters as repeated query params", async () => {
+    let captured: URL | null = null;
     server.use(
       http.get(`${API}/api/v1/components`, ({ request }) => {
-        capturedUrl = new URL(request.url);
-        return HttpResponse.json({
-          items: [],
-          total: 0,
-          page: 1,
-          page_size: 25,
-        });
+        captured = new URL(request.url);
+        return HttpResponse.json({ items: [], total: 0, page: 1, page_size: 25 });
       }),
     );
 
@@ -35,10 +30,10 @@ describe("useComponents", () => {
         useComponents({
           filters: {
             q: "esp",
-            family: "Microcontroladores",
-            supplier: "Mouser",
-            tier: "A",
-            nato_score: "high_risk",
+            families: ["Microcontroladores", "Sensores"],
+            tiers: [1, 2],
+            nato_scores: ["A+", "D"],
+            supplier_ids: ["sup-1", "sup-2"],
           },
           page: 2,
           pageSize: 50,
@@ -47,39 +42,32 @@ describe("useComponents", () => {
     );
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(capturedUrl).not.toBeNull();
-    const params = (capturedUrl as unknown as URL).searchParams;
-    expect(params.get("q")).toBe("esp");
-    expect(params.get("family")).toBe("Microcontroladores");
-    expect(params.get("supplier")).toBe("Mouser");
-    expect(params.get("tier")).toBe("A");
-    expect(params.get("nato_score")).toBe("high_risk");
-    expect(params.get("page")).toBe("2");
-    expect(params.get("page_size")).toBe("50");
+    const url = captured as unknown as URL;
+    expect(url.searchParams.get("q")).toBe("esp");
+    expect(url.searchParams.getAll("family")).toEqual(["Microcontroladores", "Sensores"]);
+    expect(url.searchParams.getAll("tier")).toEqual(["1", "2"]);
+    expect(url.searchParams.getAll("nato_score")).toEqual(["A+", "D"]);
+    expect(url.searchParams.getAll("supplier_id")).toEqual(["sup-1", "sup-2"]);
+    expect(url.searchParams.get("page")).toBe("2");
+    expect(url.searchParams.get("page_size")).toBe("50");
   });
 
-  it("omits empty / unset filters from the request", async () => {
-    let capturedUrl: URL | null = null;
+  it("omits empty filters from the URL", async () => {
+    let captured: URL | null = null;
     server.use(
       http.get(`${API}/api/v1/components`, ({ request }) => {
-        capturedUrl = new URL(request.url);
-        return HttpResponse.json({
-          items: [],
-          total: 0,
-          page: 1,
-          page_size: 25,
-        });
+        captured = new URL(request.url);
+        return HttpResponse.json({ items: [], total: 0, page: 1, page_size: 25 });
       }),
     );
-
     const { result } = renderHook(
       () => useComponents({ filters: { q: "   " }, page: 1, pageSize: 25 }),
       { wrapper },
     );
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    const params = (capturedUrl as unknown as URL).searchParams;
-    expect(params.get("q")).toBeNull();
-    expect(params.get("family")).toBeNull();
-    expect(params.get("tier")).toBeNull();
+    const url = captured as unknown as URL;
+    expect(url.searchParams.get("q")).toBeNull();
+    expect(url.searchParams.getAll("family")).toEqual([]);
+    expect(url.searchParams.getAll("tier")).toEqual([]);
   });
 });

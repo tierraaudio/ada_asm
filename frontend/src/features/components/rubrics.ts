@@ -1,35 +1,51 @@
 import type { NatoScoreValue, TierValue } from "./types";
 
+/* Labels and rubric copy taken verbatim from Figma node 47:15264 (NATO popover)
+ * and the Tier popover the user provided. Do not paraphrase — the design owns
+ * the wording. */
+
 export const TIER_LABELS: Record<TierValue, string> = {
+  1: "Tier 1",
+  2: "Tier 2",
+  3: "Tier 3",
+  4: "Tier 4",
+};
+
+export interface TierRubricEntry {
+  label: string;
+  category: string;
+  risk: string;
+}
+
+export const TIER_RUBRIC: Record<TierValue, TierRubricEntry> = {
+  1: { label: "Tier 1", category: "Chips y microcontroladores", risk: "Muy alto" },
+  2: { label: "Tier 2", category: "Sensores", risk: "Alto" },
+  3: { label: "Tier 3", category: "Componentes pasivos", risk: "Medio" },
+  4: { label: "Tier 4", category: "Plásticos, placas, conectores", risk: "Bajo" },
+};
+
+export const TIER_HELP_TITLE = "¿Qué es el TIER?";
+export const TIER_HELP_INTRO =
+  "Complejidad del componente y riesgo de no ser OTAN: no es lo mismo un trozo de plástico que un microchip con posibles puertas traseras.";
+
+export const NATO_SCORE_LABELS: Record<NatoScoreValue, string> = {
   "A+": "A+",
   A: "A",
   B: "B",
   C: "C",
   D: "D",
+  F: "F",
 };
 
-export const TIER_DESCRIPTIONS: Record<TierValue, string> = {
-  "A+": "Componente crítico y de alta visibilidad: requiere segundo proveedor, plan de obsolescencia y validaciones extra.",
-  A: "Componente crítico para el producto final: requiere stock estratégico y proveedor cualificado.",
-  B: "Componente importante con varios proveedores cualificados, gestión estándar.",
-  C: "Componente estándar de consumo regular y bajo riesgo de discontinuación.",
-  D: "Commodity sin requisitos especiales — disponible en cualquier distribuidor.",
+export const NATO_SCORE_RUBRIC: Record<NatoScoreValue, string> = {
+  "A+": "100% OTAN - Todos los componentes verificados",
+  A: "OTAN - Componentes de países OTAN",
+  B: "Aliados OTAN - Componentes de países aliados",
+  C: "Neutral - Requiere revisión",
+  D: "Alto riesgo - Componentes de origen no verificado",
+  F: "No OTAN - Componentes de países no aliados",
 };
 
-export const NATO_SCORE_LABELS: Record<NatoScoreValue, string> = {
-  "100_otan": "100% OTAN",
-  otan: "OTAN",
-  allied_otan: "Aliados OTAN",
-  neutral: "Neutral",
-  high_risk: "Alto riesgo",
-  no_otan: "No OTAN",
-};
-
-export const NATO_SCORE_DESCRIPTIONS: Record<NatoScoreValue, string> = {
-  "100_otan": "Fabricado íntegramente en países miembros de la OTAN.",
-  otan: "Fabricado mayoritariamente en países miembros de la OTAN.",
-  allied_otan: "Fabricado en países aliados de la OTAN (Japón, Corea del Sur, etc.).",
-  neutral: "Origen en país neutral, sin alineación clara con la OTAN ni con sus rivales.",
-  high_risk: "Origen en país de alto riesgo geopolítico para nuestra cadena de suministro.",
-  no_otan: "Origen explícitamente fuera del bloque OTAN — escalado al equipo de compras.",
-};
+export const NATO_HELP_TITLE = "¿Qué es el Scoring OTAN?";
+export const NATO_HELP_INTRO =
+  "Revisión de Supply Chain para comprobar que todos los componentes son OTAN o aliados.";

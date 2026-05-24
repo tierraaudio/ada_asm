@@ -1,15 +1,13 @@
-export const TIER_VALUES = ["A+", "A", "B", "C", "D"] as const;
+export const TIER_VALUES = [1, 2, 3, 4] as const;
 export type TierValue = (typeof TIER_VALUES)[number];
 
-export const NATO_SCORE_VALUES = [
-  "100_otan",
-  "otan",
-  "allied_otan",
-  "neutral",
-  "high_risk",
-  "no_otan",
-] as const;
+export const NATO_SCORE_VALUES = ["A+", "A", "B", "C", "D", "F"] as const;
 export type NatoScoreValue = (typeof NATO_SCORE_VALUES)[number];
+
+export interface Supplier {
+  id: string;
+  name: string;
+}
 
 export interface Component {
   id: string;
@@ -20,34 +18,29 @@ export interface Component {
   description: string | null;
   datasheet_url: string | null;
   location: string | null;
-  supplier: string | null;
-  price_per_100: string | null;
+  fabricante: string | null;
+  tipo_almacenamiento: string | null;
+  holded_id: string | null;
+  fecha_creacion: string | null;
+  verificado: boolean;
+  notas: string | null;
   stock: number;
+  stock_min: number | null;
   tier: TierValue;
   nato_score: NatoScoreValue;
   country_of_origin: string | null;
+  proveedor_preferente_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export interface ComponentPurchase {
-  id: string;
-  component_id: string;
-  purchased_at: string;
-  quantity: number;
-  supplier: string;
-  unit_cost: string;
-  total_cost: string;
-  currency: string;
-  created_at: string;
-}
-
 export interface ComponentFilters {
   q?: string;
-  family?: string;
-  supplier?: string;
-  tier?: TierValue;
-  nato_score?: NatoScoreValue;
+  families?: string[];
+  supplier_ids?: string[];
+  tiers?: TierValue[];
+  nato_scores?: NatoScoreValue[];
+  locations?: string[];
 }
 
 export interface Paginated<T> {
@@ -55,4 +48,9 @@ export interface Paginated<T> {
   total: number;
   page: number;
   page_size: number;
+}
+
+/** Effective threshold = explicit stock_min OR tier*5 (mirrors backend default). */
+export function effectiveStockMin(component: Pick<Component, "tier" | "stock_min">): number {
+  return component.stock_min ?? component.tier * 5;
 }

@@ -1,15 +1,6 @@
 import { api } from "@/lib/api/client";
 
-import type {
-  ComponentCreatePayload,
-  ComponentUpdatePayload,
-} from "../schemas";
-import type {
-  Component,
-  ComponentFilters,
-  ComponentPurchase,
-  Paginated,
-} from "../types";
+import type { Component, ComponentFilters, Paginated, Supplier } from "../types";
 
 const BASE = "/api/v1/components";
 
@@ -17,13 +8,16 @@ function buildListParams(
   filters: ComponentFilters,
   page: number,
   pageSize: number,
-): Record<string, string | number> {
-  const params: Record<string, string | number> = { page, page_size: pageSize };
-  if (filters.q?.trim()) params.q = filters.q.trim();
-  if (filters.family) params.family = filters.family;
-  if (filters.supplier) params.supplier = filters.supplier;
-  if (filters.tier) params.tier = filters.tier;
-  if (filters.nato_score) params.nato_score = filters.nato_score;
+): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("page_size", String(pageSize));
+  if (filters.q?.trim()) params.set("q", filters.q.trim());
+  for (const f of filters.families ?? []) params.append("family", f);
+  for (const s of filters.supplier_ids ?? []) params.append("supplier_id", s);
+  for (const t of filters.tiers ?? []) params.append("tier", String(t));
+  for (const n of filters.nato_scores ?? []) params.append("nato_score", n);
+  for (const l of filters.locations ?? []) params.append("location", l);
   return params;
 }
 
@@ -39,39 +33,14 @@ export const componentsApi = {
     return response.data;
   },
 
-  get: async (id: string): Promise<Component> => {
-    const response = await api.get<Component>(`${BASE}/${id}`);
-    return response.data;
-  },
-
-  create: async (payload: ComponentCreatePayload): Promise<Component> => {
-    const response = await api.post<Component>(BASE, payload);
-    return response.data;
-  },
-
-  update: async (id: string, payload: ComponentUpdatePayload): Promise<Component> => {
-    const response = await api.patch<Component>(`${BASE}/${id}`, payload);
-    return response.data;
-  },
-
   delete: async (id: string): Promise<void> => {
     await api.delete(`${BASE}/${id}`);
   },
+};
 
-  listPurchases: async (
-    id: string,
-    page: number,
-    pageSize: number,
-  ): Promise<Paginated<ComponentPurchase>> => {
-    const response = await api.get<Paginated<ComponentPurchase>>(
-      `${BASE}/${id}/purchases`,
-      { params: { page, page_size: pageSize } },
-    );
-    return response.data;
-  },
-
-  sync: async (id: string): Promise<{ status: "queued" }> => {
-    const response = await api.post<{ status: "queued" }>(`${BASE}/${id}/sync`);
+export const suppliersApi = {
+  list: async (): Promise<Supplier[]> => {
+    const response = await api.get<Supplier[]>("/api/v1/suppliers");
     return response.data;
   },
 };
