@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
 import { Calendar, MapPin, Package, Save, X } from "lucide-react";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
 
@@ -107,7 +107,7 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
     handleSubmit,
     reset,
     setValue,
-    watch,
+    control,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -185,9 +185,6 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
     }
   });
 
-  const proveedorId = watch("proveedor_preferente_id");
-  const family = watch("family");
-  const tipoAlmacenamiento = watch("tipo_almacenamiento");
   const submitError =
     create.error && isAxiosError(create.error) && create.error.response?.status === 409
       ? "Ya existe un componente con ese MPN."
@@ -345,72 +342,79 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
               icon={<Package className="size-3.5" />}
               error={errors.tipo_almacenamiento?.message}
             >
-              <Select
-                value={tipoAlmacenamiento || "__none__"}
-                onValueChange={(v) =>
-                  setValue("tipo_almacenamiento", v === "__none__" ? "" : v, {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  })
-                }
-              >
-                <SelectTrigger className={inputCls}>
-                  <SelectValue placeholder="Selecciona…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">—</SelectItem>
-                  {TIPO_ALMACENAMIENTO_VALUES.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="tipo_almacenamiento"
+                render={({ field }) => (
+                  <Select
+                    value={field.value ? field.value : "__none__"}
+                    onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                  >
+                    <SelectTrigger className={inputCls}>
+                      <SelectValue placeholder="Selecciona…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">—</SelectItem>
+                      {TIPO_ALMACENAMIENTO_VALUES.map((v) => (
+                        <SelectItem key={v} value={v}>
+                          {v}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </FormField>
             <FormField
               label="Familia"
               icon={<Package className="size-3.5" />}
               error={errors.family?.message}
             >
-              <Select
-                value={family || ""}
-                onValueChange={(v) =>
-                  setValue("family", v, { shouldDirty: true, shouldValidate: true })
-                }
-              >
-                <SelectTrigger className={inputCls}>
-                  <SelectValue placeholder="Selecciona familia…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {FAMILY_VALUES.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {v}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="family"
+                render={({ field }) => (
+                  <Select
+                    {...(field.value ? { value: field.value } : {})}
+                    onValueChange={(v) => field.onChange(v)}
+                  >
+                    <SelectTrigger className={inputCls}>
+                      <SelectValue placeholder="Selecciona familia…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FAMILY_VALUES.map((v) => (
+                        <SelectItem key={v} value={v}>
+                          {v}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </FormField>
             <FormField label="Proveedor preferente">
-              <Select
-                value={proveedorId || "__none__"}
-                onValueChange={(v) =>
-                  setValue("proveedor_preferente_id", v === "__none__" ? "" : v, {
-                    shouldDirty: true,
-                  })
-                }
-              >
-                <SelectTrigger className={inputCls}>
-                  <SelectValue placeholder="Sin proveedor preferente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Sin proveedor —</SelectItem>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                control={control}
+                name="proveedor_preferente_id"
+                render={({ field }) => (
+                  <Select
+                    value={field.value ? field.value : "__none__"}
+                    onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
+                  >
+                    <SelectTrigger className={inputCls}>
+                      <SelectValue placeholder="Sin proveedor preferente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— Sin proveedor —</SelectItem>
+                      {suppliers.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </FormField>
           </div>
 
