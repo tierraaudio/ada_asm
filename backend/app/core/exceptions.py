@@ -124,6 +124,40 @@ class ComponentMpnAlreadyRegisteredError(DomainError):
     http_status = 409
 
 
+# ---------- Modules ----------
+
+
+class ModuleNotFoundError(DomainError):
+    code = "MODULE_NOT_FOUND"
+    http_status = 404
+
+
+class ModuleSkuAlreadyRegisteredError(DomainError):
+    code = "MODULE_SKU_ALREADY_REGISTERED"
+    http_status = 409
+
+
+class ModuleCycleDetectedError(DomainError):
+    """Adding a child module would close a cycle in the module DAG."""
+
+    code = "MODULE_CYCLE_DETECTED"
+    http_status = 422
+
+
+class ChildAlreadyPresentError(DomainError):
+    """`(parent, child)` edge already exists — update `quantity` instead."""
+
+    code = "CHILD_ALREADY_PRESENT"
+    http_status = 422
+
+
+class InvalidChildReferenceError(DomainError):
+    """XOR violation on a child reference, or the referenced row is missing."""
+
+    code = "INVALID_CHILD_REFERENCE"
+    http_status = 422
+
+
 # ---------- Misc ----------
 
 
