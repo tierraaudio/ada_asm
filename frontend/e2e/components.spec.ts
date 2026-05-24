@@ -1,9 +1,10 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@singularthings.io";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "admin123";
 
-async function login(page: import("@playwright/test").Page) {
+async function login(page: Page) {
   await page.goto("/login");
   await page.getByLabel(/email/i).fill(ADMIN_EMAIL);
   await page.getByLabel(/contraseña/i).fill(ADMIN_PASSWORD);

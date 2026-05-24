@@ -14,6 +14,7 @@ from app.api.v1.schemas.components import (
     ComponentCreateRequest,
     ComponentDetailResponse,
     ComponentResponse,
+    ComponentSummaryResponse,
     ComponentUpdateRequest,
     CreateNatoScoringRequest,
     NatoScoringResponse,
@@ -21,6 +22,10 @@ from app.api.v1.schemas.components import (
     PaginatedComponents,
     ScoringAlternativeResponse,
     ScoringClassificationResponse,
+)
+from app.api.v1.schemas.stock_events import (
+    PaginatedStockEvents,
+    StockEventResponse,
 )
 from app.api.v1.schemas.supplier_data import (
     SupplierPriceResponse,
@@ -42,6 +47,7 @@ from app.application.services.nato_scoring_service import (
 from app.domain.entities.component import NatoScoreValue, TierValue
 from app.domain.entities.user import User
 from app.domain.repositories.component_repository import ComponentFilters
+from app.infrastructure.db.models.supplier import SupplierModel
 from app.infrastructure.db.models.user import UserModel
 from app.infrastructure.repositories.component_repository import (
     SqlAlchemyComponentRepository,
@@ -54,6 +60,9 @@ from app.infrastructure.repositories.scoring_alternative_repository import (
 )
 from app.infrastructure.repositories.scoring_classification_repository import (
     SqlAlchemyScoringClassificationRepository,
+)
+from app.infrastructure.repositories.stock_event_repository import (
+    SqlAlchemyStockEventRepository,
 )
 from app.infrastructure.repositories.supplier_price_repository import (
     SqlAlchemySupplierPriceRepository,
@@ -109,11 +118,46 @@ def _payload_to_update(payload: ComponentUpdateRequest) -> ComponentUpdate:
 
 
 async def _scoring_to_response(session: AsyncSession, bundle: ScoringBundle) -> NatoScoringResponse:
-    """Hydrate `classified_by_full_name` with one extra users lookup."""
+    """Hydrate `classified_by_full_name` and embed `alternative_component` summaries."""
     full_name: str | None = None
     if bundle.scoring.classified_by_user_id is not None:
         user_row = await session.get(UserModel, bundle.scoring.classified_by_user_id)
         full_name = user_row.full_name if user_row else None
+
+    # Hydrate each alternative with a summary of the referenced component.
+    component_repo = SqlAlchemyComponentRepository(session)
+    alt_ids = [
+        a.alternative_component_id
+        for a in bundle.alternatives
+        if a.alternative_component_id is not None
+    ]
+    alt_entities = []
+    for aid in alt_ids:
+        comp = await component_repo.get_by_id(aid)
+        if comp is not None:
+            alt_entities.append(comp)
+    if alt_entities:
+        # `_hydrate_current_prices` fills `current_price_per_100_eur`.
+        await component_repo._hydrate_current_prices(alt_entities)
+    alt_by_id = {c.id: c for c in alt_entities}
+
+    alternatives_resp: list[ScoringAlternativeResponse] = []
+    for a in bundle.alternatives:
+        embed: ComponentSummaryResponse | None = None
+        comp = alt_by_id.get(cast(UUID, a.alternative_component_id))
+        if comp is not None:
+            embed = ComponentSummaryResponse.model_validate(comp)
+        alternatives_resp.append(
+            ScoringAlternativeResponse(
+                id=a.id,
+                nato_scoring_id=cast(UUID, a.nato_scoring_id),
+                alternative_component_id=cast(UUID, a.alternative_component_id),
+                notes=a.notes,
+                sort_order=a.sort_order,
+                alternative_component=embed,
+            )
+        )
+
     return NatoScoringResponse(
         id=bundle.scoring.id,
         component_id=cast(UUID, bundle.scoring.component_id),
@@ -130,7 +174,7 @@ async def _scoring_to_response(session: AsyncSession, bundle: ScoringBundle) -> 
         classifications=[
             ScoringClassificationResponse.model_validate(c) for c in bundle.classifications
         ],
-        alternatives=[ScoringAlternativeResponse.model_validate(a) for a in bundle.alternatives],
+        alternatives=alternatives_resp,
     )
 
 
@@ -370,3 +414,54 @@ async def list_supplier_stocks(
     await _service(session).get(component_id)
     stocks = await SqlAlchemySupplierStockRepository(session).list_for_component(component_id)
     return [SupplierStockResponse.model_validate(s) for s in stocks]
+
+
+@router.get(
+    "/{component_id}/stock-events",
+    response_model=PaginatedStockEvents,
+)
+async def list_stock_events(
+    component_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> PaginatedStockEvents:
+    """Stock events ordered by `occurred_at DESC`. Feeds the Historial modal."""
+    await _service(session).get(component_id)
+    page_data = await SqlAlchemyStockEventRepository(session).list_for_component(
+        component_id=component_id, page=page, page_size=page_size
+    )
+    # Hydrate supplier_name for purchases (single batch query).
+    supplier_ids = {e.supplier_id for e in page_data.items if e.supplier_id is not None}
+    suppliers_by_id: dict[UUID, str] = {}
+    if supplier_ids:
+        rows = (
+            (await session.execute(select(SupplierModel).where(SupplierModel.id.in_(supplier_ids))))
+            .scalars()
+            .all()
+        )
+        suppliers_by_id = {row.id: row.name for row in rows}
+    items = [
+        StockEventResponse(
+            id=e.id,
+            component_id=cast(UUID, e.component_id),
+            kind=e.kind,
+            quantity=e.quantity,
+            occurred_at=e.occurred_at,
+            notes=e.notes,
+            supplier_id=e.supplier_id,
+            supplier_name=suppliers_by_id.get(e.supplier_id) if e.supplier_id else None,
+            unit_cost=e.unit_cost,
+            total_cost=e.total_cost,
+            currency=e.currency,
+            project_id=e.project_id,
+            project_name_snapshot=e.project_name_snapshot,
+            created_at=cast(Any, e.created_at),
+            updated_at=cast(Any, e.updated_at),
+        )
+        for e in page_data.items
+    ]
+    return PaginatedStockEvents(
+        items=items, total=page_data.total, page=page_data.page, page_size=page_data.page_size
+    )

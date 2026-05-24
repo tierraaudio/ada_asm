@@ -1,7 +1,7 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LoginPage } from "./LoginPage";
 import { useAuthStore } from "@/lib/stores/auth-store";
@@ -11,6 +11,13 @@ import { renderWithProviders, sampleUser } from "@/tests/utils";
 const API = "http://localhost:8000";
 
 describe("<LoginPage>", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_ENV", "development");
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("logs in on valid credentials and populates the store", async () => {
     server.use(
       http.post(`${API}/api/v1/auth/login`, () =>

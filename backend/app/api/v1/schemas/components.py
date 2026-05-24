@@ -125,6 +125,24 @@ class ScoringClassificationResponse(BaseModel):
     sort_order: int
 
 
+class ComponentSummaryResponse(BaseModel):
+    """Lightweight subset of `Component` for embedding in cross-references."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    mpn: str
+    sku: str | None = None
+    name: str
+    family: str
+    fabricante: str | None = None
+    country_of_origin: CountryCode | None = None
+    nato_score: NatoScoreLiteral
+    tier: TierLiteral
+    stock: int
+    current_price_per_100_eur: Decimal | None = None
+
+
 class ScoringAlternativeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -133,6 +151,9 @@ class ScoringAlternativeResponse(BaseModel):
     alternative_component_id: UUID
     notes: str | None = None
     sort_order: int
+    # Hydrated server-side from `components` (+ supplier_prices JOIN for the
+    # current 100u price). Null if the referenced component was deleted.
+    alternative_component: ComponentSummaryResponse | None = None
 
 
 class NatoScoringSummaryResponse(BaseModel):

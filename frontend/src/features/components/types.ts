@@ -49,12 +49,49 @@ export interface ScoringClassification {
   sort_order: number;
 }
 
+export interface ComponentSummary {
+  id: string;
+  mpn: string;
+  sku: string | null;
+  name: string;
+  family: string;
+  fabricante: string | null;
+  country_of_origin: string | null;
+  nato_score: NatoScoreValue;
+  tier: TierValue;
+  stock: number;
+  current_price_per_100_eur: string | null;
+}
+
 export interface ScoringAlternative {
   id: string;
   nato_scoring_id: string;
   alternative_component_id: string;
   notes: string | null;
   sort_order: number;
+  /** Hydrated server-side; null if the referenced component was deleted. */
+  alternative_component: ComponentSummary | null;
+}
+
+export type StockEventKind = "purchase" | "consumption";
+
+export interface StockEvent {
+  id: string;
+  component_id: string;
+  kind: StockEventKind;
+  quantity: number;
+  occurred_at: string;
+  notes: string | null;
+  supplier_id: string | null;
+  /** JOIN with suppliers.name (server-set). */
+  supplier_name: string | null;
+  unit_cost: string | null;
+  total_cost: string | null;
+  currency: string;
+  project_id: string | null;
+  project_name_snapshot: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type NatoScoringStatus = "active" | "archived";

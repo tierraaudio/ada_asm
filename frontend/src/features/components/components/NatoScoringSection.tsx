@@ -1,4 +1,4 @@
-import { Info, ShieldCheck } from "lucide-react";
+import { Eye, Info, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,6 +10,11 @@ import { TierBadge } from "./TierBadge";
 
 interface NatoScoringSectionProps {
   scoring: NatoScoring | null;
+  /**
+   * Triggered by the primary action: opens the Detalle Scoring OTAN modal when
+   * an active scoring exists, or the Clasificar Componente form when not.
+   * The caller decides which modal to render based on `scoring`.
+   */
   onOpenClasificarComponente: () => void;
 }
 
@@ -57,10 +62,20 @@ export function NatoScoringSection({
 
   return (
     <section className="rounded-lg border border-border bg-white p-4">
-      <header className="mb-3 flex items-center gap-2">
+      <header className="mb-3 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
           Scoring OTAN
         </h3>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={onOpenClasificarComponente}
+        >
+          <Eye className="size-3.5" />
+          Ver detalle
+        </Button>
       </header>
 
       <div className="flex flex-wrap items-center gap-3">

@@ -6,6 +6,7 @@ import type {
   ComponentFilters,
   NatoScoring,
   Paginated,
+  StockEvent,
   Supplier,
   SupplierPrice,
   SupplierStockSnapshot,
@@ -88,6 +89,13 @@ export const componentsApi = {
 
   listSupplierStocks: async (id: string): Promise<SupplierStockSnapshot[]> => {
     const response = await api.get<SupplierStockSnapshot[]>(`${BASE}/${id}/supplier-stocks`);
+    return response.data;
+  },
+
+  listStockEvents: async (id: string, page = 1, pageSize = 200): Promise<Paginated<StockEvent>> => {
+    const response = await api.get<Paginated<StockEvent>>(`${BASE}/${id}/stock-events`, {
+      params: { page, page_size: pageSize },
+    });
     return response.data;
   },
 };

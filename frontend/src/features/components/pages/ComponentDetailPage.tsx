@@ -14,15 +14,17 @@ import {
 } from "@/components/ui/dialog";
 
 import { ComponentHeaderCard } from "../components/ComponentHeaderCard";
+import { HistorialDeComprasModal } from "../components/HistorialDeComprasModal";
 import { HistoricoPreciosChart } from "../components/HistoricoPreciosChart";
+import { NatoScoringModal } from "../components/NatoScoringModal";
 import { NatoScoringSection } from "../components/NatoScoringSection";
 import { PreciosDeHoyTable } from "../components/PreciosDeHoyTable";
 import { StockDisponibleChart } from "../components/StockDisponibleChart";
 import { useComponentDetail } from "../hooks/use-component-detail";
+import { useStockEvents, useSupplierPrices, useSupplierStocks } from "../hooks/use-supplier-data";
 import { useSuppliers } from "../hooks/use-suppliers";
-import { useSupplierPrices, useSupplierStocks } from "../hooks/use-supplier-data";
 
-type ModalKey = "historial" | "clasificar" | null;
+type ModalKey = "historial" | "scoring" | "clasificar" | null;
 
 export function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +33,7 @@ export function ComponentDetailPage() {
   const suppliersQuery = useSuppliers();
   const pricesQuery = useSupplierPrices(id);
   const stocksQuery = useSupplierStocks(id);
+  const stockEventsQuery = useStockEvents(id);
   const [openModal, setOpenModal] = useState<ModalKey>(null);
 
   if (!id || detailQuery.isLoading) {
@@ -53,6 +56,8 @@ export function ComponentDetailPage() {
   const suppliers = suppliersQuery.data ?? [];
   const prices = pricesQuery.data ?? [];
   const stocks = stocksQuery.data ?? [];
+  const stockEvents = stockEventsQuery.data?.items ?? [];
+  const scoring = component.current_nato_scoring;
 
   return (
     <DashboardLayout>
@@ -90,8 +95,8 @@ export function ComponentDetailPage() {
           }
           rightSlot={
             <NatoScoringSection
-              scoring={component.current_nato_scoring}
-              onOpenClasificarComponente={() => setOpenModal("clasificar")}
+              scoring={scoring}
+              onOpenClasificarComponente={() => setOpenModal(scoring ? "scoring" : "clasificar")}
             />
           }
         />
@@ -127,22 +132,26 @@ export function ComponentDetailPage() {
         </div>
       </div>
 
-      <PlaceholderModal
+      <HistorialDeComprasModal
         open={openModal === "historial"}
         onOpenChange={(open) => !open && setOpenModal(null)}
-        title="Historial de compras"
-        body={
-          <>
-            <p>
-              Próxima iteración: gráfica &laquo;Stock interno con eventos&raquo; + tabla compras +
-              estadísticas + alertas y recomendaciones (Figma 47:20273).
-            </p>
-            <p>
-              Datos ya disponibles en <code>stock_events</code> (purchase + consumption).
-            </p>
-          </>
-        }
+        component={component}
+        stockEvents={stockEvents}
+        suppliers={suppliers}
+        supplierPrices={prices}
+        supplierStocks={stocks}
       />
+
+      {scoring && (
+        <NatoScoringModal
+          open={openModal === "scoring"}
+          onOpenChange={(open) => !open && setOpenModal(null)}
+          component={component}
+          scoring={scoring}
+          onOpenClasificarComponente={() => setOpenModal("clasificar")}
+        />
+      )}
+
       <PlaceholderModal
         open={openModal === "clasificar"}
         onOpenChange={(open) => !open && setOpenModal(null)}

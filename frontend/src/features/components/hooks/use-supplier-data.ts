@@ -25,3 +25,15 @@ export function useSupplierStocks(componentId: string | undefined) {
     enabled: Boolean(componentId),
   });
 }
+
+export function stockEventsQueryKey(componentId: string) {
+  return ["components", "stock-events", componentId] as const;
+}
+
+export function useStockEvents(componentId: string | undefined) {
+  return useQuery({
+    queryKey: stockEventsQueryKey(componentId ?? ""),
+    queryFn: () => componentsApi.listStockEvents(componentId as string),
+    enabled: Boolean(componentId),
+  });
+}
