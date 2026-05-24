@@ -22,7 +22,6 @@ export interface Component {
   tipo_almacenamiento: string | null;
   holded_id: string | null;
   fecha_creacion: string | null;
-  verificado: boolean;
   notas: string | null;
   stock: number;
   stock_min: number | null;
@@ -34,6 +33,51 @@ export interface Component {
   current_price_per_100_eur: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface ScoringClassification {
+  id: string;
+  nato_scoring_id: string;
+  part_label: string;
+  fabricante: string | null;
+  country_of_origin: string | null;
+  nato_score: NatoScoreValue | null;
+  verificado: boolean;
+  notas: string | null;
+  reference_component_id: string | null;
+  reference_url: string | null;
+  sort_order: number;
+}
+
+export interface ScoringAlternative {
+  id: string;
+  nato_scoring_id: string;
+  alternative_component_id: string;
+  notes: string | null;
+  sort_order: number;
+}
+
+export type NatoScoringStatus = "active" | "archived";
+
+export interface NatoScoring {
+  id: string;
+  component_id: string;
+  nato_score: NatoScoreValue;
+  tier: TierValue;
+  classified_at: string;
+  expires_at: string;
+  classified_by_user_id: string | null;
+  classified_by_full_name: string | null;
+  status: NatoScoringStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  classifications: ScoringClassification[];
+  alternatives: ScoringAlternative[];
+}
+
+export interface ComponentDetail extends Component {
+  current_nato_scoring: NatoScoring | null;
 }
 
 export interface ComponentFilters {

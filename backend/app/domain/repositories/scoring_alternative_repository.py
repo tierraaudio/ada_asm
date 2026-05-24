@@ -10,9 +10,7 @@ from app.domain.entities.scoring_alternative import ScoringAlternative
 
 
 class ScoringAlternativeRepository(Protocol):
-    async def list_for_scoring(
-        self, nato_scoring_id: UUID
-    ) -> list[ScoringAlternative]: ...
+    async def list_for_scoring(self, nato_scoring_id: UUID) -> list[ScoringAlternative]: ...
 
     async def replace_for_scoring(
         self,

@@ -10,9 +10,7 @@ from app.domain.entities.scoring_classification import ScoringClassification
 
 
 class ScoringClassificationRepository(Protocol):
-    async def list_for_scoring(
-        self, nato_scoring_id: UUID
-    ) -> list[ScoringClassification]: ...
+    async def list_for_scoring(self, nato_scoring_id: UUID) -> list[ScoringClassification]: ...
 
     async def replace_for_scoring(
         self,

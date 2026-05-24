@@ -33,9 +33,7 @@ class SqlAlchemyNatoScoringRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def get_active_for_component(
-        self, component_id: UUID
-    ) -> ComponentNatoScoring | None:
+    async def get_active_for_component(self, component_id: UUID) -> ComponentNatoScoring | None:
         stmt = select(ComponentNatoScoringModel).where(
             ComponentNatoScoringModel.component_id == component_id,
             ComponentNatoScoringModel.status == "active",
@@ -43,9 +41,7 @@ class SqlAlchemyNatoScoringRepository:
         row = (await self._session.execute(stmt)).scalar_one_or_none()
         return _to_entity(row) if row else None
 
-    async def list_for_component(
-        self, component_id: UUID
-    ) -> list[ComponentNatoScoring]:
+    async def list_for_component(self, component_id: UUID) -> list[ComponentNatoScoring]:
         stmt = (
             select(ComponentNatoScoringModel)
             .where(ComponentNatoScoringModel.component_id == component_id)

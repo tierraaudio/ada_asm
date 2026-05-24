@@ -1,6 +1,13 @@
 import { api } from "@/lib/api/client";
 
-import type { Component, ComponentFilters, Paginated, Supplier } from "../types";
+import type {
+  Component,
+  ComponentDetail,
+  ComponentFilters,
+  NatoScoring,
+  Paginated,
+  Supplier,
+} from "../types";
 
 const BASE = "/api/v1/components";
 
@@ -33,8 +40,43 @@ export const componentsApi = {
     return response.data;
   },
 
+  get: async (id: string): Promise<ComponentDetail> => {
+    const response = await api.get<ComponentDetail>(`${BASE}/${id}`);
+    return response.data;
+  },
+
   delete: async (id: string): Promise<void> => {
     await api.delete(`${BASE}/${id}`);
+  },
+
+  listNatoScorings: async (id: string): Promise<NatoScoring[]> => {
+    const response = await api.get<NatoScoring[]>(`${BASE}/${id}/nato-scorings`);
+    return response.data;
+  },
+
+  createNatoScoring: async (
+    id: string,
+    payload: {
+      nato_score: NatoScoring["nato_score"];
+      tier: NatoScoring["tier"];
+      classified_at?: string;
+      expires_at?: string;
+      notes?: string;
+      classifications?: Array<{
+        part_label: string;
+        fabricante?: string | null;
+        country_of_origin?: string | null;
+        nato_score?: NatoScoring["nato_score"] | null;
+        verificado?: boolean;
+        notas?: string | null;
+        reference_component_id?: string | null;
+        reference_url?: string | null;
+      }>;
+      alternatives?: Array<{ alternative_component_id: string; notes?: string | null }>;
+    },
+  ): Promise<NatoScoring> => {
+    const response = await api.post<NatoScoring>(`${BASE}/${id}/nato-scorings`, payload);
+    return response.data;
   },
 };
 

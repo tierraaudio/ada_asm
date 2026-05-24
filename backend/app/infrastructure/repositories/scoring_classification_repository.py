@@ -38,9 +38,7 @@ class SqlAlchemyScoringClassificationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_for_scoring(
-        self, nato_scoring_id: UUID
-    ) -> list[ScoringClassification]:
+    async def list_for_scoring(self, nato_scoring_id: UUID) -> list[ScoringClassification]:
         stmt = (
             select(ScoringClassificationModel)
             .where(ScoringClassificationModel.nato_scoring_id == nato_scoring_id)
@@ -66,9 +64,7 @@ class SqlAlchemyScoringClassificationRepository:
             saved.append(await self.save(c))
         return saved
 
-    async def save(
-        self, classification: ScoringClassification
-    ) -> ScoringClassification:
+    async def save(self, classification: ScoringClassification) -> ScoringClassification:
         row = ScoringClassificationModel(
             id=classification.id,
             nato_scoring_id=classification.nato_scoring_id,

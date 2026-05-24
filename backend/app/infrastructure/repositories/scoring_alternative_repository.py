@@ -28,9 +28,7 @@ class SqlAlchemyScoringAlternativeRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_for_scoring(
-        self, nato_scoring_id: UUID
-    ) -> list[ScoringAlternative]:
+    async def list_for_scoring(self, nato_scoring_id: UUID) -> list[ScoringAlternative]:
         stmt = (
             select(ScoringAlternativeModel)
             .where(ScoringAlternativeModel.nato_scoring_id == nato_scoring_id)

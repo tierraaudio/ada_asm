@@ -5,6 +5,7 @@ import { RequireAuth } from "@/features/auth/components/RequireAuth";
 import { ForgotPasswordPage } from "@/features/auth/pages/ForgotPasswordPage";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
+import { ComponentDetailPage } from "@/features/components/pages/ComponentDetailPage";
 import { ComponentsListPage } from "@/features/components/pages/ComponentsListPage";
 
 const PlaceholderPage = ({ label = "ADA ASM placeholder" }: { label?: string }) => (
@@ -42,10 +43,7 @@ export const App = () => {
           path="/components/new"
           element={<DashboardPlaceholder label="Nuevo componente · próximamente" />}
         />
-        <Route
-          path="/components/:id"
-          element={<DashboardPlaceholder label="Detalle componente · próximamente" />}
-        />
+        <Route path="/components/:id" element={<ComponentDetailPage />} />
         <Route
           path="/notifications"
           element={<DashboardPlaceholder label="Notificaciones · próximamente" />}
