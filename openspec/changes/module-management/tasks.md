@@ -115,8 +115,8 @@ Order is suggested for incremental delivery. Each numbered section can be its ow
 
 ## 12. Validación final
 
-- [ ] 12.1 `docker compose build && docker compose up -d` → migrate + seed_components + seed_modules.
-- [ ] 12.2 Smoke manual de los 4 flujos (lista expandible, detalle con agregados, edit + add child, ver histórico de precios).
-- [ ] 12.3 `pnpm test --run` + `pnpm typecheck` + `pnpm lint` + `pre-commit run --all-files` green.
-- [ ] 12.4 `uv run pytest --cov=app --cov-fail-under=80` green.
-- [ ] 12.5 Reseed + reinicio + verificar URLs públicas (`/modules`, `/modules/:id`, `/modules/:id/edit`).
+- [x] 12.1 `docker compose build && docker compose up -d` → migrate + seed_components + seed_modules.
+- [x] 12.2 Smoke manual de los 4 flujos (lista expandible, detalle con agregados, edit + add child, ver histórico de precios).
+- [x] 12.3 `pnpm test --run` + `pnpm typecheck` + `pnpm lint` + `pre-commit run --all-files` green.
+- [x] 12.4 `uv run pytest --cov=app --cov-fail-under=80` green.
+- [x] 12.5 Reseed + reinicio + verificar URLs públicas (`/modules`, `/modules/:id`, `/modules/:id/edit`).
