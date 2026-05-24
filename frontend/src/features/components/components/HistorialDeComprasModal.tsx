@@ -1,5 +1,5 @@
 import { ArrowUpRight, ChartPie, History, PackageX, ShieldAlert, TrendingUp } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -23,6 +23,7 @@ import type {
   SupplierPrice,
   SupplierStockSnapshot,
 } from "../types";
+import { periodCutoff, PeriodToggle, type Period } from "./PeriodToggle";
 
 interface HistorialDeComprasModalProps {
   open: boolean;
@@ -327,9 +328,14 @@ export function HistorialDeComprasModal({
   supplierPrices,
   supplierStocks,
 }: HistorialDeComprasModalProps) {
+  const [stockPeriod, setStockPeriod] = useState<Period>("year");
+  const filteredStockEvents = useMemo(() => {
+    const cutoff = periodCutoff(stockPeriod);
+    return stockEvents.filter((e) => new Date(e.occurred_at) >= cutoff);
+  }, [stockEvents, stockPeriod]);
   const series = useMemo(
-    () => buildStockSeries(stockEvents, component.stock),
-    [stockEvents, component.stock],
+    () => buildStockSeries(filteredStockEvents, component.stock),
+    [filteredStockEvents, component.stock],
   );
   const supplierAggregates = useMemo(
     () => aggregatePurchasesBySupplier(stockEvents),
@@ -364,14 +370,17 @@ export function HistorialDeComprasModal({
 
         {/* Stock interno con eventos */}
         <section className="rounded-lg border border-border p-4">
-          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-text-secondary">
-            <History className="size-4" />
-            Stock interno con eventos
-          </h3>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+              <History className="size-4" />
+              Stock interno con eventos
+            </h3>
+            <PeriodToggle value={stockPeriod} onChange={setStockPeriod} />
+          </div>
           <div className="h-64">
             {series.length === 0 ? (
               <p className="flex h-full items-center justify-center text-sm text-text-secondary">
-                Sin eventos registrados todavía.
+                Sin eventos en el rango seleccionado.
               </p>
             ) : (
               <ResponsiveContainer width="100%" height="100%">

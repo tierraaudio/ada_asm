@@ -12,9 +12,9 @@ import {
 import { cn } from "@/lib/utils/cn";
 
 import type { Supplier, SupplierPrice } from "../types";
+import { periodCutoff, PeriodToggle, type Period } from "./PeriodToggle";
 
 type QtyTier = 1 | 10 | 100 | 1000;
-type Period = "week" | "month" | "year";
 
 interface HistoricoPreciosChartProps {
   prices: SupplierPrice[];
@@ -29,15 +29,6 @@ const SUPPLIER_COLOURS = [
   "#22c55e", // green-500
   "#f59e0b", // amber-500
 ];
-
-function periodCutoff(period: Period): Date {
-  const now = new Date();
-  const out = new Date(now);
-  if (period === "week") out.setDate(now.getDate() - 7);
-  else if (period === "month") out.setMonth(now.getMonth() - 1);
-  else out.setFullYear(now.getFullYear() - 1);
-  return out;
-}
 
 interface ChartPoint {
   date: string;
@@ -114,15 +105,7 @@ export function HistoricoPreciosChart({ prices, suppliers }: HistoricoPreciosCha
             { value: 1000, label: "1000 uds" },
           ]}
         />
-        <ToggleGroup
-          value={period}
-          onChange={(v) => setPeriod(v as Period)}
-          options={[
-            { value: "week", label: "Semana" },
-            { value: "month", label: "Mes" },
-            { value: "year", label: "Año" },
-          ]}
-        />
+        <PeriodToggle value={period} onChange={setPeriod} />
       </div>
       <div className="flex min-h-[220px] flex-1 flex-col">
         {data.length === 0 ? (
