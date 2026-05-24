@@ -55,10 +55,7 @@ const formSchema = z.object({
   family: z
     .string()
     .min(1, "Familia obligatoria")
-    .refine(
-      (v) => (FAMILY_VALUES as readonly string[]).includes(v),
-      "Familia inválida",
-    ),
+    .refine((v) => (FAMILY_VALUES as readonly string[]).includes(v), "Familia inválida"),
   proveedor_preferente_id: z.string().optional(),
   fabricante: z.string().trim().max(120).optional(),
   stock: z.coerce.number().int().min(0, "Stock no puede ser negativo"),
