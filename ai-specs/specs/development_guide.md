@@ -68,6 +68,16 @@ docker compose run --rm backend python -m app.scripts.seed_components
 
 Inserts ten Figma-flavoured components (ACS712, BME280, ESP32-WROOM-32E, …) plus 3–6 `ComponentPurchase` rows per component so the chart and history views render. The script refuses with exit 2 if the `components` table is non-empty; pass `--reset` to truncate `component_purchases` + `components` first. Random values are deterministically seeded (`random.seed(42)`) so repeated runs produce the same data.
 
+### Seed sample modules (optional, dev only)
+
+After seeding components, populate the `/modules` catalogue with the three reusable assemblies from the Figma (Módulo Sensor Ambiental, Etapa Driver, Sistema Potencia BLDC) — the seed also wires the DAG (Sistema Potencia BLDC contains Etapa Driver as a sub-module + the STM32 MCU is shared with Sensor Ambiental):
+
+```bash
+docker compose run --rm backend python -m app.scripts.seed_modules
+```
+
+Pass `--reset` to truncate `module_children` + `modules` first. The script exits with 3 if the referenced components aren't already seeded; exits with 2 if `modules` is non-empty without `--reset`.
+
 ### Password recovery in development
 
 `SMTP_HOST` is empty by default, so the backend uses the `ConsoleEmailSender`: instead of dispatching a real email, it emits a structured log line tagged `email.console.delivery` with `dev_only=true`. To find the reset link locally, watch the backend logs:

@@ -417,6 +417,160 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
+  # ----- Modules -----
+  /api/v1/modules:
+    get:
+      tags: [modules]
+      summary: List modules (catalogue), aggregates hydrated server-side
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: ILIKE match against lower(sku), lower(name), lower(description)
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        "200":
+          description: Paginated list with each item carrying its aggregated_* fields
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [modules]
+      summary: Create a new module
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Module + aggregates + children + parents
+        "409":
+          description: MODULE_SKU_ALREADY_REGISTERED
+
+  /api/v1/modules/{module_id}:
+    parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [modules]
+      summary: Module detail with hydrated aggregates, children, and parents
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: ModuleResponse — extends Module with children + parents arrays
+        "404":
+          description: MODULE_NOT_FOUND
+    patch:
+      tags: [modules]
+      summary: Partial update; id/created_at/updated_at ignored if sent
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Module re-hydrated with aggregates
+        "404":
+          description: MODULE_NOT_FOUND
+        "409":
+          description: MODULE_SKU_ALREADY_REGISTERED
+    delete:
+      tags: [modules]
+      summary: Delete a module (CASCADE removes its edges but not its children)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: MODULE_NOT_FOUND
+
+  /api/v1/modules/{module_id}/children:
+    parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [modules]
+      summary: Add a child (component XOR module) with quantity
+      description: |
+        Validates XOR + existence + cycle detection (WITH RECURSIVE) +
+        duplicate pair. Returns the hydrated edge with `child_module` or
+        `child_component` summary populated.
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: ModuleChildResponse with hydrated summary
+        "404":
+          description: MODULE_NOT_FOUND (parent missing)
+        "422":
+          description: |
+            One of: INVALID_CHILD_REFERENCE (XOR violation OR missing referenced row),
+            MODULE_CYCLE_DETECTED, CHILD_ALREADY_PRESENT.
+
+  /api/v1/modules/{module_id}/children/{child_id}:
+    parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: child_id
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [modules]
+      summary: Update quantity / notes / sort_order of an existing edge
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Updated ModuleChildResponse
+        "404":
+          description: MODULE_NOT_FOUND (parent or edge missing)
+        "422":
+          description: quantity < 1
+    delete:
+      tags: [modules]
+      summary: Remove an edge — idempotent on missing
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Edge removed (or never existed)
+
+  /api/v1/modules/{module_id}/price-history:
+    parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: query
+        name: period
+        schema: { type: string, enum: [week, month, year], default: year }
+    get:
+      tags: [modules]
+      summary: Aggregated price time-series (server-computed from descendant components)
+      description: |
+        For each `valid_from` date in the period, sums
+        `quantity_propagated × precio_vigente(componente, fecha)` over every
+        descendant component using its preferred supplier at qty_tier=100.
+        Empty `series` when no descendants have supplier_prices.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: "ModulePriceHistoryResponse with series of {date, price} points"
+        "404":
+          description: MODULE_NOT_FOUND
+
 components:
   securitySchemes:
     bearerAuth:

@@ -8,6 +8,9 @@ import { ResetPasswordPage } from "@/features/auth/pages/ResetPasswordPage";
 import { ComponentDetailPage } from "@/features/components/pages/ComponentDetailPage";
 import { ComponentEditPage } from "@/features/components/pages/ComponentEditPage";
 import { ComponentsListPage } from "@/features/components/pages/ComponentsListPage";
+import { ModuleDetailPage } from "@/features/modules/pages/ModuleDetailPage";
+import { ModuleEditPage } from "@/features/modules/pages/ModuleEditPage";
+import { ModulesListPage } from "@/features/modules/pages/ModulesListPage";
 
 const PlaceholderPage = ({ label = "ADA ASM placeholder" }: { label?: string }) => (
   <div className="flex h-full items-center justify-center">
@@ -36,7 +39,10 @@ export const App = () => {
           path="/projects"
           element={<DashboardPlaceholder label="Proyectos · próximamente" />}
         />
-        <Route path="/modules" element={<DashboardPlaceholder label="Módulos · próximamente" />} />
+        <Route path="/modules" element={<ModulesListPage />} />
+        <Route path="/modules/new" element={<ModuleEditPage mode="create" />} />
+        <Route path="/modules/:id" element={<ModuleDetailPage />} />
+        <Route path="/modules/:id/edit" element={<ModuleEditPage mode="edit" />} />
         <Route path="/components" element={<ComponentsListPage />} />
         <Route path="/components/new" element={<ComponentEditPage mode="create" />} />
         <Route path="/components/:id" element={<ComponentDetailPage />} />

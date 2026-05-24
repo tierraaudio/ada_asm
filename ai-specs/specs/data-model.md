@@ -29,10 +29,65 @@ The top of the asset hierarchy. Sourced bidirectionally with Holded — created 
 
 ### 3. Module
 
-A grouping node in the asset tree. Can contain other Modules or Components. The tree has no fixed depth limit and is persisted using `ltree` so the path itself is queryable. Carries the rolled-up price computed from its children.
+A reusable assembly catalogue entry — the intermediate node of the asset tree. Holds metadata (sku/name/version/fabricante/location/tipo_almacenamiento) + `stock` of already-assembled units. Connected to its children (other modules or components) through `module_children` edges, each carrying an explicit `quantity`. Reuse is supported: the same module or component can appear under multiple parents (the tree is a DAG, not a strict tree). Cycles are forbidden and rejected by the service before insert (via `WITH RECURSIVE`).
 
-- **Status**: Not yet implemented.
-- **Introduced by**: User Story `Creación de Módulo en ASM`.
+Aggregates (`precio_total`, `aggregated_nato_score`, `aggregated_tier`, `aggregated_expires_at`, `buildable_stock`) are **computed server-side at read time** from the descendant components — they're never persisted. See the "Aggregations" subsection below.
+
+- **Status**: ✅ Implemented in `module-management` (migration `20260524_1938`).
+- **Table**: `modules`.
+- **Columns**:
+  - `id` UUIDv4, PK, `server_default gen_random_uuid()`
+  - `sku` `varchar(100)`, not null — case-insensitive unique via `lower(sku)`
+  - `name` `varchar(200)`, not null
+  - `description` `text`, nullable
+  - `version` `varchar(40)`, not null, default `'v1.0'` — free-text, no implicit versioning
+  - `fabricante` `varchar(120)`, nullable
+  - `location` `varchar(100)`, nullable — e.g. `G-M-01`
+  - `tipo_almacenamiento` `varchar(80)`, nullable — FE-enforced enum `Gaveta | Almacén`
+  - `stock` `integer`, not null, default `0` — assembled units in the warehouse
+  - `notas` `text`, nullable
+  - `fecha_creacion` `date`, nullable
+  - `created_at` / `updated_at` `timestamptz`
+- **Indexes**: unique functional `uq_modules_sku_lower (lower(sku))`; `ix_modules_name_lower (lower(name))`.
+
+### 3a. ModuleChild
+
+An edge in the module DAG. Each row points from a `parent_module_id` to **exactly one** of (`child_module_id`, `child_component_id`) — enforced via XOR CHECK constraint. The same `(parent, child)` pair is unique (one edge per pair); to repeat a hijo `N` times, raise `quantity`. Cycles among module nodes are forbidden (checked by `ModuleService` before insert; trivial self-reference also blocked at DB level).
+
+- **Status**: ✅ Implemented in `module-management` (migration `20260524_1938`).
+- **Table**: `module_children`.
+- **Columns**:
+  - `id` UUIDv4, PK
+  - `parent_module_id` UUIDv4, FK → `modules.id` ON DELETE CASCADE
+  - `child_module_id` UUIDv4, nullable, FK → `modules.id` ON DELETE CASCADE
+  - `child_component_id` UUIDv4, nullable, FK → `components.id` ON DELETE CASCADE
+  - `quantity` `smallint`, not null, CHECK `> 0`
+  - `sort_order` `integer`, not null, default `0`
+  - `notes` `text`, nullable
+  - `created_at` / `updated_at` `timestamptz`
+- **Constraints**:
+  - CHECK `(child_module_id IS NOT NULL)::int + (child_component_id IS NOT NULL)::int = 1` (XOR)
+  - CHECK `child_module_id IS NULL OR child_module_id <> parent_module_id` (no direct self-ref)
+- **Partial UNIQUE indexes**:
+  - `uq_module_children_parent_child_module (parent_module_id, child_module_id) WHERE child_module_id IS NOT NULL`
+  - `uq_module_children_parent_child_component (parent_module_id, child_component_id) WHERE child_component_id IS NOT NULL`
+- **Non-unique indexes**: `(parent_module_id, sort_order)`, `(child_module_id)`, `(child_component_id)`.
+
+#### Aggregations (`Module` server-computed, never persisted)
+
+For a module `M` the API hydrates the following on every `GET /api/v1/modules/{id}` (and `GET /api/v1/modules`):
+
+| Aggregate | Formula | Notes |
+|---|---|---|
+| `precio_total` | `Σ child ∈ direct_children: quantity × child_price` | Component children → `current_price_per_100_eur`. Module children → recursively, `precio_total(M')`. Returns `null` when no descendants have prices. |
+| `aggregated_nato_score` | `MIN_lex(F < D < C < B < A < A+)` over **component descendants** | The worst score across all leaf components contributes. `null` when no descendant components. |
+| `aggregated_tier` | `MIN_numeric` over component descendants | Tier 1 = most critical = worst. `null` when no descendant components. |
+| `aggregated_expires_at` | `MIN(date)` over descendant components with an active scoring | `null` when no scorings present. |
+| `buildable_stock` | `MIN(component.stock // edge.quantity)` over direct **component** edges | Submodule children currently don't contribute (only direct components count); the FE surfaces this caveat in a tooltip. Returns `0` when no direct component children. |
+
+The recursive walks are bounded to depth 8 to prevent runaway in case of misconfigured DAGs.
+
+### 4. Component
 
 ### 4. Component
 
@@ -234,8 +289,13 @@ User *───* Project              (via project_memberships, see Login US for
 User 1───* ComponentNatoScoring (classified_by_user_id)
 
 Project 1───* Module
-Module  1───* Module            (self-reference)
-Module  1───* Component
+Module  1───* ModuleChild       (parent_module_id)
+ModuleChild *───1 Module        (child_module_id, nullable)     -- XOR with child_component_id
+ModuleChild *───1 Component     (child_component_id, nullable)  -- XOR with child_module_id
+
+  -- DAG semantics: a Module or Component can be a child of N parents.
+  -- Cycles among Module nodes are forbidden (BE-enforced via WITH RECURSIVE
+  -- before insert).
 
 Supplier 1───* SupplierPrice
 Supplier 1───* SupplierStockSnapshot
