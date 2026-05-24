@@ -45,7 +45,7 @@ export function TierBadge({
     <span
       aria-label={`Tier ${value}`}
       className={cn(
-        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold",
+        "inline-flex items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-semibold",
         withTooltip && "cursor-help",
         TIER_CLASSES[value],
         className,
@@ -65,7 +65,7 @@ export function TierBadge({
     return (
       <Tooltip>
         <TooltipTrigger asChild>{badge}</TooltipTrigger>
-        <TooltipContent className="w-80 p-4 text-sm" align="start">
+        <TooltipContent className="w-80 p-4 text-sm" align="start" side="bottom" sideOffset={6}>
           <h3 className="mb-1 text-sm font-semibold text-text-primary">{TIER_HELP_TITLE}</h3>
           <p className="mb-3 text-xs text-text-secondary">{TIER_HELP_INTRO}</p>
           <p className="mb-2 text-xs font-semibold text-text-primary">Niveles de TIER:</p>
@@ -91,7 +91,7 @@ export function TierBadge({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{badge}</TooltipTrigger>
-      <TooltipContent>
+      <TooltipContent side="bottom" sideOffset={6}>
         <p className="font-semibold text-text-primary">{rubric.category}</p>
         <p className="text-text-secondary">Riesgo: {rubric.risk}</p>
       </TooltipContent>

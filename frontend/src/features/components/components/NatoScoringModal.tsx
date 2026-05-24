@@ -1,13 +1,7 @@
 import { Check, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatEuros } from "@/lib/format/currency";
 import { cn } from "@/lib/utils/cn";
 
@@ -81,7 +75,7 @@ export function NatoScoringModal({
 }: NatoScoringModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[min(90vw,1100px)] max-w-none overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[min(95vw,1400px)] max-w-none overflow-y-auto">
         <DialogHeader>
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
@@ -153,13 +147,21 @@ export function NatoScoringModal({
             </p>
           ) : (
             <div className="overflow-hidden rounded-lg border border-border">
-              <table className="w-full text-sm">
+              <table className="w-full table-fixed text-sm">
+                <colgroup>
+                  <col className="w-[26%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[24%]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-muted/40 text-xs uppercase tracking-wide text-text-secondary">
                     <Th>Componente</Th>
                     <Th>Fabricante</Th>
                     <Th>Origen</Th>
-                    <Th>Estado</Th>
+                    <Th>Score</Th>
                     <Th>Verificado</Th>
                     <Th>Notas</Th>
                   </tr>
@@ -209,7 +211,16 @@ export function NatoScoringModal({
             </p>
           ) : (
             <div className="overflow-hidden rounded-lg border border-border">
-              <table className="w-full text-sm">
+              <table className="w-full table-fixed text-sm">
+                <colgroup>
+                  <col className="w-[28%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[14%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[14%]" />
+                </colgroup>
                 <thead>
                   <tr className="bg-muted/40 text-xs uppercase tracking-wide text-text-secondary">
                     <Th>Componente Alternativo</Th>
@@ -230,12 +241,6 @@ export function NatoScoringModal({
             </div>
           )}
         </section>
-
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Cerrar
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

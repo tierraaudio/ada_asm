@@ -57,7 +57,7 @@ export function NatoScoreBadge({
     <span
       aria-label={`Scoring OTAN ${NATO_SCORE_LABELS[value]}`}
       className={cn(
-        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold",
+        "inline-flex items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-semibold",
         withTooltip && "cursor-help",
         NATO_CLASSES[value],
         className,
@@ -78,7 +78,7 @@ export function NatoScoreBadge({
     return (
       <Tooltip>
         <TooltipTrigger asChild>{badge}</TooltipTrigger>
-        <TooltipContent className="w-80 p-4 text-sm" align="start">
+        <TooltipContent className="w-80 p-4 text-sm" align="start" side="bottom" sideOffset={6}>
           <h3 className="mb-1 text-sm font-semibold text-text-primary">{NATO_HELP_TITLE}</h3>
           <p className="mb-3 text-xs text-text-secondary">{NATO_HELP_INTRO}</p>
           <p className="mb-2 text-xs font-semibold text-text-primary">Niveles de clasificación:</p>
@@ -104,7 +104,9 @@ export function NatoScoreBadge({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{badge}</TooltipTrigger>
-      <TooltipContent>{NATO_SCORE_RUBRIC[value]}</TooltipContent>
+      <TooltipContent side="bottom" sideOffset={6}>
+        {NATO_SCORE_RUBRIC[value]}
+      </TooltipContent>
     </Tooltip>
   );
 }
