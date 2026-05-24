@@ -1,10 +1,9 @@
-import { AlertTriangle, ArrowUpRight, PackageX, ShieldAlert, TrendingUp } from "lucide-react";
+import { ArrowUpRight, ChartPie, History, PackageX, ShieldAlert, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Legend,
   Line,
   LineChart,
@@ -14,14 +13,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils/cn";
 
 import type {
@@ -43,19 +35,38 @@ interface HistorialDeComprasModalProps {
 }
 
 interface StockPoint {
+  /** YYYY-MM-DD */
   date: string;
+  /** Running stock after this event. */
   stock: number;
+  /** Render value for the green dot (purchase). */
   purchase?: number | undefined;
+  /** Render value for the red dot (consumption). */
   consumption?: number | undefined;
-  label?: string | undefined;
+  /** Original event payload — drives the tooltip. */
+  event: StockEvent;
+}
+
+function formatDdMmYyyy(iso: string): string {
+  const datePart = iso.split("T")[0] ?? iso;
+  const [y = "????", m = "??", d = "??"] = datePart.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function formatEur(value: number | null | undefined, fractionDigits = 2): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  return new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(value);
 }
 
 function buildStockSeries(events: StockEvent[], currentStock: number): StockPoint[] {
-  // Sort ascending by occurred_at.
   const asc = [...events].sort((a, b) =>
     a.occurred_at < b.occurred_at ? -1 : a.occurred_at > b.occurred_at ? 1 : 0,
   );
-  // Pick a baseline so the running total ends at `currentStock`.
   const sumSigned = asc.reduce(
     (acc, e) => acc + (e.kind === "purchase" ? e.quantity : -e.quantity),
     0,
@@ -68,10 +79,7 @@ function buildStockSeries(events: StockEvent[], currentStock: number): StockPoin
       stock: running,
       purchase: e.kind === "purchase" ? running : undefined,
       consumption: e.kind === "consumption" ? running : undefined,
-      label:
-        e.kind === "purchase"
-          ? `+${e.quantity} de ${e.supplier_name ?? "supplier"}`
-          : `−${e.quantity} → ${e.project_name_snapshot ?? "proyecto"}`,
+      event: e,
     };
   });
 }
@@ -83,7 +91,7 @@ interface ChartTooltipPayload {
 function CustomDot(props: { cx?: number; cy?: number; payload?: StockPoint }) {
   const { cx, cy, payload } = props;
   if (cx == null || cy == null || !payload) return null;
-  const isPurchase = payload.purchase !== undefined;
+  const isPurchase = payload.event.kind === "purchase";
   const fill = isPurchase ? "#22c55e" : "#ef4444";
   return <circle cx={cx} cy={cy} r={4} fill={fill} stroke="#fff" strokeWidth={1.5} />;
 }
@@ -91,13 +99,34 @@ function CustomDot(props: { cx?: number; cy?: number; payload?: StockPoint }) {
 function StockEventTooltip(props: { active?: boolean; payload?: ChartTooltipPayload[] }) {
   const { active, payload } = props;
   if (!active || !payload || payload.length === 0) return null;
-  const p = payload[0]?.payload;
-  if (!p) return null;
+  const point = payload[0]?.payload;
+  if (!point) return null;
+  const { stock, event } = point;
+  const isPurchase = event.kind === "purchase";
+  const unit = event.unit_cost != null ? Number(event.unit_cost) : null;
+  const total = event.total_cost != null ? Number(event.total_cost) : null;
+
   return (
-    <div className="rounded-md border border-border bg-white p-2 text-xs shadow">
-      <p className="font-semibold text-text-primary">{p.date}</p>
-      <p className="text-text-secondary">Stock: {p.stock} uds</p>
-      {p.label && <p className="text-text-secondary">{p.label}</p>}
+    <div className="min-w-[180px] rounded-md border border-border bg-white p-3 text-sm shadow-md">
+      <p className="text-base font-semibold text-text-primary">
+        {formatDdMmYyyy(event.occurred_at)}
+      </p>
+      <p className="mt-1 text-text-primary">
+        Stock: <span className="font-medium">{stock} uds</span>
+      </p>
+      {isPurchase ? (
+        <>
+          <p className="mt-1 font-semibold text-emerald-600">+ {event.quantity} compradas</p>
+          <p className="text-text-secondary">Proveedor: {event.supplier_name ?? "—"}</p>
+          {unit != null && <p className="text-text-secondary">Precio: €{unit.toFixed(2)}/ud</p>}
+          {total != null && <p className="text-text-secondary">Total: {formatEur(total)}</p>}
+        </>
+      ) : (
+        <>
+          <p className="mt-1 font-semibold text-red-600">-{event.quantity} usadas</p>
+          <p className="text-text-secondary">Proyecto: {event.project_name_snapshot ?? "—"}</p>
+        </>
+      )}
     </div>
   );
 }
@@ -118,16 +147,36 @@ function aggregatePurchasesBySupplier(events: StockEvent[]): SupplierAggregate[]
     current.cost += Number(e.total_cost ?? 0);
     byName.set(name, current);
   }
-  return [...byName.values()].sort((a, b) => b.qty - a.qty);
+  return [...byName.values()].sort((a, b) => b.cost - a.cost);
 }
 
-function formatEur(value: number | null | undefined): string {
-  if (value == null) return "—";
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 2,
-  }).format(value);
+/**
+ * FIFO from most recent purchases summing to `currentStock`. Returns the
+ * weighted average unit cost of the units that make up the current stock,
+ * plus how many of those units were "above average" (used by the
+ * "stock acumulado a precio alto" alert).
+ */
+function weightedStockCost(
+  events: StockEvent[],
+  currentStock: number,
+): { weightedUnit: number; coveredUnits: number } {
+  if (currentStock <= 0) return { weightedUnit: 0, coveredUnits: 0 };
+  const purchasesDesc = events
+    .filter((e) => e.kind === "purchase")
+    .sort((a, b) => (a.occurred_at < b.occurred_at ? 1 : -1));
+  let remaining = currentStock;
+  let weightedSum = 0;
+  let coveredUnits = 0;
+  for (const p of purchasesDesc) {
+    if (remaining <= 0) break;
+    const unit = p.unit_cost != null ? Number(p.unit_cost) : 0;
+    const take = Math.min(p.quantity, remaining);
+    weightedSum += unit * take;
+    coveredUnits += take;
+    remaining -= take;
+  }
+  const weightedUnit = coveredUnits > 0 ? weightedSum / coveredUnits : 0;
+  return { weightedUnit, coveredUnits };
 }
 
 function buildAlerts(
@@ -214,22 +263,20 @@ function buildAlerts(
     });
   }
 
-  // 4) Stock acumulado a precio alto — average purchase cost > current preferred 100u price.
-  const purchases = events.filter((e) => e.kind === "purchase");
-  if (purchases.length > 0 && pref) {
-    const avgUnit =
-      purchases.reduce((acc, e) => acc + Number(e.unit_cost ?? 0), 0) / purchases.length;
+  // 4) Stock acumulado a precio alto — weighted stock cost > current preferred 100u price.
+  if (pref && component.stock > 0) {
+    const { weightedUnit } = weightedStockCost(events, component.stock);
     const latestPref = prices
       .filter((p) => p.supplier_id === pref && p.qty_tier === 100)
       .sort((a, b) => (a.valid_from < b.valid_from ? 1 : -1))[0];
     const currentPref = latestPref ? Number(latestPref.price) : null;
-    if (currentPref !== null && avgUnit > currentPref) {
-      const pct = ((avgUnit - currentPref) / currentPref) * 100;
+    if (currentPref != null && weightedUnit > currentPref) {
+      const pct = ((weightedUnit - currentPref) / currentPref) * 100;
       out.push({
         id: "stock_caro",
         severity: "info",
         title: "Stock acumulado a precio alto",
-        detail: `El coste medio de compra (${formatEur(avgUnit)}) está un ${pct.toFixed(0)}% por encima del precio actual.`,
+        detail: `El coste medio del stock actual (${formatEur(weightedUnit)}) está un ${pct.toFixed(0)}% por encima del precio actual (${formatEur(currentPref)}).`,
       });
     }
   }
@@ -242,6 +289,34 @@ const SEVERITY_META = {
   info: { Icon: ArrowUpRight, cls: "border-sky-200 bg-sky-50 text-sky-800" },
   critical: { Icon: PackageX, cls: "border-red-200 bg-red-50 text-red-800" },
 } as const;
+
+interface BarTooltipPayload {
+  dataKey: string;
+  name: string;
+  value: number;
+  color: string;
+  payload: SupplierAggregate;
+}
+
+function SupplierBarTooltip(props: { active?: boolean; payload?: BarTooltipPayload[] }) {
+  const { active, payload } = props;
+  if (!active || !payload || payload.length === 0) return null;
+  const row = payload[0]?.payload;
+  if (!row) return null;
+  return (
+    <div className="min-w-[160px] rounded-md border border-border bg-white p-3 text-sm shadow-md">
+      <p className="font-semibold text-text-primary">{row.supplierName}</p>
+      <p className="text-text-secondary">
+        <span className="mr-1 inline-block size-2 rounded-sm bg-emerald-500" />
+        Cantidad: <span className="font-medium text-text-primary">{row.qty} uds</span>
+      </p>
+      <p className="text-text-secondary">
+        <span className="mr-1 inline-block size-2 rounded-sm bg-sky-500" />
+        Coste total: <span className="font-medium text-text-primary">{formatEur(row.cost)}</span>
+      </p>
+    </div>
+  );
+}
 
 export function HistorialDeComprasModal({
   open,
@@ -260,10 +335,17 @@ export function HistorialDeComprasModal({
     () => aggregatePurchasesBySupplier(stockEvents),
     [stockEvents],
   );
+
   const purchases = stockEvents.filter((e) => e.kind === "purchase");
   const totalInvested = purchases.reduce((acc, e) => acc + Number(e.total_cost ?? 0), 0);
   const totalUnitsPurchased = purchases.reduce((acc, e) => acc + e.quantity, 0);
-  const avgUnitCost = totalUnitsPurchased > 0 ? totalInvested / totalUnitsPurchased : 0;
+  const componentAvgUnit = totalUnitsPurchased > 0 ? totalInvested / totalUnitsPurchased : 0;
+  const { weightedUnit: stockAvgUnit } = useMemo(
+    () => weightedStockCost(stockEvents, component.stock),
+    [stockEvents, component.stock],
+  );
+  const totalInStock = stockAvgUnit * component.stock;
+
   const alerts = useMemo(
     () => buildAlerts(component, stockEvents, supplierPrices, supplierStocks, suppliers),
     [component, stockEvents, supplierPrices, supplierStocks, suppliers],
@@ -271,7 +353,7 @@ export function HistorialDeComprasModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[min(90vw,1100px)] max-w-none overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-[min(90vw,1240px)] max-w-none overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg">
             Historial de compras —{" "}
@@ -282,7 +364,8 @@ export function HistorialDeComprasModal({
 
         {/* Stock interno con eventos */}
         <section className="rounded-lg border border-border p-4">
-          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+          <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            <History className="size-4" />
             Stock interno con eventos
           </h3>
           <div className="h-64">
@@ -294,7 +377,15 @@ export function HistorialDeComprasModal({
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={series} margin={{ top: 10, right: 16, bottom: 0, left: -8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis dataKey="date" fontSize={11} stroke="#6b7280" />
+                  <XAxis
+                    dataKey="date"
+                    fontSize={11}
+                    stroke="#6b7280"
+                    tickFormatter={(v: string) => {
+                      const [, m = "??", d = "??"] = v.split("-");
+                      return `${d}/${m}`;
+                    }}
+                  />
                   <YAxis fontSize={11} stroke="#6b7280" />
                   <Tooltip content={<StockEventTooltip />} />
                   <Line
@@ -320,13 +411,14 @@ export function HistorialDeComprasModal({
           </p>
         </section>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {/* Proveedor más comprado */}
           <section className="rounded-lg border border-border p-4">
-            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+              <ChartPie className="size-4 text-brand" />
               Proveedor más comprado
             </h3>
-            <div className="h-56">
+            <div className="h-72">
               {supplierAggregates.length === 0 ? (
                 <p className="flex h-full items-center justify-center text-sm text-text-secondary">
                   Sin compras registradas.
@@ -340,18 +432,15 @@ export function HistorialDeComprasModal({
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="supplierName" fontSize={11} stroke="#6b7280" />
                     <YAxis fontSize={11} stroke="#6b7280" />
-                    <Tooltip
-                      formatter={(value, name) => {
-                        if (name === "qty") return [`${String(value)} uds`, "Cantidad"];
-                        return [formatEur(Number(value)), "Coste total"];
-                      }}
+                    <Tooltip content={<SupplierBarTooltip />} cursor={{ fill: "#f3f4f6" }} />
+                    <Legend
+                      wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+                      formatter={(value: string) =>
+                        value === "qty" ? "Cantidad (uds)" : "Coste total (€)"
+                      }
                     />
-                    <Legend />
-                    <Bar dataKey="qty" name="Cantidad" fill="#e91e8c" radius={[4, 4, 0, 0]}>
-                      {supplierAggregates.map((s, idx) => (
-                        <Cell key={s.supplierName} fill={idx === 0 ? "#e91e8c" : "#0ea5e9"} />
-                      ))}
-                    </Bar>
+                    <Bar dataKey="qty" name="qty" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="cost" name="cost" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -360,34 +449,28 @@ export function HistorialDeComprasModal({
 
           {/* Estadísticas de compra */}
           <section className="rounded-lg border border-border p-4">
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+              <ChartPie className="size-4 text-brand" />
               Estadísticas de compra
             </h3>
-            <dl className="space-y-3 text-sm">
-              <Stat label="Coste total del componente" value={formatEur(totalInvested)} />
-              <Stat
+            <div className="space-y-3">
+              <StatBlock
                 label="Coste medio del componente"
-                value={
-                  <span>
-                    {formatEur(avgUnitCost)}{" "}
-                    <span className="text-xs text-text-secondary">
-                      ({totalUnitsPurchased} uds compradas)
-                    </span>
-                  </span>
-                }
+                value={formatEur(componentAvgUnit)}
+                helper="Basado en todas las compras"
               />
-              <Stat
-                label="Total invertido"
-                value={
-                  <span className="text-base font-semibold text-brand">
-                    {formatEur(totalInvested)}
-                  </span>
-                }
+              <StatBlock
+                label="Coste medio del stock actual"
+                value={formatEur(stockAvgUnit)}
+                helper="Media ponderada del stock en almacén"
               />
-              <p className="text-xs text-text-secondary">
-                Basado en todas las compras registradas (no incluye consumos).
-              </p>
-            </dl>
+              <StatBlock
+                label="Total invertido en stock"
+                value={formatEur(totalInStock)}
+                helper={`${component.stock} unidades × ${formatEur(stockAvgUnit)} promedio`}
+                emphasis
+              />
+            </div>
           </section>
         </div>
 
@@ -423,25 +506,34 @@ export function HistorialDeComprasModal({
             </ul>
           )}
         </section>
-
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Cerrar
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+function StatBlock({
+  label,
+  value,
+  helper,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  emphasis?: boolean;
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-xs uppercase tracking-wide text-text-secondary">{label}</dt>
-      <dd className="text-sm font-medium text-text-primary">{value}</dd>
+    <div className="rounded-md border border-border bg-white px-4 py-3">
+      <p className="text-xs text-text-secondary">{label}</p>
+      <p
+        className={cn(
+          "mt-1 text-2xl font-semibold leading-none",
+          emphasis ? "text-brand" : "text-text-primary",
+        )}
+      >
+        {value}
+      </p>
+      <p className="mt-1 text-xs text-text-secondary">{helper}</p>
     </div>
   );
 }
-
-// Silence unused-import warning if AlertTriangle is removed later.
-void AlertTriangle;
