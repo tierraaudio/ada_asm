@@ -35,7 +35,6 @@ class ComponentCreate:
     tipo_almacenamiento: str | None = None
     holded_id: str | None = None
     fecha_creacion: date | None = None
-    verificado: bool = False
     notas: str | None = None
     stock: int = 0
     stock_min: int | None = None
@@ -72,7 +71,6 @@ class ComponentUpdate:
     tipo_almacenamiento: str | None | _MissingSentinel = _MISSING
     holded_id: str | None | _MissingSentinel = _MISSING
     fecha_creacion: date | None | _MissingSentinel = _MISSING
-    verificado: bool | _MissingSentinel = _MISSING
     notas: str | None | _MissingSentinel = _MISSING
     stock: int | _MissingSentinel = _MISSING
     stock_min: int | None | _MissingSentinel = _MISSING
@@ -114,7 +112,6 @@ class ComponentsService:
             tipo_almacenamiento=payload.tipo_almacenamiento,
             holded_id=payload.holded_id,
             fecha_creacion=payload.fecha_creacion,
-            verificado=payload.verificado,
             notas=payload.notas,
             stock=payload.stock,
             stock_min=payload.stock_min,
@@ -144,7 +141,6 @@ class ComponentsService:
             tipo_almacenamiento=_apply(existing.tipo_almacenamiento, payload.tipo_almacenamiento),
             holded_id=_apply(existing.holded_id, payload.holded_id),
             fecha_creacion=_apply(existing.fecha_creacion, payload.fecha_creacion),
-            verificado=_apply(existing.verificado, payload.verificado),
             notas=_apply(existing.notas, payload.notas),
             stock=_apply(existing.stock, payload.stock),
             stock_min=_apply(existing.stock_min, payload.stock_min),

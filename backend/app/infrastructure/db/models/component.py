@@ -6,7 +6,6 @@ from datetime import date
 from uuid import UUID
 
 from sqlalchemy import (
-    Boolean,
     CheckConstraint,
     Date,
     ForeignKey,
@@ -56,9 +55,6 @@ class ComponentModel(Base, TimestampMixin):
     tipo_almacenamiento: Mapped[str | None] = mapped_column(String(80), nullable=True)
     holded_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     fecha_creacion: Mapped[date | None] = mapped_column(Date, nullable=True)
-    verificado: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default=text("false")
-    )
     notas: Mapped[str | None] = mapped_column(nullable=True)
     stock: Mapped[int] = mapped_column(
         Integer,

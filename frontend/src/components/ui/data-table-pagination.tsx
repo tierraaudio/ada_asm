@@ -1,9 +1,4 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -41,10 +36,7 @@ export function DataTablePagination({
   const atLast = page >= pageCount;
   return (
     <div
-      className={cn(
-        "flex items-center justify-end gap-2 text-sm text-text-secondary",
-        className,
-      )}
+      className={cn("flex items-center justify-end gap-2 text-sm text-text-secondary", className)}
       role="navigation"
       aria-label="Paginación"
     >

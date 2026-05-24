@@ -63,7 +63,7 @@ async def test_create_with_minimal_payload(
     body = response.json()
     assert body["sku"] is None
     assert body["stock"] == 0
-    assert body["verificado"] is False
+    assert body["stock_min"] is None
 
 
 async def test_create_duplicate_mpn_returns_409(

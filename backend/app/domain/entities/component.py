@@ -31,7 +31,6 @@ class Component:
     tipo_almacenamiento: str | None = None
     holded_id: str | None = None
     fecha_creacion: date | None = None
-    verificado: bool = False
     notas: str | None = None
     stock: int = 0
     stock_min: int | None = None

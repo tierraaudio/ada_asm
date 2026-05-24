@@ -35,7 +35,6 @@ def _to_entity(row: ComponentModel) -> Component:
         tipo_almacenamiento=row.tipo_almacenamiento,
         holded_id=row.holded_id,
         fecha_creacion=row.fecha_creacion,
-        verificado=row.verificado,
         notas=row.notas,
         stock=row.stock,
         stock_min=row.stock_min,
@@ -168,7 +167,6 @@ class SqlAlchemyComponentRepository:
             tipo_almacenamiento=component.tipo_almacenamiento,
             holded_id=component.holded_id,
             fecha_creacion=component.fecha_creacion,
-            verificado=component.verificado,
             notas=component.notas,
             stock=component.stock,
             stock_min=component.stock_min,
@@ -205,7 +203,6 @@ class SqlAlchemyComponentRepository:
         row.tipo_almacenamiento = component.tipo_almacenamiento
         row.holded_id = component.holded_id
         row.fecha_creacion = component.fecha_creacion
-        row.verificado = component.verificado
         row.notas = component.notas
         row.stock = component.stock
         row.stock_min = component.stock_min

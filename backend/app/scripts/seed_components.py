@@ -24,17 +24,33 @@ from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 
+from app.application.services.nato_scoring_service import (
+    AlternativeInput,
+    ClassificationInput,
+    CreateScoringInput,
+    NatoScoringService,
+)
 from app.domain.entities.component import Component, NatoScoreValue, TierValue
 from app.domain.entities.stock_event import StockEvent
 from app.domain.entities.supplier import Supplier
 from app.domain.entities.supplier_price import QtyTier, SupplierPrice
 from app.domain.entities.supplier_stock import SupplierStock
 from app.domain.repositories.component_repository import ComponentFilters
+from app.infrastructure.db.models.user import UserModel
 from app.infrastructure.db.session import get_session_factory
 from app.infrastructure.repositories.component_repository import (
     SqlAlchemyComponentRepository,
+)
+from app.infrastructure.repositories.nato_scoring_repository import (
+    SqlAlchemyNatoScoringRepository,
+)
+from app.infrastructure.repositories.scoring_alternative_repository import (
+    SqlAlchemyScoringAlternativeRepository,
+)
+from app.infrastructure.repositories.scoring_classification_repository import (
+    SqlAlchemyScoringClassificationRepository,
 )
 from app.infrastructure.repositories.stock_event_repository import (
     SqlAlchemyStockEventRepository,
@@ -50,6 +66,97 @@ from app.infrastructure.repositories.supplier_stock_repository import (
 )
 
 SUPPLIER_NAMES = ["DigiKey", "Mouser", "Farnell", "RS", "TME"]
+
+# Per-family realistic sub-parts to seed `scoring_classifications` with.
+# Each tuple is (part_label, fabricante, country_of_origin, nato_score, verificado, notas).
+FAMILY_CLASSIFICATIONS: dict[str, list[tuple[str, str, str, NatoScoreValue, bool, str]]] = {
+    "Microcontroladores": [
+        (
+            "Chip principal",
+            "STMicroelectronics",
+            "FR",
+            "A+",
+            True,
+            "Fabricado en Francia. Cumple con estándares OTAN.",
+        ),
+        ("Encapsulado plástico", "TDK", "DE", "A", True, "Material de bajo riesgo. Origen OTAN."),
+        ("Sustrato cerámico", "Kyocera", "JP", "B", True, "Origen aliado OTAN."),
+    ],
+    "Sensores": [
+        ("Chip sensor", "Bosch Sensortec", "DE", "A", True, "Sensor verificado de origen OTAN."),
+        ("Encapsulado QFN", "Amkor", "KR", "B", True, "Encapsulado de un aliado OTAN."),
+    ],
+    "Condensadores": [
+        ("Dieléctrico cerámico", "Murata", "JP", "B", True, "Material cerámico de origen aliado."),
+        (
+            "Terminales metálicos",
+            "Local Plastics",
+            "PL",
+            "A+",
+            True,
+            "Terminales de origen verificado OTAN.",
+        ),
+    ],
+    "Resistencias": [
+        ("Elemento resistivo", "Yageo", "TW", "B", True, "Fabricación en Taiwán, aliado OTAN."),
+        ("Encapsulado SMD", "Yageo", "TW", "B", True, "Mismo origen que el elemento resistivo."),
+    ],
+    "Diodos": [
+        (
+            "Cristal semiconductor",
+            "Diodes Inc.",
+            "US",
+            "A+",
+            True,
+            "Silicio verificado de origen OTAN.",
+        ),
+        ("Encapsulado SMA", "ON Semiconductor", "US", "A+", True, "Origen verificado OTAN."),
+    ],
+    "Transistores": [
+        ("Wafer semiconductor", "Infineon", "DE", "A", True, "Wafer alemán de origen OTAN."),
+        ("Encapsulado TO-220", "Nexperia", "NL", "A", True, "Encapsulado de origen OTAN."),
+        (
+            "Leadframe metálico",
+            "Local Plastics",
+            "PL",
+            "A+",
+            True,
+            "Aleación de origen verificado.",
+        ),
+    ],
+    "Conectores": [
+        ("Cuerpo plástico", "Amphenol", "US", "A+", True, "Plástico ignífugo de origen OTAN."),
+        ("Contactos metálicos", "Molex", "US", "A+", True, "Aleación de cobre verificada."),
+    ],
+    "Fuentes de alimentación": [
+        ("Chip regulador", "Texas Instruments", "US", "A+", True, "Silicio verificado OTAN."),
+        ("Bobina interna", "Würth Elektronik", "DE", "A", True, "Inductor de origen OTAN."),
+        ("Encapsulado SMD", "Local Plastics", "PL", "A+", True, "Encapsulado verificado."),
+    ],
+    "Módulos": [
+        ("MCU principal", "Espressif", "CN", "D", False, "Origen no OTAN — revisar."),
+        ("RF transceiver", "Espressif", "CN", "D", False, "Componente RF no verificado."),
+        ("Antena PCB", "Local Plastics", "PL", "A+", True, "Antena impresa, origen OTAN."),
+    ],
+}
+
+
+def _classifications_for(family: str) -> list[ClassificationInput]:
+    template = FAMILY_CLASSIFICATIONS.get(
+        family,
+        [("Cuerpo principal", "Genérico", "ES", "B", True, "Componente sin desglose detallado.")],
+    )
+    return [
+        ClassificationInput(
+            part_label=label,
+            fabricante=fab,
+            country_of_origin=country,
+            nato_score=score,
+            verificado=verified,
+            notas=note,
+        )
+        for (label, fab, country, score, verified, note) in template
+    ]
 
 
 @dataclass
@@ -69,7 +176,6 @@ class ComponentSeed:
     stock_min: int
     preferred_supplier: str
     datasheet_url: str
-    verificado: bool
 
 
 # Tier per family rule of thumb:
@@ -94,7 +200,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=5,
         preferred_supplier="DigiKey",
         datasheet_url="https://www.st.com/resource/en/datasheet/stm32f407vg.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="GRM31CR71H106KA12L",
@@ -112,7 +217,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=50,
         preferred_supplier="TME",
         datasheet_url="https://www.murata.com/datasheet/grm31cr71h106ka12.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="RC0805FR-0710K",
@@ -130,7 +234,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=80,
         preferred_supplier="TME",
         datasheet_url="https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_11.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="BME280",
@@ -148,7 +251,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=12,
         preferred_supplier="Mouser",
         datasheet_url="https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bme280-ds002.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="LM2596S-5.0",
@@ -166,7 +268,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=15,
         preferred_supplier="TME",
         datasheet_url="https://www.ti.com/lit/ds/symlink/lm2596.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="ACS712ELCTR-20A-T",
@@ -184,7 +285,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="DigiKey",
         datasheet_url="https://www.allegromicro.com/-/media/files/datasheets/acs712-datasheet.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="B340A",
@@ -202,7 +302,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=40,
         preferred_supplier="Farnell",
         datasheet_url="https://www.diodes.com/assets/Datasheets/B340A.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="IRF1404 - MOSFET N 100V 162A",
@@ -220,7 +319,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="Mouser",
         datasheet_url="https://www.infineon.com/dgdl/irf1404pbf.pdf",
-        verificado=False,
     ),
     ComponentSeed(
         mpn="USB Type-C 24-pin Female SMD",
@@ -238,7 +336,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=20,
         preferred_supplier="DigiKey",
         datasheet_url="https://www.amphenol-cs.com/media/wysiwyg/files/drawing/12401548.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="ESP32-WROOM-32",
@@ -256,7 +353,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=8,
         preferred_supplier="TME",
         datasheet_url="https://www.espressif.com/sites/default/files/documentation/esp32-wroom-32_datasheet_en.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="NE555",
@@ -274,7 +370,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="TME",
         datasheet_url="https://www.ti.com/lit/ds/symlink/ne555.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="ATMEGA328P-PU",
@@ -292,7 +387,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=8,
         preferred_supplier="DigiKey",
         datasheet_url="https://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="RP2040",
@@ -310,7 +404,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="Mouser",
         datasheet_url="https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="W25Q128JVSIQ",
@@ -328,7 +421,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="DigiKey",
         datasheet_url="https://www.winbond.com/resource-files/w25q128jv_revh.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="MPU-6050",
@@ -346,7 +438,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="Mouser",
         datasheet_url="https://invensense.tdk.com/wp-content/uploads/2015/02/MPU-6000-Datasheet1.pdf",
-        verificado=False,
     ),
     ComponentSeed(
         mpn="DHT22",
@@ -364,7 +455,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="Farnell",
         datasheet_url="https://www.sparkfun.com/datasheets/Sensors/Temperature/DHT22.pdf",
-        verificado=False,
     ),
     ComponentSeed(
         mpn="VL53L1X",
@@ -382,7 +472,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="DigiKey",
         datasheet_url="https://www.st.com/resource/en/datasheet/vl53l1x.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="LM358",
@@ -400,7 +489,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=30,
         preferred_supplier="TME",
         datasheet_url="https://www.ti.com/lit/ds/symlink/lm358.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="AMS1117-3.3",
@@ -418,7 +506,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=40,
         preferred_supplier="TME",
         datasheet_url="https://www.advanced-monolithic.com/pdf/ds1117.pdf",
-        verificado=False,
     ),
     ComponentSeed(
         mpn="TPS5430",
@@ -436,7 +523,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="DigiKey",
         datasheet_url="https://www.ti.com/lit/ds/symlink/tps5430.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="CR2032",
@@ -454,7 +540,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=40,
         preferred_supplier="Farnell",
         datasheet_url="https://industrial.panasonic.com/cdbs/www-data/pdf/AAB4000/AAB4000C20.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="RC0805FR-074K7",
@@ -472,7 +557,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=100,
         preferred_supplier="TME",
         datasheet_url="https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_11.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="RC0805JR-07330R",
@@ -490,7 +574,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=100,
         preferred_supplier="TME",
         datasheet_url="https://www.yageo.com/upload/media/product/productsearch/datasheet/rchip/PYu-RC_Group_51_RoHS_L_11.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="CL10A106KP8NNNC",
@@ -508,7 +591,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=200,
         preferred_supplier="Mouser",
         datasheet_url="https://product.samsungsem.com/mlcc/CL10A106KP8NNNC.do",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="EEUFM1H101",
@@ -526,7 +608,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=60,
         preferred_supplier="Farnell",
         datasheet_url="https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1265.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="SS14",
@@ -544,7 +625,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=80,
         preferred_supplier="DigiKey",
         datasheet_url="https://www.vishay.com/docs/88751/ss12.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="1N4148W",
@@ -562,7 +642,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=200,
         preferred_supplier="TME",
         datasheet_url="https://www.onsemi.com/pdf/datasheet/1n4148w-d.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="2N7002",
@@ -580,7 +659,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=100,
         preferred_supplier="Farnell",
         datasheet_url="https://assets.nexperia.com/documents/data-sheet/2N7002.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="BC547BTA",
@@ -598,7 +676,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=100,
         preferred_supplier="TME",
         datasheet_url="https://www.onsemi.com/pdf/datasheet/bc547-d.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="61300411121",
@@ -616,7 +693,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=60,
         preferred_supplier="Farnell",
         datasheet_url="https://www.we-online.com/components/products/datasheet/61300411121.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="Molex 22-23-2041",
@@ -634,7 +710,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=40,
         preferred_supplier="DigiKey",
         datasheet_url="https://www.molex.com/pdm_docs/sd/022232041_sd.pdf",
-        verificado=True,
     ),
     ComponentSeed(
         mpn="RPi-Pico-W",
@@ -652,7 +727,6 @@ SAMPLE_COMPONENTS: list[ComponentSeed] = [
         stock_min=10,
         preferred_supplier="Mouser",
         datasheet_url="https://datasheets.raspberrypi.com/picow/pico-w-datasheet.pdf",
-        verificado=True,
     ),
 ]
 
@@ -681,8 +755,10 @@ async def _seed(reset: bool) -> int:
         if reset:
             await session.execute(
                 text(
-                    "TRUNCATE stock_events, supplier_stocks, supplier_prices, "
-                    "suppliers, components RESTART IDENTITY CASCADE"
+                    "TRUNCATE scoring_alternatives, scoring_classifications, "
+                    "component_nato_scorings, stock_events, supplier_stocks, "
+                    "supplier_prices, suppliers, components "
+                    "RESTART IDENTITY CASCADE"
                 )
             )
             await session.commit()
@@ -703,6 +779,7 @@ async def _seed(reset: bool) -> int:
             supplier_by_name[name] = saved.id
 
         today = date.today()
+        saved_components: list[tuple[Component, ComponentSeed]] = []
         for sample in SAMPLE_COMPONENTS:
             component = await components_repo.save(
                 Component(
@@ -717,7 +794,6 @@ async def _seed(reset: bool) -> int:
                     tipo_almacenamiento=sample.tipo_almacenamiento,
                     holded_id=f"HLD-{sample.sku}",
                     fecha_creacion=today - timedelta(days=random.randint(180, 720)),
-                    verificado=sample.verificado,
                     notas=None,
                     stock=sample.stock,
                     stock_min=sample.stock_min,
@@ -727,6 +803,7 @@ async def _seed(reset: bool) -> int:
                     proveedor_preferente_id=supplier_by_name[sample.preferred_supplier],
                 )
             )
+            saved_components.append((component, sample))
 
             # Supplier prices: today's snapshot for every supplier x every qty_tier.
             base_unit_cost_by_supplier = {
@@ -806,10 +883,55 @@ async def _seed(reset: bool) -> int:
                         )
                     )
 
+        # ---- NATO scorings (one active per component) ------------------------
+        # Need an admin user for the audit trail. Fall back to None if no users.
+        admin_row = (
+            await session.execute(
+                select(UserModel).where(UserModel.global_role == "admin").limit(1)
+            )
+        ).scalar_one_or_none()
+        classified_by = admin_row.id if admin_row else None
+
+        scoring_service = NatoScoringService(
+            session=session,
+            components=components_repo,
+            scorings=SqlAlchemyNatoScoringRepository(session),
+            classifications=SqlAlchemyScoringClassificationRepository(session),
+            alternatives=SqlAlchemyScoringAlternativeRepository(session),
+        )
+
+        # Pre-index components by family so each scoring's `alternatives` block
+        # can pick 2-3 same-family candidates without re-querying.
+        by_family: dict[str, list[Component]] = {}
+        for comp, sample in saved_components:
+            by_family.setdefault(sample.family, []).append(comp)
+
+        for component, sample in saved_components:
+            classified_at = today - timedelta(days=random.randint(0, 60))
+            alternatives_pool = [
+                c for c in by_family.get(sample.family, []) if c.id != component.id
+            ]
+            picked = random.sample(alternatives_pool, k=min(3, len(alternatives_pool)))
+            await scoring_service.create_scoring(
+                component_id=component.id,
+                payload=CreateScoringInput(
+                    nato_score=sample.nato_score,
+                    tier=sample.tier,
+                    classified_at=classified_at,
+                    classified_by_user_id=classified_by,
+                    notes=f"Clasificación inicial seedeada para {sample.mpn}.",
+                    classifications=_classifications_for(sample.family),
+                    alternatives=[
+                        AlternativeInput(alternative_component_id=alt.id) for alt in picked
+                    ],
+                ),
+            )
+
         await session.commit()
         print(
             f"Seeded {len(SAMPLE_COMPONENTS)} components, "
-            f"{len(SUPPLIER_NAMES)} suppliers, prices, stocks and stock events."
+            f"{len(SUPPLIER_NAMES)} suppliers, prices, stocks, stock events "
+            f"and 1 active NATO scoring + classifications/alternatives per component."
         )
         return 0
 

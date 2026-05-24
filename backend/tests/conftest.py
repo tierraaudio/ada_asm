@@ -74,8 +74,9 @@ async def _truncate_auth_tables() -> AsyncIterator[None]:
             await session.execute(
                 text(
                     "TRUNCATE TABLE refresh_tokens, "
-                    "password_reset_tokens, stock_events, "
-                    "supplier_stocks, supplier_prices, "
+                    "password_reset_tokens, scoring_alternatives, "
+                    "scoring_classifications, component_nato_scorings, "
+                    "stock_events, supplier_stocks, supplier_prices, "
                     "components, suppliers, users RESTART IDENTITY CASCADE"
                 )
             )
