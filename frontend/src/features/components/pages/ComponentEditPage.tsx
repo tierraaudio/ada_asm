@@ -21,6 +21,7 @@ import type { ComponentCreatePayload, ComponentUpdatePayload } from "../api/comp
 import { HistoricoPreciosChart } from "../components/HistoricoPreciosChart";
 import { PreciosDeHoyTable } from "../components/PreciosDeHoyTable";
 import { StockDisponibleChart } from "../components/StockDisponibleChart";
+import { FAMILY_VALUES, TIPO_ALMACENAMIENTO_VALUES } from "../types";
 import { useComponentDetail } from "../hooks/use-component-detail";
 import { useCreateComponent, useUpdateComponent } from "../hooks/use-component-mutations";
 import { useStockEvents, useSupplierPrices, useSupplierStocks } from "../hooks/use-supplier-data";
@@ -44,8 +45,20 @@ const formSchema = z.object({
       "URL inválida (debe empezar por http:// o https://)",
     ),
   location: z.string().trim().max(100).optional(),
-  tipo_almacenamiento: z.string().trim().max(80).optional(),
-  family: z.string().trim().min(1, "Familia obligatoria").max(100),
+  tipo_almacenamiento: z
+    .string()
+    .optional()
+    .refine(
+      (v) => !v || (TIPO_ALMACENAMIENTO_VALUES as readonly string[]).includes(v),
+      "Valor inválido",
+    ),
+  family: z
+    .string()
+    .min(1, "Familia obligatoria")
+    .refine(
+      (v) => (FAMILY_VALUES as readonly string[]).includes(v),
+      "Familia inválida",
+    ),
   proveedor_preferente_id: z.string().optional(),
   fabricante: z.string().trim().max(120).optional(),
   stock: z.coerce.number().int().min(0, "Stock no puede ser negativo"),
@@ -176,6 +189,8 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
   });
 
   const proveedorId = watch("proveedor_preferente_id");
+  const family = watch("family");
+  const tipoAlmacenamiento = watch("tipo_almacenamiento");
   const submitError =
     create.error && isAxiosError(create.error) && create.error.response?.status === 409
       ? "Ya existe un componente con ese MPN."
@@ -333,24 +348,50 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
               icon={<Package className="size-3.5" />}
               error={errors.tipo_almacenamiento?.message}
             >
-              <input
-                {...register("tipo_almacenamiento")}
-                type="text"
-                className={inputCls}
-                placeholder="Antiestático"
-              />
+              <Select
+                value={tipoAlmacenamiento || "__none__"}
+                onValueChange={(v) =>
+                  setValue("tipo_almacenamiento", v === "__none__" ? "" : v, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
+              >
+                <SelectTrigger className={inputCls}>
+                  <SelectValue placeholder="Selecciona…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">—</SelectItem>
+                  {TIPO_ALMACENAMIENTO_VALUES.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FormField>
             <FormField
               label="Familia"
               icon={<Package className="size-3.5" />}
               error={errors.family?.message}
             >
-              <input
-                {...register("family")}
-                type="text"
-                className={inputCls}
-                placeholder="Microcontroladores"
-              />
+              <Select
+                value={family || ""}
+                onValueChange={(v) =>
+                  setValue("family", v, { shouldDirty: true, shouldValidate: true })
+                }
+              >
+                <SelectTrigger className={inputCls}>
+                  <SelectValue placeholder="Selecciona familia…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FAMILY_VALUES.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FormField>
             <FormField label="Proveedor preferente">
               <Select
