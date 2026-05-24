@@ -105,7 +105,7 @@ export function ComponentDetailPage() {
           }
         />
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.6fr_1fr]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.3fr_1.3fr]">
           <DetailSection title="Precios de hoy">
             {pricesQuery.isLoading ? (
               <p className="text-sm text-text-secondary">Cargando precios…</p>
