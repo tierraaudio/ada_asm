@@ -4,13 +4,38 @@ import type {
   Component,
   ComponentDetail,
   ComponentFilters,
+  NatoScoreValue,
   NatoScoring,
   Paginated,
   StockEvent,
   Supplier,
   SupplierPrice,
   SupplierStockSnapshot,
+  TierValue,
 } from "../types";
+
+export interface ComponentCreatePayload {
+  mpn: string;
+  name: string;
+  family: string;
+  tier: TierValue;
+  nato_score: NatoScoreValue;
+  sku?: string | null;
+  description?: string | null;
+  datasheet_url?: string | null;
+  location?: string | null;
+  fabricante?: string | null;
+  tipo_almacenamiento?: string | null;
+  holded_id?: string | null;
+  fecha_creacion?: string | null;
+  notas?: string | null;
+  stock?: number;
+  stock_min?: number | null;
+  country_of_origin?: string | null;
+  proveedor_preferente_id?: string | null;
+}
+
+export type ComponentUpdatePayload = Partial<Omit<ComponentCreatePayload, "mpn">>;
 
 const BASE = "/api/v1/components";
 
@@ -45,6 +70,16 @@ export const componentsApi = {
 
   get: async (id: string): Promise<ComponentDetail> => {
     const response = await api.get<ComponentDetail>(`${BASE}/${id}`);
+    return response.data;
+  },
+
+  create: async (payload: ComponentCreatePayload): Promise<Component> => {
+    const response = await api.post<Component>(BASE, payload);
+    return response.data;
+  },
+
+  update: async (id: string, payload: ComponentUpdatePayload): Promise<Component> => {
+    const response = await api.patch<Component>(`${BASE}/${id}`, payload);
     return response.data;
   },
 
