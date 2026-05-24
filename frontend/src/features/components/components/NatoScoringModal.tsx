@@ -75,7 +75,10 @@ export function NatoScoringModal({
 }: NatoScoringModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] w-[min(95vw,1400px)] max-w-none overflow-y-auto">
+      <DialogContent
+        className="max-h-[90vh] w-[min(95vw,1400px)] max-w-none overflow-y-auto"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
         <DialogHeader>
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
