@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { ComponentHeaderCard } from "../components/ComponentHeaderCard";
 import { HistorialDeComprasModal } from "../components/HistorialDeComprasModal";
@@ -81,17 +82,20 @@ export function ComponentDetailPage() {
         <ComponentHeaderCard
           component={component}
           suppliers={suppliers}
-          actionSlot={
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => setOpenModal("historial")}
-            >
-              <History className="size-4" />
-              Historial de compras
-            </Button>
+          stockActionSlot={
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Historial de compras"
+                  onClick={() => setOpenModal("historial")}
+                  className="inline-flex size-6 items-center justify-center rounded-md border border-border bg-white text-text-secondary transition-colors hover:border-brand/40 hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                >
+                  <History className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Historial de compras</TooltipContent>
+            </Tooltip>
           }
           rightSlot={
             <NatoScoringSection

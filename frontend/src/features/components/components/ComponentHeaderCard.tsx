@@ -35,8 +35,8 @@ interface ComponentHeaderCardProps {
   suppliers: Supplier[];
   /** Right-side block (Scoring OTAN section), pixel-aligned with the grid. */
   rightSlot?: ReactNode;
-  /** Rendered in the row-3, col-4 cell (just below "Proveedor preferente"). */
-  actionSlot?: ReactNode;
+  /** Rendered inline inside the Stock cell, just before "X unidades". */
+  stockActionSlot?: ReactNode;
 }
 
 /**
@@ -54,7 +54,7 @@ export function ComponentHeaderCard({
   component,
   suppliers,
   rightSlot,
-  actionSlot,
+  stockActionSlot,
 }: ComponentHeaderCardProps) {
   const preferred = suppliers.find((s) => s.id === component.proveedor_preferente_id);
   return (
@@ -117,13 +117,16 @@ export function ComponentHeaderCard({
           <Field
             label="Stock"
             value={
-              <span>
-                {component.stock} <span className="text-text-secondary">unidades</span>
+              <span className="inline-flex items-center gap-2">
+                {stockActionSlot}
+                <span>
+                  {component.stock} <span className="text-text-secondary">unidades</span>
+                </span>
               </span>
             }
           />
           <Field label="Holded ID" value={component.holded_id ?? "—"} />
-          <div className="flex items-end">{actionSlot}</div>
+          <div aria-hidden />
 
           <Field
             icon={<Paperclip className="size-3.5" />}

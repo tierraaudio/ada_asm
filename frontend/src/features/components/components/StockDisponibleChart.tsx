@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -49,30 +48,43 @@ export function StockDisponibleChart({ snapshots, suppliers }: StockDisponibleCh
   }
 
   return (
-    <div className="h-full min-h-[220px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 10, right: 16, bottom: 0, left: -8 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="date" fontSize={11} stroke="#6b7280" />
-          <YAxis fontSize={11} stroke="#6b7280" />
-          <Tooltip
-            formatter={(v) => `${v} uds`}
-            labelFormatter={(label) => `Fecha: ${label as string}`}
-          />
-          <Legend />
-          {names.map((name, idx) => (
-            <Line
-              key={name}
-              type="monotone"
-              dataKey={name}
-              stroke={SUPPLIER_COLOURS[idx % SUPPLIER_COLOURS.length] ?? "#999"}
-              strokeWidth={2}
-              dot={{ r: 3 }}
-              connectNulls
+    <div className="flex h-full min-h-[220px] flex-col">
+      <div className="min-h-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 16, bottom: 4, left: -8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="date" fontSize={11} stroke="#6b7280" />
+            <YAxis fontSize={11} stroke="#6b7280" />
+            <Tooltip
+              formatter={(v) => `${v} uds`}
+              labelFormatter={(label) => `Fecha: ${label as string}`}
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            {names.map((name, idx) => (
+              <Line
+                key={name}
+                type="monotone"
+                dataKey={name}
+                stroke={SUPPLIER_COLOURS[idx % SUPPLIER_COLOURS.length] ?? "#999"}
+                strokeWidth={2}
+                dot={{ r: 3 }}
+                connectNulls
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-text-secondary">
+        {names.map((name, idx) => (
+          <li key={name} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <span
+              aria-hidden
+              className="inline-block size-2 rounded-full"
+              style={{ backgroundColor: SUPPLIER_COLOURS[idx % SUPPLIER_COLOURS.length] ?? "#999" }}
+            />
+            {name}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
