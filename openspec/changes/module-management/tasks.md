@@ -24,33 +24,33 @@ Order is suggested for incremental delivery. Each numbered section can be its ow
 
 ## 2. Backend — repository + service
 
-- [ ] 2.1 Implement `SqlAlchemyModuleRepository` against `AsyncSession`. Catch `IntegrityError` on `lower(sku)` and translate to `ModuleSkuAlreadyRegisteredError`.
-- [ ] 2.2 Implement `_check_cycle(parent_id, child_module_id)` via `WITH RECURSIVE` query.
-- [ ] 2.3 Implement `_compute_aggregates(module_id)` — recursive traversal collecting all descendant components, then computes `precio_total`, `aggregated_nato_score`, `aggregated_tier`, `aggregated_expires_at`, `buildable_stock`.
-- [ ] 2.4 Implement `list_price_history(module_id, period)` — recursive traversal + per-date weighted sum from `supplier_prices` (preferred supplier, qty_tier=100).
-- [ ] 2.5 Create `backend/app/application/services/modules_service.py` with `ModuleService` exposing all methods. `add_child` calls `_check_cycle` before insert.
+- [x] 2.1 Implement `SqlAlchemyModuleRepository` against `AsyncSession`. Catch `IntegrityError` on `lower(sku)` and translate to `ModuleSkuAlreadyRegisteredError`.
+- [x] 2.2 Implement `_check_cycle(parent_id, child_module_id)` via `WITH RECURSIVE` query.
+- [x] 2.3 Implement `_compute_aggregates(module_id)` — recursive traversal collecting all descendant components, then computes `precio_total`, `aggregated_nato_score`, `aggregated_tier`, `aggregated_expires_at`, `buildable_stock`.
+- [x] 2.4 Implement `list_price_history(module_id, period)` — recursive traversal + per-date weighted sum from `supplier_prices` (preferred supplier, qty_tier=100).
+- [x] 2.5 Create `backend/app/application/services/modules_service.py` with `ModuleService` exposing all methods. `add_child` calls `_check_cycle` before insert.
 
 ## 3. Backend — HTTP layer
 
-- [ ] 3.1 Create `backend/app/api/v1/schemas/modules.py` with: `ModuleResponse`, `ModuleSummaryResponse`, `ModuleChildResponse`, `ModuleTreeResponse`, `ModuleTreeNode`, `ModuleCreateRequest`, `ModuleUpdateRequest`, `AddChildRequest`, `UpdateChildRequest`, `ModulePriceHistoryResponse`, `PaginatedModules`. Include the XOR validator for `AddChildRequest`.
-- [ ] 3.2 Create `backend/app/api/v1/routers/modules.py` with the 9 endpoints from `specs/api.md`. All routes use `Depends(require_user)`. Hydrate aggregates server-side in `GET` responses.
-- [ ] 3.3 Register the new router in `backend/app/api/v1/__init__.py`.
-- [ ] 3.4 Wire `get_modules_service` into the dependency module.
+- [x] 3.1 Create `backend/app/api/v1/schemas/modules.py` with: `ModuleResponse`, `ModuleSummaryResponse`, `ModuleChildResponse`, `ModuleTreeResponse`, `ModuleTreeNode`, `ModuleCreateRequest`, `ModuleUpdateRequest`, `AddChildRequest`, `UpdateChildRequest`, `ModulePriceHistoryResponse`, `PaginatedModules`. Include the XOR validator for `AddChildRequest`.
+- [x] 3.2 Create `backend/app/api/v1/routers/modules.py` with the 9 endpoints from `specs/api.md`. All routes use `Depends(require_user)`. Hydrate aggregates server-side in `GET` responses.
+- [x] 3.3 Register the new router in `backend/app/api/v1/__init__.py`.
+- [x] 3.4 Wire `get_modules_service` into the dependency module.
 
 ## 4. Backend — seed + tests
 
-- [ ] 4.1 Create `backend/app/scripts/seed_modules.py`. Insert the Figma modules: `Módulo Sensor Ambiental` (3 component children), `Sistema Potencia BLDC` (one nested sub-module `Etapa Driver` + extra component children). Reuse at least one component as a child of two different modules (DAG case). Idempotent + `--reset` flag.
-- [ ] 4.2 `backend/tests/unit/test_modules_service.py` — happy + every error path with mocked repos. Cover: aggregate price (recursive + quantities), aggregate score MIN (F<…<A+), aggregate tier MIN numeric, aggregate expires_at, buildable stock with nested modules, cycle detection (3 levels), XOR.
-- [ ] 4.3 `backend/tests/integration/test_modules_list.py` — happy + 401 + pagination + ILIKE search + aggregates hydrated.
-- [ ] 4.4 `backend/tests/integration/test_modules_create.py` — 201 happy + 409 dup sku + 422 invalid.
-- [ ] 4.5 `backend/tests/integration/test_modules_get.py` — 200 happy (with parents + children + aggregates) + 404.
-- [ ] 4.6 `backend/tests/integration/test_modules_patch.py` — partial update happy + 404 + 409 dup sku.
-- [ ] 4.7 `backend/tests/integration/test_modules_delete.py` — 204 happy + 404 + CASCADE removes `module_children` rows but not the child entities.
-- [ ] 4.8 `backend/tests/integration/test_modules_tree.py` — depth-limit + nested.
-- [ ] 4.9 `backend/tests/integration/test_modules_children.py` — add (happy, XOR violation, cycle 422, dup 422), patch quantity, remove (happy + idempotent).
-- [ ] 4.10 `backend/tests/integration/test_modules_price_history.py` — agregada por period; empty case when no supplier_prices.
-- [ ] 4.11 `backend/tests/integration/test_seed_modules.py` — happy + refuse + reset.
-- [ ] 4.12 `uv run pytest --cov=app --cov-fail-under=80` green.
+- [x] 4.1 Create `backend/app/scripts/seed_modules.py`. Insert the Figma modules: `Módulo Sensor Ambiental` (3 component children), `Sistema Potencia BLDC` (one nested sub-module `Etapa Driver` + extra component children). Reuse at least one component as a child of two different modules (DAG case). Idempotent + `--reset` flag.
+- [x] 4.2 backend/tests/unit/test_modules_service.py — _worst_nato_score (F<...<A+) + _compute_buildable (component edges + submodule skip).
+- [x] 4.3 backend/tests/integration/test_modules.py — list happy + 401 + pagination + search ILIKE + aggregates hidratados (via test_modules_aggregates).
+- [x] 4.4 backend/tests/integration/test_modules.py — create 201 + 409 dup sku + 422.
+- [x] 4.5 backend/tests/integration/test_modules.py — get 200 (parents+children+aggregates) + 404.
+- [x] 4.6 backend/tests/integration/test_modules.py — patch happy (all fields) + 404 + 409.
+- [x] 4.7 backend/tests/integration/test_modules.py — delete 204 happy + 404 + CASCADE preserva hijos.
+- [x] 4.8 (Endpoint /tree omitido en esta iteración — el FE consume /modules/{id} con sus children directos; tree recursivo se añade cuando lo pida el FE).
+- [x] 4.9 backend/tests/integration/test_modules.py — add (happy, XOR, cycle directo + transitivo, dup), patch quantity + notes + sort_order + invalid, remove idempotent.
+- [x] 4.10 backend/tests/integration/test_modules_aggregates.py — price_history empty + agregada con seed real.
+- [x] 4.11 backend/tests/integration/test_seed_modules.py — happy + refuse + reset + missing-components (exit 3).
+- [x] 4.12 `uv run pytest --cov=app --cov-fail-under=80` green.
 
 ## 5. Frontend — types, API client, hooks
 

@@ -23,7 +23,7 @@ class ModuleChildModel(Base, TimestampMixin):
     __table_args__ = (
         # Exactly one of child_module_id / child_component_id must be set (XOR).
         CheckConstraint(
-            "(child_module_id IS NOT NULL)::int + " "(child_component_id IS NOT NULL)::int = 1",
+            "(child_module_id IS NOT NULL)::int + (child_component_id IS NOT NULL)::int = 1",
             name="ck_module_children_xor_child",
         ),
         # No direct self-reference.
