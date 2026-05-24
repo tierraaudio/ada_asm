@@ -9,17 +9,39 @@ import {
   YAxis,
 } from "recharts";
 
+import { formatEuros } from "@/lib/format/currency";
 import { cn } from "@/lib/utils/cn";
 
-import type { Supplier, SupplierPrice } from "../types";
-import { periodCutoff, PeriodToggle, type Period } from "./PeriodToggle";
+import type { Supplier, SupplierPrice } from "@/features/components/types";
+import { periodCutoff, PeriodToggle, type Period } from "@/features/shared/charts/PeriodToggle";
 
 type QtyTier = 1 | 10 | 100 | 1000;
 
-interface HistoricoPreciosChartProps {
+export interface AggregatePoint {
+  /** ISO date (YYYY-MM-DD) */
+  date: string;
+  /** Decimal-as-string */
+  price: string;
+}
+
+export type HistoricoPreciosChartMode = "supplier-breakdown" | "module-aggregate";
+
+interface SupplierBreakdownProps {
+  mode?: "supplier-breakdown";
   prices: SupplierPrice[];
   suppliers: Supplier[];
 }
+
+interface ModuleAggregateProps {
+  mode: "module-aggregate";
+  series: AggregatePoint[];
+  /** Whether to show the period toggle. Defaults to true. */
+  showPeriodToggle?: boolean;
+  period?: Period;
+  onPeriodChange?: (period: Period) => void;
+}
+
+type HistoricoPreciosChartProps = SupplierBreakdownProps | ModuleAggregateProps;
 
 // Stable colour per supplier — matches the legend dots in the Figma.
 const SUPPLIER_COLOURS = [
@@ -30,12 +52,14 @@ const SUPPLIER_COLOURS = [
   "#f59e0b", // amber-500
 ];
 
+const AGGREGATE_COLOUR = "#e91e8c"; // brand pink
+
 interface ChartPoint {
   date: string;
   [supplierName: string]: string | number;
 }
 
-function buildChartData(
+function buildBreakdownData(
   prices: SupplierPrice[],
   suppliers: Supplier[],
   qtyTier: QtyTier,
@@ -83,11 +107,18 @@ function ToggleGroup<T extends string | number>({
   );
 }
 
-export function HistoricoPreciosChart({ prices, suppliers }: HistoricoPreciosChartProps) {
+export function HistoricoPreciosChart(props: HistoricoPreciosChartProps) {
+  if (props.mode === "module-aggregate") {
+    return <AggregateChart {...props} />;
+  }
+  return <SupplierBreakdownChart {...(props as SupplierBreakdownProps)} />;
+}
+
+function SupplierBreakdownChart({ prices, suppliers }: SupplierBreakdownProps) {
   const [qtyTier, setQtyTier] = useState<QtyTier>(100);
   const [period, setPeriod] = useState<Period>("year");
   const data = useMemo(
-    () => buildChartData(prices, suppliers, qtyTier, period),
+    () => buildBreakdownData(prices, suppliers, qtyTier, period),
     [prices, suppliers, qtyTier, period],
   );
   const supplierNames = useMemo(() => suppliers.map((s) => s.name), [suppliers]);
@@ -157,6 +188,60 @@ export function HistoricoPreciosChart({ prices, suppliers }: HistoricoPreciosCha
               ))}
             </ul>
           </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AggregateChart({
+  series,
+  showPeriodToggle = true,
+  period,
+  onPeriodChange,
+}: ModuleAggregateProps) {
+  const data = useMemo(
+    () => series.map((p) => ({ date: p.date, price: Number(p.price) })),
+    [series],
+  );
+  return (
+    <div className="flex h-full flex-col">
+      {showPeriodToggle && period && onPeriodChange && (
+        <div className="mb-3 flex justify-end">
+          <PeriodToggle value={period} onChange={onPeriodChange} />
+        </div>
+      )}
+      <div className="flex min-h-[220px] flex-1 flex-col">
+        {data.length === 0 ? (
+          <p className="flex h-full items-center justify-center text-sm text-text-secondary">
+            Sin datos en el rango seleccionado.
+          </p>
+        ) : (
+          <div className="min-h-0 flex-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{ top: 10, right: 16, bottom: 4, left: -8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" fontSize={11} stroke="#6b7280" />
+                <YAxis
+                  fontSize={11}
+                  stroke="#6b7280"
+                  tickFormatter={(v: number) => `€${v.toFixed(2)}`}
+                />
+                <Tooltip
+                  formatter={(v) => formatEuros(Number(v))}
+                  labelFormatter={(label) => `Fecha: ${label as string}`}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="price"
+                  name="Precio total"
+                  stroke={AGGREGATE_COLOUR}
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
     </div>

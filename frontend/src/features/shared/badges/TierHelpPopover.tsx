@@ -2,8 +2,8 @@ import { Info } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-import { TIER_HELP_INTRO, TIER_HELP_TITLE, TIER_RUBRIC } from "../rubrics";
-import { TIER_VALUES } from "../types";
+import { TIER_HELP_INTRO, TIER_HELP_TITLE, TIER_RUBRIC } from "@/features/shared/rubrics";
+import { TIER_VALUES } from "@/features/shared/enums";
 import { TierBadge } from "./TierBadge";
 
 export function TierHelpPopover() {

@@ -6,8 +6,8 @@ import { formatEuros } from "@/lib/format/currency";
 import { cn } from "@/lib/utils/cn";
 
 import type { ComponentDetail, ComponentSummary, NatoScoring } from "../types";
-import { NatoScoreBadge } from "./NatoScoreBadge";
-import { TierBadge } from "./TierBadge";
+import { NatoScoreBadge } from "@/features/shared/badges/NatoScoreBadge";
+import { TierBadge } from "@/features/shared/badges/TierBadge";
 
 interface NatoScoringModalProps {
   open: boolean;

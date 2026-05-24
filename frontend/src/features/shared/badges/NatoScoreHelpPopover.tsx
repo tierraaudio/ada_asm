@@ -2,8 +2,8 @@ import { Info } from "lucide-react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-import { NATO_HELP_INTRO, NATO_HELP_TITLE, NATO_SCORE_RUBRIC } from "../rubrics";
-import { NATO_SCORE_VALUES } from "../types";
+import { NATO_HELP_INTRO, NATO_HELP_TITLE, NATO_SCORE_RUBRIC } from "@/features/shared/rubrics";
+import { NATO_SCORE_VALUES } from "@/features/shared/enums";
 import { NatoScoreBadge } from "./NatoScoreBadge";
 
 export function NatoScoreHelpPopover() {

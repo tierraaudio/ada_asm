@@ -18,9 +18,9 @@ import { cn } from "@/lib/utils/cn";
 
 import { ComponentsFiltersDrawer } from "../components/ComponentsFiltersDrawer";
 import { ConfirmDeleteDialog } from "../components/ConfirmDeleteDialog";
-import { NatoScoreBadge } from "../components/NatoScoreBadge";
-import { NatoScoreHelpPopover } from "../components/NatoScoreHelpPopover";
-import { StockStatusBadge } from "../components/StockStatusBadge";
+import { NatoScoreBadge } from "@/features/shared/badges/NatoScoreBadge";
+import { NatoScoreHelpPopover } from "@/features/shared/badges/NatoScoreHelpPopover";
+import { StockStatusBadge } from "@/features/shared/badges/StockStatusBadge";
 import { iconForFamily } from "../family-icons";
 import { useDeleteComponent } from "../hooks/use-component-mutations";
 import { useComponents } from "../hooks/use-components";

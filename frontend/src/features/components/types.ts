@@ -1,9 +1,17 @@
-export const TIER_VALUES = [1, 2, 3, 4] as const;
-export type TierValue = (typeof TIER_VALUES)[number];
+// Shared enums (TIER, NATO_SCORE, TIPO_ALMACENAMIENTO) live in
+// `features/shared/enums.ts` so other features (modules, projects) can
+// consume them without depending on the components feature.
+import {
+  NATO_SCORE_VALUES,
+  TIER_VALUES,
+  TIPO_ALMACENAMIENTO_VALUES,
+} from "@/features/shared/enums";
+import type { NatoScoreValue, TierValue, TipoAlmacenamientoValue } from "@/features/shared/enums";
 
-export const NATO_SCORE_VALUES = ["A+", "A", "B", "C", "D", "F"] as const;
-export type NatoScoreValue = (typeof NATO_SCORE_VALUES)[number];
+export { NATO_SCORE_VALUES, TIER_VALUES, TIPO_ALMACENAMIENTO_VALUES };
+export type { NatoScoreValue, TierValue, TipoAlmacenamientoValue };
 
+// FAMILY_* is components-specific (modules don't have a "family" axis).
 export const FAMILY_VALUES = [
   "Microcontroladores",
   "Sensores",
@@ -17,9 +25,6 @@ export const FAMILY_VALUES = [
   "Fuentes de alimentación",
 ] as const;
 export type FamilyValue = (typeof FAMILY_VALUES)[number];
-
-export const TIPO_ALMACENAMIENTO_VALUES = ["Gaveta", "Almacén"] as const;
-export type TipoAlmacenamientoValue = (typeof TIPO_ALMACENAMIENTO_VALUES)[number];
 
 export interface Supplier {
   id: string;

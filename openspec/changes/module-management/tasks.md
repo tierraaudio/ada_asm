@@ -4,13 +4,13 @@ Order is suggested for incremental delivery. Each numbered section can be its ow
 
 ## 0. Refactor — extract shared FE primitives (frontend only)
 
-- [ ] 0.1 Create `frontend/src/features/shared/enums.ts` with `TIER_VALUES`, `NATO_SCORE_VALUES`, `TIPO_ALMACENAMIENTO_VALUES` (move from `features/components/types.ts`; re-export from there to keep components imports working).
-- [ ] 0.2 Move `NatoScoreBadge`, `TierBadge`, `StockStatusBadge`, `NatoScoreHelpPopover`, `TierHelpPopover` to `frontend/src/features/shared/badges/`. Update all imports across `features/components` + tests.
-- [ ] 0.3 Move `PeriodToggle` and `HistoricoPreciosChart` to `frontend/src/features/shared/charts/`. Update imports.
-- [ ] 0.4 Extend `HistoricoPreciosChart` with `mode: "supplier-breakdown" | "module-aggregate"`. Default to `"supplier-breakdown"` (current behaviour). Add `series?` prop for module-aggregate mode (single line, brand colour, EUR tooltip).
-- [ ] 0.5 Extract `<FiltersDrawer>` from `ComponentsFiltersDrawer` to `frontend/src/features/shared/filters/FiltersDrawer.tsx`. `ComponentsFiltersDrawer` becomes a thin wrapper that declares its `groups` prop.
-- [ ] 0.6 Move `rubrics.ts` to `frontend/src/features/shared/rubrics.ts`. Update imports.
-- [ ] 0.7 Run typecheck + lint + 95 existing tests — all green. No behaviour changes.
+- [x] 0.1 Create `frontend/src/features/shared/enums.ts` with `TIER_VALUES`, `NATO_SCORE_VALUES`, `TIPO_ALMACENAMIENTO_VALUES` (move from `features/components/types.ts`; re-export from there to keep components imports working).
+- [x] 0.2 Move `NatoScoreBadge`, `TierBadge`, `StockStatusBadge`, `NatoScoreHelpPopover`, `TierHelpPopover` to `frontend/src/features/shared/badges/`. Update all imports across `features/components` + tests.
+- [x] 0.3 Move `PeriodToggle` and `HistoricoPreciosChart` to `frontend/src/features/shared/charts/`. Update imports.
+- [x] 0.4 Extend `HistoricoPreciosChart` with `mode: "supplier-breakdown" | "module-aggregate"`. Default to `"supplier-breakdown"` (current behaviour). Add `series?` prop for module-aggregate mode (single line, brand colour, EUR tooltip).
+- [x] 0.5 Extract `<FiltersDrawer>` from `ComponentsFiltersDrawer` to `frontend/src/features/shared/filters/FiltersDrawer.tsx`. `ComponentsFiltersDrawer` becomes a thin wrapper that declares its `groups` prop.
+- [x] 0.6 Move `rubrics.ts` to `frontend/src/features/shared/rubrics.ts`. Update imports.
+- [x] 0.7 Run typecheck + lint + 95 existing tests — all green. No behaviour changes.
 
 ## 1. Backend — domain + DB
 

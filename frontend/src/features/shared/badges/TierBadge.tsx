@@ -3,9 +3,14 @@ import type { HTMLAttributes } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils/cn";
 
-import { TIER_HELP_INTRO, TIER_HELP_TITLE, TIER_LABELS, TIER_RUBRIC } from "../rubrics";
-import { TIER_VALUES } from "../types";
-import type { TierValue } from "../types";
+import {
+  TIER_HELP_INTRO,
+  TIER_HELP_TITLE,
+  TIER_LABELS,
+  TIER_RUBRIC,
+} from "@/features/shared/rubrics";
+import { TIER_VALUES } from "@/features/shared/enums";
+import type { TierValue } from "@/features/shared/enums";
 
 /**
  * Colour bands per the Figma:

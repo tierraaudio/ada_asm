@@ -5,8 +5,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils/cn";
 
 import type { NatoScoring } from "../types";
-import { NatoScoreBadge } from "./NatoScoreBadge";
-import { TierBadge } from "./TierBadge";
+import { NatoScoreBadge } from "@/features/shared/badges/NatoScoreBadge";
+import { TierBadge } from "@/features/shared/badges/TierBadge";
 
 interface NatoScoringSectionProps {
   scoring: NatoScoring | null;

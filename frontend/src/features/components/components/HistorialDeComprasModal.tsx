@@ -23,7 +23,7 @@ import type {
   SupplierPrice,
   SupplierStockSnapshot,
 } from "../types";
-import { periodCutoff, PeriodToggle, type Period } from "./PeriodToggle";
+import { periodCutoff, PeriodToggle, type Period } from "@/features/shared/charts/PeriodToggle";
 
 interface HistorialDeComprasModalProps {
   open: boolean;

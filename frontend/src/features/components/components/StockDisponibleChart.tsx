@@ -10,7 +10,7 @@ import {
 } from "recharts";
 
 import type { Supplier, SupplierStockSnapshot } from "../types";
-import { periodCutoff, PeriodToggle, type Period } from "./PeriodToggle";
+import { periodCutoff, PeriodToggle, type Period } from "@/features/shared/charts/PeriodToggle";
 
 const SUPPLIER_COLOURS = ["#e91e8c", "#0f172a", "#0ea5e9", "#22c55e", "#f59e0b"];
 

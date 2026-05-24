@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils/cn";
 
 import type { ComponentCreatePayload, ComponentUpdatePayload } from "../api/components-api";
-import { HistoricoPreciosChart } from "../components/HistoricoPreciosChart";
+import { HistoricoPreciosChart } from "@/features/shared/charts/HistoricoPreciosChart";
 import { PreciosDeHoyTable } from "../components/PreciosDeHoyTable";
 import { StockDisponibleChart } from "../components/StockDisponibleChart";
 import { FAMILY_VALUES, TIPO_ALMACENAMIENTO_VALUES } from "../types";

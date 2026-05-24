@@ -1,4 +1,4 @@
-import type { NatoScoreValue, TierValue } from "./types";
+import type { NatoScoreValue, TierValue } from "@/features/shared/enums";
 
 /* Labels and rubric copy taken verbatim from Figma node 47:15264 (NATO popover)
  * and the Tier popover the user provided. Do not paraphrase — the design owns

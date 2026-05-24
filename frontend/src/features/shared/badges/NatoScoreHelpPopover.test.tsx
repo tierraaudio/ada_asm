@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { renderWithProviders } from "@/tests/utils";
 
-import { NATO_SCORE_RUBRIC } from "../rubrics";
+import { NATO_SCORE_RUBRIC } from "@/features/shared/rubrics";
 import { NatoScoreHelpPopover } from "./NatoScoreHelpPopover";
 
 describe("<NatoScoreHelpPopover>", () => {

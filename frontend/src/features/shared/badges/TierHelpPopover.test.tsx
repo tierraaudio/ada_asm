@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { renderWithProviders } from "@/tests/utils";
 
-import { TIER_RUBRIC } from "../rubrics";
+import { TIER_RUBRIC } from "@/features/shared/rubrics";
 import { TierHelpPopover } from "./TierHelpPopover";
 
 describe("<TierHelpPopover>", () => {

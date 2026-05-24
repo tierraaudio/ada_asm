@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import { renderWithProviders } from "@/tests/utils";
 
-import { NATO_SCORE_LABELS, NATO_SCORE_RUBRIC } from "../rubrics";
-import { NATO_SCORE_VALUES } from "../types";
+import { NATO_SCORE_LABELS, NATO_SCORE_RUBRIC } from "@/features/shared/rubrics";
+import { NATO_SCORE_VALUES } from "@/features/shared/enums";
 import { NatoScoreBadge } from "./NatoScoreBadge";
 
 describe("<NatoScoreBadge>", () => {

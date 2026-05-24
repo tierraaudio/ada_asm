@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 import { ComponentHeaderCard } from "../components/ComponentHeaderCard";
 import { HistorialDeComprasModal } from "../components/HistorialDeComprasModal";
-import { HistoricoPreciosChart } from "../components/HistoricoPreciosChart";
+import { HistoricoPreciosChart } from "@/features/shared/charts/HistoricoPreciosChart";
 import { NatoScoringModal } from "../components/NatoScoringModal";
 import { NatoScoringSection } from "../components/NatoScoringSection";
 import { PreciosDeHoyTable } from "../components/PreciosDeHoyTable";

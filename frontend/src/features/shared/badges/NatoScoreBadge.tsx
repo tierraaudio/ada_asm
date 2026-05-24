@@ -4,9 +4,14 @@ import type { HTMLAttributes } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils/cn";
 
-import { NATO_HELP_INTRO, NATO_HELP_TITLE, NATO_SCORE_LABELS, NATO_SCORE_RUBRIC } from "../rubrics";
-import { NATO_SCORE_VALUES } from "../types";
-import type { NatoScoreValue } from "../types";
+import {
+  NATO_HELP_INTRO,
+  NATO_HELP_TITLE,
+  NATO_SCORE_LABELS,
+  NATO_SCORE_RUBRIC,
+} from "@/features/shared/rubrics";
+import { NATO_SCORE_VALUES } from "@/features/shared/enums";
+import type { NatoScoreValue } from "@/features/shared/enums";
 
 /**
  * Colour bands from the Figma list page (47:15264).
