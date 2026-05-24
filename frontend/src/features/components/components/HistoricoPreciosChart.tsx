@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils/cn";
 
 import type { Supplier, SupplierPrice } from "../types";
 
-type QtyTier = 10 | 100 | 1000;
+type QtyTier = 1 | 10 | 100 | 1000;
 type Period = "week" | "month" | "year";
 
 interface HistoricoPreciosChartProps {
@@ -83,9 +83,7 @@ function ToggleGroup<T extends string | number>({
           onClick={() => onChange(opt.value)}
           className={cn(
             "rounded px-3 py-1 text-xs font-medium transition-colors",
-            value === opt.value
-              ? "bg-brand text-white"
-              : "text-text-secondary hover:bg-muted",
+            value === opt.value ? "bg-brand text-white" : "text-text-secondary hover:bg-muted",
           )}
         >
           {opt.label}
@@ -95,10 +93,7 @@ function ToggleGroup<T extends string | number>({
   );
 }
 
-export function HistoricoPreciosChart({
-  prices,
-  suppliers,
-}: HistoricoPreciosChartProps) {
+export function HistoricoPreciosChart({ prices, suppliers }: HistoricoPreciosChartProps) {
   const [qtyTier, setQtyTier] = useState<QtyTier>(100);
   const [period, setPeriod] = useState<Period>("year");
   const data = useMemo(
@@ -114,6 +109,7 @@ export function HistoricoPreciosChart({
           value={qtyTier}
           onChange={(v) => setQtyTier(v as QtyTier)}
           options={[
+            { value: 1, label: "1 ud" },
             { value: 10, label: "10 uds" },
             { value: 100, label: "100 uds" },
             { value: 1000, label: "1000 uds" },

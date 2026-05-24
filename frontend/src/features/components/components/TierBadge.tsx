@@ -1,6 +1,5 @@
 import type { HTMLAttributes } from "react";
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils/cn";
 
@@ -64,9 +63,9 @@ export function TierBadge({
 
   if (helpMode === "full") {
     return (
-      <Popover>
-        <PopoverTrigger asChild>{badge}</PopoverTrigger>
-        <PopoverContent className="w-80 p-4 text-sm" align="start">
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent className="w-80 p-4 text-sm" align="start">
           <h3 className="mb-1 text-sm font-semibold text-text-primary">{TIER_HELP_TITLE}</h3>
           <p className="mb-3 text-xs text-text-secondary">{TIER_HELP_INTRO}</p>
           <p className="mb-2 text-xs font-semibold text-text-primary">Niveles de TIER:</p>
@@ -83,8 +82,8 @@ export function TierBadge({
               </li>
             ))}
           </ul>
-        </PopoverContent>
-      </Popover>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 

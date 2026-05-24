@@ -1,4 +1,4 @@
-import { ArrowLeft, Edit3 } from "lucide-react";
+import { ArrowLeft, Edit3, History } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -76,10 +76,21 @@ export function ComponentDetailPage() {
         <ComponentHeaderCard
           component={component}
           suppliers={suppliers}
+          actionSlot={
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => setOpenModal("historial")}
+            >
+              <History className="size-4" />
+              Historial de compras
+            </Button>
+          }
           rightSlot={
             <NatoScoringSection
               scoring={component.current_nato_scoring}
-              onOpenHistorialDeCompras={() => setOpenModal("historial")}
               onOpenClasificarComponente={() => setOpenModal("clasificar")}
             />
           }
@@ -154,7 +165,7 @@ export function ComponentDetailPage() {
 
 function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="flex h-[360px] flex-col rounded-lg border border-border bg-white p-4 shadow-sm">
+    <section className="flex h-[480px] flex-col rounded-lg border border-border bg-white p-4 shadow-sm">
       <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
         {title}
       </h3>

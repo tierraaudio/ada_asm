@@ -1,7 +1,6 @@
 import { Shield } from "lucide-react";
 import type { HTMLAttributes } from "react";
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils/cn";
 
@@ -77,9 +76,9 @@ export function NatoScoreBadge({
 
   if (helpMode === "full") {
     return (
-      <Popover>
-        <PopoverTrigger asChild>{badge}</PopoverTrigger>
-        <PopoverContent className="w-80 p-4 text-sm" align="start">
+      <Tooltip>
+        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        <TooltipContent className="w-80 p-4 text-sm" align="start">
           <h3 className="mb-1 text-sm font-semibold text-text-primary">{NATO_HELP_TITLE}</h3>
           <p className="mb-3 text-xs text-text-secondary">{NATO_HELP_INTRO}</p>
           <p className="mb-2 text-xs font-semibold text-text-primary">Niveles de clasificación:</p>
@@ -97,8 +96,8 @@ export function NatoScoreBadge({
               {formatDdMmYyyy(natoExpiresAt)}
             </p>
           )}
-        </PopoverContent>
-      </Popover>
+        </TooltipContent>
+      </Tooltip>
     );
   }
 

@@ -35,6 +35,8 @@ interface ComponentHeaderCardProps {
   suppliers: Supplier[];
   /** Right-side block (Scoring OTAN section), pixel-aligned with the grid. */
   rightSlot?: ReactNode;
+  /** Rendered in the row-3, col-4 cell (just below "Proveedor preferente"). */
+  actionSlot?: ReactNode;
 }
 
 /**
@@ -48,7 +50,12 @@ interface ComponentHeaderCardProps {
  *      (Calendar / Package / MapPin / Paperclip).
  *    - Right (auto, ~360 px): the Scoring OTAN block (rightSlot).
  */
-export function ComponentHeaderCard({ component, suppliers, rightSlot }: ComponentHeaderCardProps) {
+export function ComponentHeaderCard({
+  component,
+  suppliers,
+  rightSlot,
+  actionSlot,
+}: ComponentHeaderCardProps) {
   const preferred = suppliers.find((s) => s.id === component.proveedor_preferente_id);
   return (
     <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
@@ -116,7 +123,7 @@ export function ComponentHeaderCard({ component, suppliers, rightSlot }: Compone
             }
           />
           <Field label="Holded ID" value={component.holded_id ?? "—"} />
-          <span />
+          <div className="flex items-end">{actionSlot}</div>
 
           <Field
             icon={<Paperclip className="size-3.5" />}

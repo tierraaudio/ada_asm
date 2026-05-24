@@ -49,15 +49,11 @@ export function PreciosDeHoyTable({
             key={supplier.id}
             className={cn(
               "rounded-md border px-3 py-2",
-              isPreferred
-                ? "border-brand/40 bg-brand/5"
-                : "border-border bg-white",
+              isPreferred ? "border-brand/40 bg-brand/5" : "border-border bg-white",
             )}
           >
             <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-sm font-semibold text-text-primary">
-                {supplier.name}
-              </span>
+              <span className="text-sm font-semibold text-text-primary">{supplier.name}</span>
               {isPreferred && (
                 <span className="rounded-md bg-brand px-2 py-0.5 text-xs font-semibold text-white">
                   Preferente

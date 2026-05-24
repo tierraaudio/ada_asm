@@ -12,13 +12,7 @@ import {
 
 import type { Supplier, SupplierStockSnapshot } from "../types";
 
-const SUPPLIER_COLOURS = [
-  "#e91e8c",
-  "#0f172a",
-  "#0ea5e9",
-  "#22c55e",
-  "#f59e0b",
-];
+const SUPPLIER_COLOURS = ["#e91e8c", "#0f172a", "#0ea5e9", "#22c55e", "#f59e0b"];
 
 interface StockDisponibleChartProps {
   snapshots: SupplierStockSnapshot[];
@@ -30,10 +24,7 @@ interface ChartPoint {
   [supplierName: string]: string | number;
 }
 
-function buildSeries(
-  snapshots: SupplierStockSnapshot[],
-  suppliers: Supplier[],
-): ChartPoint[] {
+function buildSeries(snapshots: SupplierStockSnapshot[], suppliers: Supplier[]): ChartPoint[] {
   const name = new Map(suppliers.map((s) => [s.id, s.name]));
   const byDate = new Map<string, ChartPoint>();
   for (const snap of snapshots) {
@@ -45,10 +36,7 @@ function buildSeries(
   return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
 }
 
-export function StockDisponibleChart({
-  snapshots,
-  suppliers,
-}: StockDisponibleChartProps) {
+export function StockDisponibleChart({ snapshots, suppliers }: StockDisponibleChartProps) {
   const data = useMemo(() => buildSeries(snapshots, suppliers), [snapshots, suppliers]);
   const names = useMemo(() => suppliers.map((s) => s.name), [suppliers]);
 

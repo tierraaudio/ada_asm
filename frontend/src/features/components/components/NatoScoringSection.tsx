@@ -1,4 +1,4 @@
-import { History, Info, ShieldCheck } from "lucide-react";
+import { Info, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -10,7 +10,6 @@ import { TierBadge } from "./TierBadge";
 
 interface NatoScoringSectionProps {
   scoring: NatoScoring | null;
-  onOpenHistorialDeCompras: () => void;
   onOpenClasificarComponente: () => void;
 }
 
@@ -31,7 +30,6 @@ function formatDdMmYyyyHm(iso: string): string {
 
 export function NatoScoringSection({
   scoring,
-  onOpenHistorialDeCompras,
   onOpenClasificarComponente,
 }: NatoScoringSectionProps) {
   if (!scoring) {
@@ -101,17 +99,6 @@ export function NatoScoringSection({
             )}
           </TooltipContent>
         </Tooltip>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onOpenHistorialDeCompras}>
-          <History className="size-4" />
-          Historial de compras
-        </Button>
-        <Button type="button" size="sm" onClick={onOpenClasificarComponente}>
-          <ShieldCheck className="size-4" />
-          Clasificar Componente
-        </Button>
       </div>
     </section>
   );
