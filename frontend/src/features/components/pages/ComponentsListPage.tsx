@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { DashboardLayout } from "@/app/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import {
   Table,
   TableBody,
@@ -242,29 +243,12 @@ export function ComponentsListPage() {
         </section>
 
         {pageCount > 1 && (
-          <div className="flex items-center justify-end gap-3 text-sm text-text-secondary">
-            <span>
-              Página {page} de {pageCount} · {total} resultados
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => gotoPage(page - 1)}
-              disabled={page <= 1}
-            >
-              Anterior
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => gotoPage(page + 1)}
-              disabled={page >= pageCount}
-            >
-              Siguiente
-            </Button>
-          </div>
+          <DataTablePagination
+            page={page}
+            pageCount={pageCount}
+            total={total}
+            onPageChange={gotoPage}
+          />
         )}
       </div>
     </DashboardLayout>
