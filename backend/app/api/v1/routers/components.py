@@ -22,6 +22,10 @@ from app.api.v1.schemas.components import (
     ScoringAlternativeResponse,
     ScoringClassificationResponse,
 )
+from app.api.v1.schemas.supplier_data import (
+    SupplierPriceResponse,
+    SupplierStockResponse,
+)
 from app.application.services.components_service import (
     _MISSING,
     ComponentCreate,
@@ -50,6 +54,12 @@ from app.infrastructure.repositories.scoring_alternative_repository import (
 )
 from app.infrastructure.repositories.scoring_classification_repository import (
     SqlAlchemyScoringClassificationRepository,
+)
+from app.infrastructure.repositories.supplier_price_repository import (
+    SqlAlchemySupplierPriceRepository,
+)
+from app.infrastructure.repositories.supplier_stock_repository import (
+    SqlAlchemySupplierStockRepository,
 )
 
 router = APIRouter(prefix="/components", tags=["components"])
@@ -322,3 +332,41 @@ async def create_nato_scoring(
         ),
     )
     return await _scoring_to_response(session, bundle)
+
+
+# ----- Supplier prices / stocks (read-only feeds for the detail screen) -----
+
+
+@router.get(
+    "/{component_id}/supplier-prices",
+    response_model=list[SupplierPriceResponse],
+)
+async def list_supplier_prices(
+    component_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[SupplierPriceResponse]:
+    """All `(supplier x qty_tier x valid_from)` rows for this component.
+
+    The FE derives both views from this feed:
+    - "Precios de hoy": latest `valid_from` per (supplier, qty_tier).
+    - "Histórico de precios": time series filtered by the chosen qty_tier.
+    """
+    await _service(session).get(component_id)
+    prices = await SqlAlchemySupplierPriceRepository(session).list_for_component(component_id)
+    return [SupplierPriceResponse.model_validate(p) for p in prices]
+
+
+@router.get(
+    "/{component_id}/supplier-stocks",
+    response_model=list[SupplierStockResponse],
+)
+async def list_supplier_stocks(
+    component_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[SupplierStockResponse]:
+    """All `(supplier x snapshot_at)` rows for the multi-line stock chart."""
+    await _service(session).get(component_id)
+    stocks = await SqlAlchemySupplierStockRepository(session).list_for_component(component_id)
+    return [SupplierStockResponse.model_validate(s) for s in stocks]

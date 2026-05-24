@@ -805,42 +805,52 @@ async def _seed(reset: bool) -> int:
             )
             saved_components.append((component, sample))
 
-            # Supplier prices: today's snapshot for every supplier x every qty_tier.
+            # Supplier prices: 4 snapshots (today + 2m + 4m + 6m ago) for every
+            # supplier x every qty_tier — enough points for the histórico chart.
             base_unit_cost_by_supplier = {
                 supplier: Decimal(str(round(random.uniform(0.50, 12.00), 2)))
                 for supplier in SUPPLIER_NAMES
             }
             for supplier_name in SUPPLIER_NAMES:
                 base = base_unit_cost_by_supplier[supplier_name]
-                for qty_tier in cast(list[QtyTier], [1, 10, 100, 1000]):
-                    await prices_repo.save(
-                        SupplierPrice(
-                            component_id=component.id,
-                            supplier_id=supplier_by_name[supplier_name],
-                            qty_tier=qty_tier,
-                            price=_qty_tier_price(base, qty_tier),
-                            valid_from=today,
+                for months_ago in (6, 4, 2, 0):
+                    valid_from = today - timedelta(days=months_ago * 30)
+                    # Slight monthly drift (±8 %) so the chart has visible motion.
+                    drift = Decimal(str(round(random.uniform(0.92, 1.08), 4)))
+                    snapshot_base = (base * drift).quantize(Decimal("0.0001"))
+                    for qty_tier in cast(list[QtyTier], [1, 10, 100, 1000]):
+                        await prices_repo.save(
+                            SupplierPrice(
+                                component_id=component.id,
+                                supplier_id=supplier_by_name[supplier_name],
+                                qty_tier=qty_tier,
+                                price=_qty_tier_price(snapshot_base, qty_tier),
+                                valid_from=valid_from,
+                            )
                         )
-                    )
 
-            # Supplier stock snapshots: one per supplier as of today.
-            # When the component itself has 0 stock, vary supplier stock so the
-            # FE can show "rojo (sin nada en proveedores)" vs "ámbar (proveedor
-            # tiene)" reliably.
+            # Supplier stock snapshots: 9 weekly snapshots over the last 60 days
+            # per supplier. The most recent snapshot also drives the StockStatus
+            # badge logic (rojo / ámbar / verde) on the list page.
             local_out = sample.stock == 0
             for supplier_name in SUPPLIER_NAMES:
+                # Pick a baseline that's coherent with the local stock signal.
                 if local_out and supplier_name in {"Farnell", "RS"}:
-                    quantity = 0
+                    baseline = 0
                 else:
-                    quantity = random.randint(0, 320) if local_out else random.randint(50, 320)
-                await stocks_repo.save(
-                    SupplierStock(
-                        component_id=component.id,
-                        supplier_id=supplier_by_name[supplier_name],
-                        quantity=quantity,
-                        snapshot_at=today,
+                    baseline = random.randint(80, 320)
+                for days_ago in (56, 49, 42, 35, 28, 21, 14, 7, 0):
+                    # Random walk around baseline so the chart is non-trivial.
+                    jitter = random.randint(-40, 40) if baseline > 0 else 0
+                    quantity = max(0, baseline + jitter)
+                    await stocks_repo.save(
+                        SupplierStock(
+                            component_id=component.id,
+                            supplier_id=supplier_by_name[supplier_name],
+                            quantity=quantity,
+                            snapshot_at=today - timedelta(days=days_ago),
+                        )
                     )
-                )
 
             # Stock events — mix of purchases and consumptions over the last
             # ~6 months. Helps the future Historial view.

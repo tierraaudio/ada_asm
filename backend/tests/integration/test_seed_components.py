@@ -31,10 +31,11 @@ async def test_seed_inserts_components_suppliers_prices_stock_events() -> None:
 
     assert await _count(ComponentModel) == expected_components
     assert await _count(SupplierModel) == expected_suppliers
-    # Each component gets 1 row per (supplier x qty_tier in {1,10,100,1000}).
-    assert await _count(SupplierPriceModel) == expected_components * expected_suppliers * 4
-    # One row per (component x supplier) snapshot.
-    assert await _count(SupplierStockModel) == expected_components * expected_suppliers
+    # Each component gets 4 snapshots (today + 2m + 4m + 6m ago) x 5 suppliers
+    # x 4 qty_tiers -> 80 price rows per component.
+    assert await _count(SupplierPriceModel) == expected_components * expected_suppliers * 4 * 4
+    # 9 weekly snapshots per supplier per component.
+    assert await _count(SupplierStockModel) == expected_components * expected_suppliers * 9
     # Each component gets 3-5 stock events.
     events = await _count(StockEventModel)
     assert events >= 3 * expected_components

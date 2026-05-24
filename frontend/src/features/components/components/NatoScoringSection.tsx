@@ -75,10 +75,7 @@ export function NatoScoringSection({
         <TierBadge value={scoring.tier} helpMode="full" />
         <span className="text-text-secondary">|</span>
         <span
-          className={cn(
-            "text-sm",
-            expired ? "font-medium text-red-600" : "text-text-secondary",
-          )}
+          className={cn("text-sm", expired ? "font-medium text-red-600" : "text-text-secondary")}
         >
           Caduca: {formatDdMmYy(scoring.expires_at)}
         </span>
@@ -100,7 +97,7 @@ export function NatoScoringSection({
               {formatDdMmYyyyHm(scoring.created_at)}
             </p>
             {scoring.notes && (
-              <p className="mt-1 text-text-secondary">"{scoring.notes}"</p>
+              <p className="mt-1 text-text-secondary">&laquo;{scoring.notes}&raquo;</p>
             )}
           </TooltipContent>
         </Tooltip>

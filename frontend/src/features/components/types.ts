@@ -80,6 +80,23 @@ export interface ComponentDetail extends Component {
   current_nato_scoring: NatoScoring | null;
 }
 
+export interface SupplierPrice {
+  id: string;
+  component_id: string;
+  supplier_id: string;
+  qty_tier: 1 | 10 | 100 | 1000;
+  price: string;
+  valid_from: string;
+}
+
+export interface SupplierStockSnapshot {
+  id: string;
+  component_id: string;
+  supplier_id: string;
+  quantity: number;
+  snapshot_at: string;
+}
+
 export interface ComponentFilters {
   q?: string;
   families?: string[];

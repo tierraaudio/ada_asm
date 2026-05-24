@@ -7,6 +7,8 @@ import type {
   NatoScoring,
   Paginated,
   Supplier,
+  SupplierPrice,
+  SupplierStockSnapshot,
 } from "../types";
 
 const BASE = "/api/v1/components";
@@ -76,6 +78,16 @@ export const componentsApi = {
     },
   ): Promise<NatoScoring> => {
     const response = await api.post<NatoScoring>(`${BASE}/${id}/nato-scorings`, payload);
+    return response.data;
+  },
+
+  listSupplierPrices: async (id: string): Promise<SupplierPrice[]> => {
+    const response = await api.get<SupplierPrice[]>(`${BASE}/${id}/supplier-prices`);
+    return response.data;
+  },
+
+  listSupplierStocks: async (id: string): Promise<SupplierStockSnapshot[]> => {
+    const response = await api.get<SupplierStockSnapshot[]>(`${BASE}/${id}/supplier-stocks`);
     return response.data;
   },
 };
