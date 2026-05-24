@@ -101,8 +101,8 @@ export function StockStatusBadge({
           )}
           {...props}
         >
+          <Icon className={cn("size-4 shrink-0", classes)} aria-hidden />
           <span>{stock} uds</span>
-          <Icon className={cn("size-4", classes)} aria-hidden />
         </span>
       </TooltipTrigger>
       <TooltipContent align="end" className="w-64">
