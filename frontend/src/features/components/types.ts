@@ -30,6 +30,8 @@ export interface Component {
   nato_score: NatoScoreValue;
   country_of_origin: string | null;
   proveedor_preferente_id: string | null;
+  /** Latest 100u price from the preferred supplier (read-only, server-computed). */
+  current_price_per_100_eur: string | null;
   created_at: string;
   updated_at: string;
 }

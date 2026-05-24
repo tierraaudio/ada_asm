@@ -209,7 +209,7 @@ export function ComponentsListPage() {
                   <TableHead className="text-xs font-bold uppercase tracking-wide">
                     Supplier
                   </TableHead>
-                  <TableHead className="text-right text-xs font-bold uppercase tracking-wide">
+                  <TableHead className="text-xs font-bold uppercase tracking-wide">
                     Precio (100u)
                   </TableHead>
                   <TableHead className="text-xs font-bold uppercase tracking-wide">Stock</TableHead>
@@ -304,10 +304,8 @@ function ComponentRow({ component, supplierNameById, onDelete, onView }: Compone
         {component.location ?? "—"}
       </TableCell>
       <TableCell className="text-text-primary">{supplierName}</TableCell>
-      <TableCell className="text-right font-medium text-brand">
-        {/* TODO: replace with latest 100u supplier_price once the list endpoint
-            exposes it (next iteration alongside detalle). */}
-        {formatEuros(null)}
+      <TableCell className="font-medium text-brand">
+        {formatEuros(component.current_price_per_100_eur)}
       </TableCell>
       <TableCell>
         <StockStatusBadge stock={component.stock} stockMin={stockMin} supplierStock={[]} />

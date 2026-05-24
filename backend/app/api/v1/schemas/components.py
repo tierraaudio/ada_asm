@@ -43,6 +43,10 @@ class ComponentResponse(BaseModel):
     proveedor_preferente_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
+    # Server-computed, read-only — current 100u price from the preferred supplier
+    # (latest valid_from). Null when the component has no preferred supplier or
+    # no price yet recorded for that supplier at qty_tier=100.
+    current_price_per_100_eur: Decimal | None = None
 
 
 class ComponentCreateRequest(BaseModel):

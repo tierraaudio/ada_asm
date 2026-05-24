@@ -31,6 +31,7 @@ const SAMPLE_ROW = {
   nato_score: "A+" as const,
   country_of_origin: "FR",
   proveedor_preferente_id: "sup-1",
+  current_price_per_100_eur: "7.2000",
   created_at: "2026-05-24T00:00:00Z",
   updated_at: "2026-05-24T00:00:00Z",
 };
@@ -65,6 +66,8 @@ describe("<ComponentsListPage>", () => {
     expect(screen.getByText("G-A-12")).toBeInTheDocument();
     expect(screen.getByText("DigiKey")).toBeInTheDocument();
     expect(screen.getByText("145 uds")).toBeInTheDocument();
+    // Spanish euro formatter ⇒ "7,20 €"
+    expect(screen.getByText(/7,20.*€/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Scoring OTAN A\+/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Ver componente/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Eliminar componente/i })).toBeInTheDocument();

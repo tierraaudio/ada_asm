@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -40,6 +41,9 @@ class Component:
     proveedor_preferente_id: UUID | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
+    # Transient — populated by the list query via JOIN with supplier_prices
+    # (preferred supplier x qty_tier=100 x latest valid_from). Never stored.
+    current_price_per_100_eur: Decimal | None = None
 
     def effective_stock_min(self) -> int:
         """Default threshold is `tier * 5` when not explicitly set."""

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from decimal import Decimal
 from typing import cast
 from uuid import UUID
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, func, or_, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +18,7 @@ from app.domain.repositories.component_repository import (
     ComponentPage,
 )
 from app.infrastructure.db.models.component import ComponentModel
+from app.infrastructure.db.models.supplier_price import SupplierPriceModel
 
 
 def _to_entity(row: ComponentModel) -> Component:
@@ -92,7 +95,55 @@ class SqlAlchemyComponentRepository:
         result = await self._session.execute(stmt)
         items = [_to_entity(row) for row in result.scalars().all()]
 
+        # Hydrate `current_price_per_100_eur` for the page: 1 extra query that
+        # picks the latest `valid_from` price per (component, preferred supplier)
+        # where qty_tier=100. Items without a preferred supplier stay at None.
+        await self._hydrate_current_prices(items)
+
         return ComponentPage(items=items, total=total, page=page, page_size=page_size)
+
+    async def _hydrate_current_prices(self, items: Sequence[Component]) -> None:
+        pairs = [
+            (c.id, c.proveedor_preferente_id)
+            for c in items
+            if c.proveedor_preferente_id is not None
+        ]
+        if not pairs:
+            return
+
+        # Window function: rank rows per (component, supplier) by valid_from DESC,
+        # then keep rank=1. Filters to qty_tier=100 + the pairs we care about.
+        ranked = (
+            select(
+                SupplierPriceModel.component_id,
+                SupplierPriceModel.supplier_id,
+                SupplierPriceModel.price,
+                func.row_number()
+                .over(
+                    partition_by=(
+                        SupplierPriceModel.component_id,
+                        SupplierPriceModel.supplier_id,
+                    ),
+                    order_by=SupplierPriceModel.valid_from.desc(),
+                )
+                .label("rn"),
+            )
+            .where(SupplierPriceModel.qty_tier == 100)
+            .where(
+                tuple_(
+                    SupplierPriceModel.component_id,
+                    SupplierPriceModel.supplier_id,
+                ).in_(pairs)
+            )
+            .subquery()
+        )
+        stmt = select(ranked.c.component_id, ranked.c.price).where(ranked.c.rn == 1)
+        result = await self._session.execute(stmt)
+        price_by_component: dict[UUID, Decimal] = {
+            row.component_id: row.price for row in result.all()
+        }
+        for item in items:
+            item.current_price_per_100_eur = price_by_component.get(item.id)
 
     async def get_by_id(self, component_id: UUID) -> Component | None:
         row = await self._session.get(ComponentModel, component_id)
