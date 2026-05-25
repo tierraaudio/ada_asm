@@ -21,7 +21,9 @@ import { ConfirmDeleteDialog } from "../components/ConfirmDeleteDialog";
 import { NatoScoreBadge } from "@/features/shared/badges/NatoScoreBadge";
 import { NatoScoreHelpPopover } from "@/features/shared/badges/NatoScoreHelpPopover";
 import { StockStatusBadge } from "@/features/shared/badges/StockStatusBadge";
-import { iconForFamily } from "../family-icons";
+import { FamilyChip } from "@/features/shared/badges/FamilyChip";
+
+import { descriptionForFamily, iconForFamily } from "../family-icons";
 import { useDeleteComponent } from "../hooks/use-component-mutations";
 import { useComponents } from "../hooks/use-components";
 import { useSuppliers } from "../hooks/use-suppliers";
@@ -281,7 +283,9 @@ function ComponentRow({ component, supplierNameById, onDelete, onView }: Compone
       <TableCell className="font-medium text-text-primary">{component.sku ?? "—"}</TableCell>
       <TableCell className="font-mono text-xs text-text-secondary">{component.mpn}</TableCell>
       <TableCell className="text-text-primary">{component.name}</TableCell>
-      <TableCell className="text-text-primary">{component.family}</TableCell>
+      <TableCell>
+        <FamilyChip value={component.family} description={descriptionForFamily(component.family)} />
+      </TableCell>
       <TableCell className="font-mono text-xs text-text-primary">
         {component.location ?? "—"}
       </TableCell>

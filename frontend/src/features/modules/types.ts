@@ -5,6 +5,15 @@ import type { NatoScoreValue, TierValue } from "@/features/shared/enums";
 export const MODULE_FAMILY_VALUES = ["Board", "Device", "Bundle", "Case"] as const;
 export type ModuleFamilyValue = (typeof MODULE_FAMILY_VALUES)[number];
 
+/** Tooltip body for each module family — surfaced by the FamilyChip on hover. */
+export const MODULE_FAMILY_DESCRIPTIONS: Record<ModuleFamilyValue, string> = {
+  Board: "Subensamblado PCB con componentes (drivers, filtros, reguladores…).",
+  Device:
+    "Subsistema funcional completo e instrumentable (sensores, controladores, etapas de potencia).",
+  Bundle: "Conjunto de devices que se sirven como producto único al cliente.",
+  Case: "Empaquetado / enclosure que aloja un bundle (caja de transporte, rack).",
+};
+
 export interface ModuleAggregates {
   precio_total: string | null;
   aggregated_nato_score: NatoScoreValue | null;

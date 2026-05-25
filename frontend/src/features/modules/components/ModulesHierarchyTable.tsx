@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteDialog } from "@/features/components/components/ConfirmDeleteDialog";
-import { iconForFamily } from "@/features/components/family-icons";
+import { descriptionForFamily, iconForFamily } from "@/features/components/family-icons";
+import { FamilyChip } from "@/features/shared/badges/FamilyChip";
 import { NatoScoreBadge } from "@/features/shared/badges/NatoScoreBadge";
 import { StockStatusBadge } from "@/features/shared/badges/StockStatusBadge";
 import { formatEuros } from "@/lib/format/currency";
@@ -12,7 +13,12 @@ import { cn } from "@/lib/utils/cn";
 
 import { useModuleDetail } from "../hooks/use-module-detail";
 import { useDeleteModule } from "../hooks/use-module-mutations";
-import type { Module, ModuleChild, ModuleSummary } from "../types";
+import {
+  MODULE_FAMILY_DESCRIPTIONS,
+  type Module,
+  type ModuleChild,
+  type ModuleSummary,
+} from "../types";
 
 interface ModulesHierarchyTableProps {
   /** Top-level rows — used by the list page (rows are root modules). */
@@ -135,7 +141,12 @@ function ModuleRow({ module, depth, expandable }: ModuleRowProps) {
             </div>
           </div>
         </td>
-        <td className="px-3 py-2 text-text-secondary">{module.family}</td>
+        <td className="px-3 py-2">
+          <FamilyChip
+            value={module.family}
+            description={MODULE_FAMILY_DESCRIPTIONS[module.family]}
+          />
+        </td>
         <td className="px-3 py-2 font-mono text-xs text-text-secondary">{module.sku}</td>
         <td className="px-3 py-2 font-mono text-xs text-text-secondary">
           {module.location ?? "—"}
@@ -234,7 +245,9 @@ function ChildRow({ child, depth }: { child: ModuleChild; depth: number }) {
           <span className="min-w-0 flex-1 truncate text-sm text-text-primary">{c.name}</span>
         </div>
       </td>
-      <td className="px-3 py-2 text-text-secondary">{c.family}</td>
+      <td className="px-3 py-2">
+        <FamilyChip value={c.family} description={descriptionForFamily(c.family)} />
+      </td>
       <td className="px-3 py-2 font-mono text-xs text-text-secondary">{c.sku ?? "—"}</td>
       <td className="px-3 py-2 font-mono text-xs text-text-secondary">{c.location ?? "—"}</td>
       <td className="px-3 py-2 text-text-secondary">—</td>

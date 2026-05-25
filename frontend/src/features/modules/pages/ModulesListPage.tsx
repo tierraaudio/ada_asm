@@ -5,16 +5,17 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/app/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { NATO_SCORE_VALUES, TIPO_ALMACENAMIENTO_VALUES } from "@/features/shared/enums";
 import {
   FiltersDrawer,
   type FilterGroup,
   type FiltersValue,
 } from "@/features/shared/filters/FiltersDrawer";
-import { TIPO_ALMACENAMIENTO_VALUES } from "@/features/shared/enums";
+import { NATO_SCORE_LABELS } from "@/features/shared/rubrics";
 
 import { ModulesHierarchyTable } from "../components/ModulesHierarchyTable";
 import { useModules } from "../hooks/use-modules";
-import type { ModuleFilters } from "../types";
+import { MODULE_FAMILY_VALUES, type ModuleFamilyValue, type ModuleFilters } from "../types";
 
 const PAGE_SIZE = 25;
 
@@ -29,19 +30,27 @@ function useDebounced<T>(value: T, delay = 300): T {
 
 interface PageFilters extends ModuleFilters {
   tipos_almacenamiento?: string[];
+  families?: ModuleFamilyValue[];
+  nato_scores?: string[];
 }
 
 function parseFiltersFromUrl(params: URLSearchParams): PageFilters {
   const f: PageFilters = {};
   const tipos = params.getAll("tipo_almacenamiento");
   if (tipos.length) f.tipos_almacenamiento = tipos;
+  const families = params.getAll("family") as ModuleFamilyValue[];
+  if (families.length) f.families = families;
+  const nato = params.getAll("nato_score");
+  if (nato.length) f.nato_scores = nato;
   return f;
 }
 
 function writeFiltersToUrl(base: URLSearchParams, filters: PageFilters): URLSearchParams {
   const next = new URLSearchParams(base);
-  next.delete("tipo_almacenamiento");
+  ["tipo_almacenamiento", "family", "nato_score"].forEach((k) => next.delete(k));
   for (const t of filters.tipos_almacenamiento ?? []) next.append("tipo_almacenamiento", t);
+  for (const f of filters.families ?? []) next.append("family", f);
+  for (const n of filters.nato_scores ?? []) next.append("nato_score", n);
   next.delete("page");
   return next;
 }
@@ -76,17 +85,38 @@ export function ModulesListPage() {
   const total = query.data?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  // Filter client-side by tipo_almacenamiento (no BE filter yet; cheap and
-  // matches the current page size).
+  // Client-side filtering — the BE filters by `q` only. The combined chip
+  // count stays visible to the user via the drawer.
   const filteredItems = useMemo(() => {
     const items = query.data?.items ?? [];
-    if (!urlFilters.tipos_almacenamiento?.length) return items;
-    const allowed = new Set(urlFilters.tipos_almacenamiento);
-    return items.filter((m) => m.tipo_almacenamiento && allowed.has(m.tipo_almacenamiento));
-  }, [query.data, urlFilters.tipos_almacenamiento]);
+    let out = items;
+    if (urlFilters.tipos_almacenamiento?.length) {
+      const allowed = new Set(urlFilters.tipos_almacenamiento);
+      out = out.filter((m) => m.tipo_almacenamiento && allowed.has(m.tipo_almacenamiento));
+    }
+    if (urlFilters.families?.length) {
+      const allowed = new Set<ModuleFamilyValue>(urlFilters.families);
+      out = out.filter((m) => allowed.has(m.family));
+    }
+    if (urlFilters.nato_scores?.length) {
+      const allowed = new Set(urlFilters.nato_scores);
+      out = out.filter((m) => m.aggregated_nato_score && allowed.has(m.aggregated_nato_score));
+    }
+    return out;
+  }, [query.data, urlFilters]);
 
   const filterGroups: FilterGroup[] = useMemo(
     () => [
+      {
+        key: "families",
+        title: "Familia",
+        options: MODULE_FAMILY_VALUES.map((v) => ({ value: v, label: v })),
+      },
+      {
+        key: "nato_scores",
+        title: "Scoring OTAN",
+        options: NATO_SCORE_VALUES.map((s) => ({ value: s, label: NATO_SCORE_LABELS[s] })),
+      },
       {
         key: "tipos_almacenamiento",
         title: "Tipo almacenamiento",
@@ -97,13 +127,21 @@ export function ModulesListPage() {
   );
 
   const drawerValue: FiltersValue = useMemo(
-    () => ({ tipos_almacenamiento: urlFilters.tipos_almacenamiento ?? [] }),
-    [urlFilters.tipos_almacenamiento],
+    () => ({
+      families: urlFilters.families ?? [],
+      nato_scores: urlFilters.nato_scores ?? [],
+      tipos_almacenamiento: urlFilters.tipos_almacenamiento ?? [],
+    }),
+    [urlFilters],
   );
 
   function applyFilters(next: FiltersValue) {
-    const tipos = (next.tipos_almacenamiento as string[] | undefined) ?? [];
     const filters: PageFilters = {};
+    const families = (next.families as string[] | undefined) ?? [];
+    const natoScores = (next.nato_scores as string[] | undefined) ?? [];
+    const tipos = (next.tipos_almacenamiento as string[] | undefined) ?? [];
+    if (families.length) filters.families = families as ModuleFamilyValue[];
+    if (natoScores.length) filters.nato_scores = natoScores;
     if (tipos.length) filters.tipos_almacenamiento = tipos;
     setSearchParams(writeFiltersToUrl(searchParams, filters), { replace: false });
   }
@@ -149,7 +187,7 @@ export function ModulesListPage() {
             value={drawerValue}
             onApply={applyFilters}
             onClear={clearFilters}
-            legend="Filtra por tipo de almacenamiento."
+            legend="Combinan con AND. Cada bloque acumula con OR."
           />
           <Button
             type="button"
