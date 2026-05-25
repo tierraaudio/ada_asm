@@ -1,21 +1,98 @@
-import { Edit3, X } from "lucide-react";
-import { useState } from "react";
+import { Edit3, LineChart, X } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { DashboardLayout } from "@/app/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NatoScoringSummaryCard } from "@/features/shared/badges/NatoScoringSummaryCard";
+import type { NatoScoreValue } from "@/features/shared/enums";
 
 import { ModuleHeaderCard } from "../components/ModuleHeaderCard";
 import { ModulePriceHistoryModal } from "../components/ModulePriceHistoryModal";
 import { ModulesHierarchyTable } from "../components/ModulesHierarchyTable";
 import { useModuleDetail } from "../hooks/use-module-detail";
-import type { ModuleSummary } from "../types";
+import type { Module, ModuleSummary } from "../types";
+
+const NATO_RANK: Record<NatoScoreValue, number> = {
+  F: 0,
+  D: 1,
+  C: 2,
+  B: 3,
+  A: 4,
+  "A+": 5,
+};
+
+/**
+ * Build the audit tooltip body for the aggregated scoring on a module —
+ * surfaces which descendant component contributes the worst NATO / Tier /
+ * earliest expiry so the user can trace the source of the aggregate.
+ */
+function buildAuditTooltip(module: Module): {
+  title: string;
+  body: React.ReactNode;
+} | null {
+  // Find direct component children + recursively scan submodules' children
+  // (depth 1 — enough for the tooltip; the underlying aggregate is recursive).
+  const componentNames: Array<{
+    name: string;
+    nato: NatoScoreValue;
+    tier: number;
+    expires: string | null;
+  }> = [];
+  for (const edge of module.children) {
+    if (edge.child_component) {
+      componentNames.push({
+        name: edge.child_component.name,
+        nato: edge.child_component.nato_score,
+        tier: edge.child_component.tier,
+        expires: null, // not exposed in ComponentSummary; covered by module agg
+      });
+    } else if (edge.child_module) {
+      componentNames.push({
+        name: `${edge.child_module.name} (módulo)`,
+        nato: edge.child_module.aggregated_nato_score ?? ("C" as NatoScoreValue),
+        tier: edge.child_module.aggregated_tier ?? 4,
+        expires: edge.child_module.aggregated_expires_at,
+      });
+    }
+  }
+
+  if (componentNames.length === 0) return null;
+
+  const worstNato = [...componentNames].sort((a, b) => NATO_RANK[a.nato] - NATO_RANK[b.nato])[0]!;
+  const worstTier = [...componentNames].sort((a, b) => a.tier - b.tier)[0]!;
+
+  return {
+    title: "Agregado de los hijos",
+    body: (
+      <>
+        <p>
+          Peor NATO: <strong>{worstNato.nato}</strong> · {worstNato.name}
+        </p>
+        <p>
+          Peor Tier: <strong>Tier {worstTier.tier}</strong> · {worstTier.name}
+        </p>
+        {module.aggregated_expires_at && (
+          <p className="mt-1">
+            Caducidad más próxima: <strong>{module.aggregated_expires_at}</strong>
+          </p>
+        )}
+      </>
+    ),
+  };
+}
 
 export function ModuleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const query = useModuleDetail(id);
   const [priceHistoryOpen, setPriceHistoryOpen] = useState(false);
+
+  const auditTooltip = useMemo(
+    () => (query.data ? buildAuditTooltip(query.data) : null),
+    [query.data],
+  );
 
   if (!id || query.isLoading) {
     return (
@@ -33,7 +110,6 @@ export function ModuleDetailPage() {
   }
   const module = query.data;
 
-  // Render the direct children as a hierarchy table (with expandable subtrees).
   const childRows: ModuleSummary[] = module.children
     .filter((c) => c.child_module !== null)
     .map((c) => c.child_module!) as ModuleSummary[];
@@ -62,7 +138,38 @@ export function ModuleDetailPage() {
           </Button>
         </header>
 
-        <ModuleHeaderCard module={module} onOpenPriceHistory={() => setPriceHistoryOpen(true)} />
+        <ModuleHeaderCard
+          module={module}
+          stockActionSlot={
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Ver histórico de precios"
+                  onClick={() => setPriceHistoryOpen(true)}
+                  className="inline-flex size-6 items-center justify-center rounded-md border border-border bg-white text-text-secondary transition-colors hover:border-brand/40 hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                >
+                  <LineChart className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Ver histórico de precios</TooltipContent>
+            </Tooltip>
+          }
+          rightSlot={
+            <NatoScoringSummaryCard
+              score={module.aggregated_nato_score}
+              tier={module.aggregated_tier}
+              expiresAt={module.aggregated_expires_at}
+              auditTooltipTitle={auditTooltip?.title}
+              auditTooltipBody={auditTooltip?.body}
+              emptyState={{
+                message: "Este módulo no tiene componentes con scoring activo.",
+                actionLabel: "Volver al catálogo",
+                onAction: () => navigate("/modules"),
+              }}
+            />
+          }
+        />
 
         <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
