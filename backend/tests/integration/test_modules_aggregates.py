@@ -29,7 +29,7 @@ async def test_list_modules_hydrates_aggregates_with_real_seed(
     response = await api_client.get("/api/v1/modules", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
-    assert body["total"] == 3
+    assert body["total"] == 10
 
     # At least one of the seeded modules should have a non-null precio_total
     # (the seed gives every component a preferred supplier + supplier_prices).
@@ -58,7 +58,7 @@ async def test_get_detail_aggregates_with_real_seed(
     assert response.status_code == 200
     body = response.json()
     # Includes one sub-module + two component children = 3 direct edges.
-    assert len(body["children"]) == 3
+    assert len(body["children"]) == 4  # MOD-PWR-001: 2 components + 2 sub-modules (DRV, FILT)
     # Aggregates filled in.
     assert body["aggregated_tier"] is not None
     assert body["aggregated_nato_score"] is not None
@@ -101,7 +101,7 @@ async def test_service_list_modules_pagination_boundary(
     assert response.status_code == 200
     body = response.json()
     assert body["items"] == []
-    assert body["total"] == 3
+    assert body["total"] == 10
 
 
 async def test_get_by_sku_lookup(api_client: AsyncClient) -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -17,6 +17,7 @@ def _to_entity(row: StockEventModel) -> StockEvent:
     return StockEvent(
         id=row.id,
         component_id=row.component_id,
+        module_id=row.module_id,
         kind=cast(StockEventKind, row.kind),
         quantity=row.quantity,
         occurred_at=row.occurred_at,
@@ -27,6 +28,8 @@ def _to_entity(row: StockEventModel) -> StockEvent:
         currency=row.currency,
         project_id=row.project_id,
         project_name_snapshot=row.project_name_snapshot,
+        customer_id_holded=row.customer_id_holded,
+        customer_name_snapshot=row.customer_name_snapshot,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -44,6 +47,25 @@ class SqlAlchemyStockEventRepository:
         page_size: int,
     ) -> StockEventPage:
         base = select(StockEventModel).where(StockEventModel.component_id == component_id)
+        return await self._paginate(base, page=page, page_size=page_size)
+
+    async def list_for_module(
+        self,
+        *,
+        module_id: UUID,
+        page: int,
+        page_size: int,
+    ) -> StockEventPage:
+        base = select(StockEventModel).where(StockEventModel.module_id == module_id)
+        return await self._paginate(base, page=page, page_size=page_size)
+
+    async def _paginate(
+        self,
+        base: Any,  # SQLAlchemy Select; kept loose to avoid generic gymnastics.
+        *,
+        page: int,
+        page_size: int,
+    ) -> StockEventPage:
         total = int(
             (
                 await self._session.execute(select(func.count()).select_from(base.subquery()))
@@ -59,6 +81,7 @@ class SqlAlchemyStockEventRepository:
         row = StockEventModel(
             id=event.id,
             component_id=event.component_id,
+            module_id=event.module_id,
             kind=event.kind,
             quantity=event.quantity,
             occurred_at=event.occurred_at,
@@ -69,6 +92,8 @@ class SqlAlchemyStockEventRepository:
             currency=event.currency,
             project_id=event.project_id,
             project_name_snapshot=event.project_name_snapshot,
+            customer_id_holded=event.customer_id_holded,
+            customer_name_snapshot=event.customer_name_snapshot,
         )
         self._session.add(row)
         await self._session.flush()

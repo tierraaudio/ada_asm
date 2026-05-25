@@ -95,11 +95,13 @@ export interface ScoringAlternative {
   alternative_component: ComponentSummary | null;
 }
 
-export type StockEventKind = "purchase" | "consumption";
+export type StockEventKind = "purchase" | "consumption" | "fabricated" | "delivered";
 
 export interface StockEvent {
   id: string;
-  component_id: string;
+  /** XOR — exactly one of these is non-null per event. */
+  component_id: string | null;
+  module_id: string | null;
   kind: StockEventKind;
   quantity: number;
   occurred_at: string;
@@ -112,6 +114,9 @@ export interface StockEvent {
   currency: string;
   project_id: string | null;
   project_name_snapshot: string | null;
+  /** delivered-only — link to Holded customer + denormalised name. */
+  customer_id_holded: string | null;
+  customer_name_snapshot: string | null;
   created_at: string;
   updated_at: string;
 }

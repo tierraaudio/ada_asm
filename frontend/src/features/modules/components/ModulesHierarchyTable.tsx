@@ -15,9 +15,15 @@ import { useDeleteModule } from "../hooks/use-module-mutations";
 import type { Module, ModuleChild, ModuleSummary } from "../types";
 
 interface ModulesHierarchyTableProps {
-  rows: ModuleSummary[];
+  /** Top-level rows — used by the list page (rows are root modules). */
+  rows?: ModuleSummary[];
+  /** Direct edges — used by the module detail "Contiene" section so module
+   *  + component children render as a unified tree. */
+  directChildren?: ModuleChild[];
   /** When true, expanding a row lazily loads the module detail (children). */
   expandable?: boolean;
+  /** Empty-state message shown when both rows and directChildren are empty. */
+  emptyMessage?: string;
 }
 
 /**
@@ -30,7 +36,15 @@ function stockMinForModule(m: ModuleSummary): number {
   return tier * 5;
 }
 
-export function ModulesHierarchyTable({ rows, expandable = true }: ModulesHierarchyTableProps) {
+export function ModulesHierarchyTable({
+  rows,
+  directChildren,
+  expandable = true,
+  emptyMessage = "Sin módulos.",
+}: ModulesHierarchyTableProps) {
+  const hasTopLevelModules = (rows?.length ?? 0) > 0;
+  const hasDirectChildren = (directChildren?.length ?? 0) > 0;
+  const isEmpty = !hasTopLevelModules && !hasDirectChildren;
   return (
     <div className="overflow-hidden rounded-md border border-border bg-white">
       <table className="w-full table-fixed text-sm">
@@ -59,14 +73,16 @@ export function ModulesHierarchyTable({ rows, expandable = true }: ModulesHierar
           </tr>
         </thead>
         <tbody>
-          {rows.length === 0 ? (
+          {isEmpty ? (
             <tr>
               <td colSpan={9} className="px-3 py-6 text-center text-sm text-text-secondary">
-                Sin módulos.
+                {emptyMessage}
               </td>
             </tr>
+          ) : hasTopLevelModules ? (
+            rows!.map((m) => <ModuleRow key={m.id} module={m} depth={0} expandable={expandable} />)
           ) : (
-            rows.map((m) => <ModuleRow key={m.id} module={m} depth={0} expandable={expandable} />)
+            directChildren!.map((c) => <ChildRow key={c.id} child={c} depth={0} />)
           )}
         </tbody>
       </table>

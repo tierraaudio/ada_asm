@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from decimal import Decimal
+from typing import Annotated, Any, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_db_session, require_user
@@ -23,6 +25,11 @@ from app.api.v1.schemas.modules import (
     PeriodLiteral,
     UpdateChildRequest,
 )
+from app.api.v1.schemas.stock_events import (
+    PaginatedStockEvents,
+    StockEventResponse,
+    SupplierPurchaseSummary,
+)
 from app.application.services.modules_service import (
     AddChildInput,
     ModuleCreate,
@@ -35,8 +42,13 @@ from app.domain.entities.module import Module, ModuleAggregates
 from app.domain.entities.module_child import ModuleChild
 from app.domain.entities.user import User
 from app.domain.repositories.module_repository import ModuleFilters
+from app.infrastructure.db.models.stock_event import StockEventModel
+from app.infrastructure.db.models.supplier import SupplierModel
 from app.infrastructure.repositories.component_repository import (
     SqlAlchemyComponentRepository,
+)
+from app.infrastructure.repositories.stock_event_repository import (
+    SqlAlchemyStockEventRepository,
 )
 
 router = APIRouter(prefix="/modules", tags=["modules"])
@@ -334,3 +346,110 @@ async def get_price_history(
         period=period,
         series=[ModulePriceHistoryPointResponse(date=p.date, price=p.price) for p in points],
     )
+
+
+# ============================================================================
+# Stock events (module-level: fabricated + delivered)
+# ============================================================================
+
+
+@router.get(
+    "/{module_id}/stock-events",
+    response_model=PaginatedStockEvents,
+)
+async def list_module_stock_events(
+    module_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=200, ge=1, le=500),
+) -> PaginatedStockEvents:
+    # 404 if the module is missing.
+    await _service(session).get(module_id)
+    repo = SqlAlchemyStockEventRepository(session)
+    page_data = await repo.list_for_module(module_id=module_id, page=page, page_size=page_size)
+    # No supplier hydration needed (module-level events don't have suppliers
+    # in the canonical case — `fabricated` has no supplier, `delivered`
+    # carries customer info already denormalised).
+    items = [
+        StockEventResponse(
+            id=e.id,
+            component_id=e.component_id,
+            module_id=e.module_id,
+            kind=e.kind,
+            quantity=e.quantity,
+            occurred_at=e.occurred_at,
+            notes=e.notes,
+            supplier_id=e.supplier_id,
+            supplier_name=None,
+            unit_cost=e.unit_cost,
+            total_cost=e.total_cost,
+            currency=e.currency,
+            project_id=e.project_id,
+            project_name_snapshot=e.project_name_snapshot,
+            customer_id_holded=e.customer_id_holded,
+            customer_name_snapshot=e.customer_name_snapshot,
+            created_at=cast(Any, e.created_at),
+            updated_at=cast(Any, e.updated_at),
+        )
+        for e in page_data.items
+    ]
+    return PaginatedStockEvents(
+        items=items,
+        total=page_data.total,
+        page=page_data.page,
+        page_size=page_data.page_size,
+    )
+
+
+@router.get(
+    "/{module_id}/component-purchases-summary",
+    response_model=list[SupplierPurchaseSummary],
+)
+async def get_component_purchases_summary(
+    module_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[SupplierPurchaseSummary]:
+    """Aggregate component-level purchase events for every descendant
+    component of `module_id`, grouped by supplier.
+
+    Drives the "Proveedor más comprado" bar chart of the module's Histórico
+    de Fabricación modal.
+    """
+    svc = _service(session)
+    # 404 if missing.
+    await svc.get(module_id)
+
+    # Recursively collect descendant components (component_id, propagated_qty).
+    descendants = await svc._repo.list_descendant_components(module_id)
+    if not descendants:
+        return []
+    comp_ids = list({c[0] for c in descendants})
+
+    # Aggregate purchase events for those components by supplier.
+    rows = (
+        await session.execute(
+            select(
+                StockEventModel.supplier_id,
+                SupplierModel.name,
+                func.sum(StockEventModel.quantity).label("qty"),
+                func.coalesce(func.sum(StockEventModel.total_cost), 0).label("cost"),
+            )
+            .join(SupplierModel, SupplierModel.id == StockEventModel.supplier_id, isouter=True)
+            .where(StockEventModel.component_id.in_(comp_ids))
+            .where(StockEventModel.kind == "purchase")
+            .group_by(StockEventModel.supplier_id, SupplierModel.name)
+            .order_by(func.sum(StockEventModel.total_cost).desc().nullslast())
+        )
+    ).all()
+
+    return [
+        SupplierPurchaseSummary(
+            supplier_id=r[0],
+            supplier_name=r[1] or "Sin proveedor",
+            qty=int(r[2]),
+            cost=Decimal(r[3]),
+        )
+        for r in rows
+    ]

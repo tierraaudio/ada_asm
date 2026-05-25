@@ -23,9 +23,11 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import random
 import sys
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select, text
@@ -35,8 +37,24 @@ from app.application.services.modules_service import (
     ModuleCreate,
     ModuleService,
 )
+from app.domain.entities.stock_event import StockEvent
 from app.infrastructure.db.models.component import ComponentModel
 from app.infrastructure.db.session import get_session_factory
+from app.infrastructure.repositories.stock_event_repository import (
+    SqlAlchemyStockEventRepository,
+)
+
+# Holded-style customer pool used by `delivered` events. Real ID values match
+# the format Holded exposes (prefix `cli_` + opaque suffix); names are
+# fictional EU/LATAM industrial customers for synthetic richness.
+_CUSTOMERS: list[tuple[str, str]] = [
+    ("cli_AB12CD34", "Robotics Iberia SL"),
+    ("cli_EF56GH78", "Aeronáutica del Norte SA"),
+    ("cli_IJ90KL12", "Industria Vasca de Drones"),
+    ("cli_MN34OP56", "Sensores Ambientales del Mediterráneo SL"),
+    ("cli_QR78ST90", "AutoMotrix LATAM SAS"),
+    ("cli_UV12WX34", "MeteoTech Asturias SL"),
+]
 
 
 @dataclass
@@ -245,6 +263,9 @@ async def _seed(reset: bool) -> int:
             return 2
 
         if reset:
+            # Wipe module-level stock_events too (XOR ensures we don't touch
+            # the component-level rows).
+            await session.execute(text("DELETE FROM stock_events WHERE module_id IS NOT NULL"))
             await session.execute(
                 text("TRUNCATE module_children, modules RESTART IDENTITY CASCADE")
             )
@@ -315,9 +336,72 @@ async def _seed(reset: bool) -> int:
                     AddChildInput(child_module_id=sub_id, quantity=qty),
                 )
 
+        # ----- Module-level stock_events (fabricated + delivered) -----
+        rng = random.Random(20260525)
+        stock_event_repo = SqlAlchemyStockEventRepository(session)
+        total_events = 0
+        today = date.today()
+        for spec in ordered_specs:
+            module_id = created_by_sku[spec.sku]
+            # Fabricate 2-3 batches over the last ~6 months. Unit cost
+            # approximates the recipe cost for that module (rough order of
+            # magnitude); fluctuates ±10 % per batch.
+            base_unit_cost = Decimal(rng.choice(["12.50", "28.75", "55.40", "84.90", "120.00"]))
+            fabricated_batches = rng.randint(2, 3)
+            fabricated_total = 0
+            for i in range(fabricated_batches):
+                qty = rng.randint(5, 25)
+                fabricated_total += qty
+                drift = Decimal(str(rng.uniform(0.9, 1.1))).quantize(Decimal("0.0001"))
+                unit_cost = (base_unit_cost * drift).quantize(Decimal("0.0001"))
+                total_cost = (unit_cost * qty).quantize(Decimal("0.0001"))
+                occurred = today - timedelta(days=rng.randint(30, 180))
+                await stock_event_repo.save(
+                    StockEvent(
+                        module_id=module_id,
+                        kind="fabricated",
+                        quantity=qty,
+                        occurred_at=occurred,
+                        unit_cost=unit_cost,
+                        total_cost=total_cost,
+                        currency="EUR",
+                        notes=f"Lote fabricado #{i + 1}",
+                    )
+                )
+                total_events += 1
+
+            # Deliver 1-2 shipments to customers. Total delivered MUST be
+            # strictly less than fabricated_total so the resulting stock
+            # is positive and consistent with the spec's `stock`.
+            max_delivered = max(0, fabricated_total - spec.stock)
+            if max_delivered > 0:
+                shipments = rng.randint(1, 2)
+                remaining = max_delivered
+                for i in range(shipments):
+                    if remaining <= 0:
+                        break
+                    qty = rng.randint(1, max(1, remaining // (shipments - i)))
+                    remaining -= qty
+                    customer = rng.choice(_CUSTOMERS)
+                    occurred = today - timedelta(days=rng.randint(5, 60))
+                    await stock_event_repo.save(
+                        StockEvent(
+                            module_id=module_id,
+                            kind="delivered",
+                            quantity=qty,
+                            occurred_at=occurred,
+                            customer_id_holded=customer[0],
+                            customer_name_snapshot=customer[1],
+                            notes=f"Entrega #{i + 1}",
+                        )
+                    )
+                    total_events += 1
+        await session.commit()
+
         print(
             f"Seeded {len(created_by_sku)} modules with their DAG children "
-            f"(component leaves + nested sub-modules)."
+            f"(component leaves + nested sub-modules) + {total_events} module-level "
+            f"stock events (fabricated/delivered)."
         )
         return 0
 

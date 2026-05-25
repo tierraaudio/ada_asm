@@ -1,4 +1,5 @@
 import { api } from "@/lib/api/client";
+import type { Paginated, StockEvent } from "@/features/components/types";
 
 import type {
   Module,
@@ -8,6 +9,13 @@ import type {
   ModuleSummary,
   PaginatedModules,
 } from "../types";
+
+export interface SupplierPurchaseSummary {
+  supplier_id: string | null;
+  supplier_name: string;
+  qty: number;
+  cost: string;
+}
 
 const BASE = "/api/v1/modules";
 
@@ -98,6 +106,20 @@ export const modulesApi = {
     const response = await api.get<ModulePriceHistory>(`${BASE}/${id}/price-history`, {
       params: { period },
     });
+    return response.data;
+  },
+
+  listStockEvents: async (id: string, page = 1, pageSize = 200): Promise<Paginated<StockEvent>> => {
+    const response = await api.get<Paginated<StockEvent>>(`${BASE}/${id}/stock-events`, {
+      params: { page, page_size: pageSize },
+    });
+    return response.data;
+  },
+
+  listComponentPurchasesSummary: async (id: string): Promise<SupplierPurchaseSummary[]> => {
+    const response = await api.get<SupplierPurchaseSummary[]>(
+      `${BASE}/${id}/component-purchases-summary`,
+    );
     return response.data;
   },
 };

@@ -1,4 +1,4 @@
-import { Edit3, LineChart, X } from "lucide-react";
+import { Edit3, History, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -8,11 +8,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { NatoScoringSummaryCard } from "@/features/shared/badges/NatoScoringSummaryCard";
 import type { NatoScoreValue } from "@/features/shared/enums";
 
+import { HistorialFabricacionModal } from "../components/HistorialFabricacionModal";
 import { ModuleHeaderCard } from "../components/ModuleHeaderCard";
-import { ModulePriceHistoryModal } from "../components/ModulePriceHistoryModal";
 import { ModulesHierarchyTable } from "../components/ModulesHierarchyTable";
 import { useModuleDetail } from "../hooks/use-module-detail";
-import type { Module, ModuleSummary } from "../types";
+import {
+  useModuleComponentPurchasesSummary,
+  useModuleStockEvents,
+} from "../hooks/use-module-stock-events";
+import type { Module } from "../types";
 
 const NATO_RANK: Record<NatoScoreValue, number> = {
   F: 0,
@@ -87,7 +91,9 @@ export function ModuleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const query = useModuleDetail(id);
-  const [priceHistoryOpen, setPriceHistoryOpen] = useState(false);
+  const [fabricacionOpen, setFabricacionOpen] = useState(false);
+  const stockEventsQuery = useModuleStockEvents(id, fabricacionOpen);
+  const supplierSummaryQuery = useModuleComponentPurchasesSummary(id, fabricacionOpen);
 
   const auditTooltip = useMemo(
     () => (query.data ? buildAuditTooltip(query.data) : null),
@@ -109,11 +115,6 @@ export function ModuleDetailPage() {
     );
   }
   const module = query.data;
-
-  const childRows: ModuleSummary[] = module.children
-    .filter((c) => c.child_module !== null)
-    .map((c) => c.child_module!) as ModuleSummary[];
-  const directComponents = module.children.filter((c) => c.child_component !== null);
 
   return (
     <DashboardLayout>
@@ -145,14 +146,14 @@ export function ModuleDetailPage() {
               <TooltipTrigger asChild>
                 <button
                   type="button"
-                  aria-label="Ver histórico de precios"
-                  onClick={() => setPriceHistoryOpen(true)}
+                  aria-label="Histórico de fabricación"
+                  onClick={() => setFabricacionOpen(true)}
                   className="inline-flex size-6 items-center justify-center rounded-md border border-border bg-white text-text-secondary transition-colors hover:border-brand/40 hover:text-brand focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
-                  <LineChart className="size-3.5" />
+                  <History className="size-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent>Ver histórico de precios</TooltipContent>
+              <TooltipContent>Histórico de fabricación</TooltipContent>
             </Tooltip>
           }
           rightSlot={
@@ -175,46 +176,11 @@ export function ModuleDetailPage() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
             Contiene
           </h2>
-          {childRows.length === 0 && directComponents.length === 0 ? (
-            <p className="text-sm text-text-secondary">Este módulo no tiene hijos.</p>
-          ) : (
-            <>
-              {childRows.length > 0 && <ModulesHierarchyTable rows={childRows} expandable />}
-              {directComponents.length > 0 && (
-                <div className="mt-3 overflow-hidden rounded-lg border border-border">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-muted/40 text-xs uppercase tracking-wide text-text-secondary">
-                        <th className="px-3 py-2 text-left">Componente</th>
-                        <th className="px-3 py-2 text-left">SKU</th>
-                        <th className="px-3 py-2 text-left">Cantidad</th>
-                        <th className="px-3 py-2 text-left">Precio</th>
-                        <th className="px-3 py-2 text-left">Stock</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {directComponents.map((c) => {
-                        const cc = c.child_component!;
-                        return (
-                          <tr key={c.id} className="border-t border-border hover:bg-muted/30">
-                            <td className="px-3 py-2 text-text-primary">{cc.name}</td>
-                            <td className="px-3 py-2 font-mono text-xs text-text-secondary">
-                              {cc.sku ?? "—"}
-                            </td>
-                            <td className="px-3 py-2 text-text-secondary">{c.quantity}</td>
-                            <td className="px-3 py-2 text-brand">
-                              {cc.current_price_per_100_eur ?? "—"}
-                            </td>
-                            <td className="px-3 py-2 text-text-secondary">{cc.stock}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </>
-          )}
+          <ModulesHierarchyTable
+            directChildren={module.children}
+            expandable
+            emptyMessage="Este módulo no tiene hijos."
+          />
         </section>
 
         <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
@@ -244,12 +210,12 @@ export function ModuleDetailPage() {
         </section>
       </div>
 
-      <ModulePriceHistoryModal
-        open={priceHistoryOpen}
-        onOpenChange={setPriceHistoryOpen}
-        moduleId={module.id}
-        moduleName={module.name}
-        moduleSku={module.sku}
+      <HistorialFabricacionModal
+        open={fabricacionOpen}
+        onOpenChange={setFabricacionOpen}
+        module={module}
+        stockEvents={stockEventsQuery.data?.items ?? []}
+        supplierPurchases={supplierSummaryQuery.data ?? []}
       />
     </DashboardLayout>
   );
