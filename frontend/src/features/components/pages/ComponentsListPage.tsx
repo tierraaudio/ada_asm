@@ -242,14 +242,12 @@ export function ComponentsListPage() {
           )}
         </section>
 
-        {pageCount > 1 && (
-          <DataTablePagination
-            page={page}
-            pageCount={pageCount}
-            total={total}
-            onPageChange={gotoPage}
-          />
-        )}
+        <DataTablePagination
+          page={page}
+          pageCount={pageCount}
+          total={total}
+          onPageChange={gotoPage}
+        />
       </div>
     </DashboardLayout>
   );

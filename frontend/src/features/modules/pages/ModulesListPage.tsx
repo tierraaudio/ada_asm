@@ -183,14 +183,12 @@ export function ModulesListPage() {
           )}
         </section>
 
-        {pageCount > 1 && (
-          <DataTablePagination
-            page={page}
-            pageCount={pageCount}
-            total={total}
-            onPageChange={gotoPage}
-          />
-        )}
+        <DataTablePagination
+          page={page}
+          pageCount={pageCount}
+          total={total}
+          onPageChange={gotoPage}
+        />
       </div>
     </DashboardLayout>
   );
