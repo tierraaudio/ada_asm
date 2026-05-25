@@ -78,6 +78,7 @@ export interface ComponentSummary {
   name: string;
   family: string;
   fabricante: string | null;
+  location: string | null;
   country_of_origin: string | null;
   nato_score: NatoScoreValue;
   tier: TierValue;

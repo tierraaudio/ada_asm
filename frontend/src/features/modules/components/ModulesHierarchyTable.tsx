@@ -236,7 +236,7 @@ function ChildRow({ child, depth }: { child: ModuleChild; depth: number }) {
       </td>
       <td className="px-3 py-2 text-text-secondary">{c.family}</td>
       <td className="px-3 py-2 font-mono text-xs text-text-secondary">{c.sku ?? "—"}</td>
-      <td className="px-3 py-2 font-mono text-xs text-text-secondary">—</td>
+      <td className="px-3 py-2 font-mono text-xs text-text-secondary">{c.location ?? "—"}</td>
       <td className="px-3 py-2 text-text-secondary">—</td>
       <td className="px-3 py-2 font-semibold text-brand">
         {c.current_price_per_100_eur != null ? formatEuros(c.current_price_per_100_eur) : "—"}

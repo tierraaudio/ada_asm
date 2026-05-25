@@ -118,6 +118,7 @@ async def _hydrate_child(session: AsyncSession, child: ModuleChild) -> ModuleChi
                 name=comp.name,
                 family=comp.family,
                 fabricante=comp.fabricante,
+                location=comp.location,
                 country_of_origin=comp.country_of_origin,
                 nato_score=comp.nato_score,
                 tier=comp.tier,

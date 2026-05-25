@@ -136,6 +136,7 @@ class ComponentSummaryResponse(BaseModel):
     name: str
     family: str
     fabricante: str | None = None
+    location: str | None = None
     country_of_origin: CountryCode | None = None
     nato_score: NatoScoreLiteral
     tier: TierLiteral
