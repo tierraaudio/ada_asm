@@ -54,22 +54,7 @@ class _SeedSpec:
 
 
 SEED_SPECS: list[_SeedSpec] = [
-    _SeedSpec(
-        sku="MOD-SENS-001",
-        name="Módulo Sensor Ambiental",
-        description="Conjunto completo de sensores ambientales con MCU",
-        version="v1.2",
-        fabricante="Custom Assembly",
-        location="G-M-01",
-        tipo_almacenamiento="Gaveta",
-        stock=25,
-        component_children_mpns=[
-            ("STM32F407VGT6", 1),
-            ("BME280", 1),
-            ("GRM31CR71H106KA12L", 2),  # condensador cerámico
-        ],
-        sub_module_children_skus=[],
-    ),
+    # --- Level 0 leaves (sub-sub-modules) — built first ---
     _SeedSpec(
         sku="MOD-DRV-001",
         name="Etapa Driver",
@@ -86,6 +71,86 @@ SEED_SPECS: list[_SeedSpec] = [
         sub_module_children_skus=[],
     ),
     _SeedSpec(
+        sku="MOD-REG-001",
+        name="Regulador 5V",
+        description="Subensamblado de regulación lineal 5V",
+        version="v1.1",
+        fabricante="Custom Assembly",
+        location="G-M-07",
+        tipo_almacenamiento="Gaveta",
+        stock=40,
+        component_children_mpns=[
+            ("AMS1117-3.3", 2),
+            ("GRM31CR71H106KA12L", 4),
+        ],
+        sub_module_children_skus=[],
+    ),
+    _SeedSpec(
+        sku="MOD-FILT-001",
+        name="Filtro EMI",
+        description="Filtro EMI pasivo de 3 etapas",
+        version="v1.0",
+        fabricante="Custom Assembly",
+        location="G-M-08",
+        tipo_almacenamiento="Gaveta",
+        stock=60,
+        component_children_mpns=[
+            ("RC0805FR-074K7", 6),
+            ("RC0805JR-07330R", 4),
+            ("GRM31CR71H106KA12L", 3),
+        ],
+        sub_module_children_skus=[],
+    ),
+    _SeedSpec(
+        sku="MOD-COMM-001",
+        name="Interfaz UART/USB",
+        description="Subensamblado de comunicaciones serie",
+        version="v2.0",
+        fabricante="Custom Assembly",
+        location="G-M-09",
+        tipo_almacenamiento="Almacén",
+        stock=22,
+        component_children_mpns=[
+            ("USB Type-C 24-pin Female SMD", 1),
+            ("CL10A106KP8NNNC", 2),
+        ],
+        sub_module_children_skus=[],
+    ),
+    # --- Level 1 — module compositions including sub-modules ---
+    _SeedSpec(
+        sku="MOD-SENS-001",
+        name="Módulo Sensor Ambiental",
+        description="Conjunto completo de sensores ambientales con MCU",
+        version="v1.2",
+        fabricante="Custom Assembly",
+        location="G-M-01",
+        tipo_almacenamiento="Gaveta",
+        stock=25,
+        component_children_mpns=[
+            ("STM32F407VGT6", 1),
+            ("BME280", 1),
+            ("GRM31CR71H106KA12L", 2),
+        ],
+        sub_module_children_skus=[],
+    ),
+    _SeedSpec(
+        sku="MOD-IMU-001",
+        name="Módulo IMU 6-DoF",
+        description="Sensor inercial con MCU y comunicaciones",
+        version="v1.0",
+        fabricante="Custom Assembly",
+        location="G-M-10",
+        tipo_almacenamiento="Gaveta",
+        stock=15,
+        component_children_mpns=[
+            ("STM32F407VGT6", 1),
+            ("MPU-6050", 1),
+        ],
+        sub_module_children_skus=[
+            ("MOD-COMM-001", 1),
+        ],
+    ),
+    _SeedSpec(
         sku="MOD-PWR-001",
         name="Sistema Potencia BLDC",
         description="Módulo de potencia completo para control de motor BLDC",
@@ -95,11 +160,72 @@ SEED_SPECS: list[_SeedSpec] = [
         tipo_almacenamiento="Almacén",
         stock=18,
         component_children_mpns=[
-            ("STM32F407VGT6", 1),  # DAG: same MCU reused
+            ("STM32F407VGT6", 1),  # DAG: same MCU reused across modules
             ("LM2596S-5.0", 1),
         ],
         sub_module_children_skus=[
-            ("MOD-DRV-001", 1),  # nests Etapa Driver
+            ("MOD-DRV-001", 1),  # nests Etapa Driver (depth 2)
+            ("MOD-FILT-001", 1),  # nests Filtro EMI
+        ],
+    ),
+    _SeedSpec(
+        sku="MOD-DAQ-001",
+        name="Módulo de Adquisición de Datos",
+        description="Adquisición analógica con conversión + comunicaciones",
+        version="v1.0",
+        fabricante="Custom Assembly",
+        location="G-M-11",
+        tipo_almacenamiento="Almacén",
+        stock=10,
+        component_children_mpns=[
+            ("ATMEGA328P-PU", 1),
+            ("LM358", 2),
+        ],
+        sub_module_children_skus=[
+            ("MOD-REG-001", 1),
+            ("MOD-FILT-001", 1),
+        ],
+    ),
+    # --- Level 2 — top-level systems composing the above (depth=3) ---
+    _SeedSpec(
+        sku="MOD-DRONE-001",
+        name="Plataforma Dron Cuadricoptero",
+        description=(
+            "Sistema completo de control para dron cuadricoptero — "
+            "incluye potencia + IMU + adquisición. Llega a profundidad 3 "
+            "via Sistema Potencia BLDC → Etapa Driver."
+        ),
+        version="v0.9",
+        fabricante="Custom Assembly",
+        location="G-M-12",
+        tipo_almacenamiento="Almacén",
+        stock=4,
+        component_children_mpns=[
+            ("RPi-Pico-W", 1),
+        ],
+        sub_module_children_skus=[
+            ("MOD-PWR-001", 4),  # 4 motores → 4 etapas de potencia
+            ("MOD-IMU-001", 1),
+            ("MOD-DAQ-001", 1),
+        ],
+    ),
+    _SeedSpec(
+        sku="MOD-STATION-001",
+        name="Estación Meteorológica",
+        description="Sistema autónomo con sensores + comunicaciones + alimentación regulada",
+        version="v1.3",
+        fabricante="Custom Assembly",
+        location="G-M-13",
+        tipo_almacenamiento="Almacén",
+        stock=7,
+        component_children_mpns=[
+            ("ESP32-WROOM-32", 1),
+            ("CR2032", 2),
+        ],
+        sub_module_children_skus=[
+            ("MOD-SENS-001", 1),
+            ("MOD-REG-001", 1),
+            ("MOD-COMM-001", 1),
         ],
     ),
 ]
