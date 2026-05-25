@@ -20,7 +20,13 @@ from app.infrastructure.db.base import Base, TimestampMixin
 
 class ModuleModel(Base, TimestampMixin):
     __tablename__ = "modules"
-    __table_args__ = (CheckConstraint("stock >= 0", name="ck_modules_stock"),)
+    __table_args__ = (
+        CheckConstraint("stock >= 0", name="ck_modules_stock"),
+        CheckConstraint(
+            "family IN ('Board', 'Device', 'Bundle', 'Case')",
+            name="ck_modules_family",
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True),
@@ -34,6 +40,11 @@ class ModuleModel(Base, TimestampMixin):
         String(40),
         nullable=False,
         server_default=text("'v1.0'"),
+    )
+    family: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        server_default=text("'Board'"),
     )
     fabricante: Mapped[str | None] = mapped_column(String(120), nullable=True)
     location: Mapped[str | None] = mapped_column(String(100), nullable=True)

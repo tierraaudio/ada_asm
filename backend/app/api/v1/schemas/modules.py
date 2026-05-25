@@ -16,6 +16,7 @@ from app.api.v1.schemas.components import (
 )
 
 PeriodLiteral = Literal["week", "month", "year"]
+ModuleFamilyLiteral = Literal["Board", "Device", "Bundle", "Case"]
 
 
 class ModuleBase(BaseModel):
@@ -26,6 +27,7 @@ class ModuleBase(BaseModel):
     name: str
     description: str | None = None
     version: str
+    family: ModuleFamilyLiteral
     fabricante: str | None = None
     location: str | None = None
     tipo_almacenamiento: str | None = None
@@ -84,6 +86,7 @@ class ModuleCreateRequest(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=200)]
     description: str | None = None
     version: Annotated[str, Field(default="v1.0", max_length=40)] = "v1.0"
+    family: ModuleFamilyLiteral = "Board"
     fabricante: Annotated[str | None, Field(default=None, max_length=120)] = None
     location: Annotated[str | None, Field(default=None, max_length=100)] = None
     tipo_almacenamiento: Annotated[str | None, Field(default=None, max_length=80)] = None
@@ -101,6 +104,7 @@ class ModuleUpdateRequest(BaseModel):
     name: Annotated[str | None, Field(default=None, min_length=1, max_length=200)] = None
     description: str | None = None
     version: Annotated[str | None, Field(default=None, max_length=40)] = None
+    family: ModuleFamilyLiteral | None = None
     fabricante: Annotated[str | None, Field(default=None, max_length=120)] = None
     location: Annotated[str | None, Field(default=None, max_length=100)] = None
     tipo_almacenamiento: Annotated[str | None, Field(default=None, max_length=80)] = None

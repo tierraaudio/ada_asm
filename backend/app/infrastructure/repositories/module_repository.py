@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ModuleSkuAlreadyRegisteredError
-from app.domain.entities.module import Module
+from app.domain.entities.module import Module, ModuleFamilyValue
 from app.domain.entities.module_child import ModuleChild
 from app.domain.repositories.module_repository import (
     ModuleFilters,
@@ -38,6 +38,7 @@ def _to_entity(row: ModuleModel) -> Module:
         name=row.name,
         description=row.description,
         version=row.version,
+        family=cast(ModuleFamilyValue, row.family),
         fabricante=row.fabricante,
         location=row.location,
         tipo_almacenamiento=row.tipo_almacenamiento,
@@ -141,6 +142,7 @@ class SqlAlchemyModuleRepository:
             name=module.name,
             description=module.description,
             version=module.version,
+            family=module.family,
             fabricante=module.fabricante,
             location=module.location,
             tipo_almacenamiento=module.tipo_almacenamiento,
@@ -172,6 +174,7 @@ class SqlAlchemyModuleRepository:
         row.name = module.name
         row.description = module.description
         row.version = module.version
+        row.family = module.family
         row.fabricante = module.fabricante
         row.location = module.location
         row.tipo_almacenamiento = module.tipo_almacenamiento

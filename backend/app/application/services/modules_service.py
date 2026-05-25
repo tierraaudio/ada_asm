@@ -28,7 +28,7 @@ from app.core.exceptions import (
     ModuleNotFoundError,
 )
 from app.domain.entities.component import NatoScoreValue, TierValue
-from app.domain.entities.module import Module, ModuleAggregates
+from app.domain.entities.module import Module, ModuleAggregates, ModuleFamilyValue
 from app.domain.entities.module_child import ModuleChild
 from app.domain.repositories.module_repository import (
     ModuleFilters,
@@ -67,6 +67,7 @@ class ModuleCreate:
     name: str
     description: str | None = None
     version: str = "v1.0"
+    family: str = "Board"
     fabricante: str | None = None
     location: str | None = None
     tipo_almacenamiento: str | None = None
@@ -83,6 +84,7 @@ class ModuleUpdate:
     name: str | None = None
     description: str | None = None
     version: str | None = None
+    family: str | None = None
     fabricante: str | None = None
     location: str | None = None
     tipo_almacenamiento: str | None = None
@@ -168,6 +170,7 @@ class ModuleService:
             name=payload.name,
             description=payload.description,
             version=payload.version,
+            family=cast("ModuleFamilyValue", payload.family),
             fabricante=payload.fabricante,
             location=payload.location,
             tipo_almacenamiento=payload.tipo_almacenamiento,
@@ -189,6 +192,8 @@ class ModuleService:
             current.description = patch.description
         if patch.version is not None:
             current.version = patch.version
+        if patch.family is not None:
+            current.family = cast("ModuleFamilyValue", patch.family)
         if patch.fabricante is not None:
             current.fabricante = patch.fabricante
         if patch.location is not None:

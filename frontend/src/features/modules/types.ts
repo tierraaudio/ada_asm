@@ -1,6 +1,10 @@
 import type { ComponentSummary } from "@/features/components/types";
 import type { NatoScoreValue, TierValue } from "@/features/shared/enums";
 
+/** High-level classification of a module — distinct from the component family. */
+export const MODULE_FAMILY_VALUES = ["Board", "Device", "Bundle", "Case"] as const;
+export type ModuleFamilyValue = (typeof MODULE_FAMILY_VALUES)[number];
+
 export interface ModuleAggregates {
   precio_total: string | null;
   aggregated_nato_score: NatoScoreValue | null;
@@ -15,6 +19,7 @@ export interface ModuleSummary extends ModuleAggregates {
   name: string;
   description: string | null;
   version: string;
+  family: ModuleFamilyValue;
   fabricante: string | null;
   location: string | null;
   tipo_almacenamiento: string | null;

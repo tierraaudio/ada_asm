@@ -63,6 +63,7 @@ class _SeedSpec:
     name: str
     description: str
     version: str
+    family: str  # Board | Device | Bundle | Case
     fabricante: str
     location: str
     tipo_almacenamiento: str
@@ -78,6 +79,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Etapa Driver",
         description="Transistores de potencia y drivers",
         version="v1.0",
+        family="Board",
         fabricante="Custom Assembly",
         location="G-M-06",
         tipo_almacenamiento="Almacén",
@@ -93,6 +95,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Regulador 5V",
         description="Subensamblado de regulación lineal 5V",
         version="v1.1",
+        family="Board",
         fabricante="Custom Assembly",
         location="G-M-07",
         tipo_almacenamiento="Gaveta",
@@ -108,6 +111,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Filtro EMI",
         description="Filtro EMI pasivo de 3 etapas",
         version="v1.0",
+        family="Board",
         fabricante="Custom Assembly",
         location="G-M-08",
         tipo_almacenamiento="Gaveta",
@@ -124,6 +128,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Interfaz UART/USB",
         description="Subensamblado de comunicaciones serie",
         version="v2.0",
+        family="Board",
         fabricante="Custom Assembly",
         location="G-M-09",
         tipo_almacenamiento="Almacén",
@@ -140,6 +145,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Módulo Sensor Ambiental",
         description="Conjunto completo de sensores ambientales con MCU",
         version="v1.2",
+        family="Device",
         fabricante="Custom Assembly",
         location="G-M-01",
         tipo_almacenamiento="Gaveta",
@@ -156,6 +162,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Módulo IMU 6-DoF",
         description="Sensor inercial con MCU y comunicaciones",
         version="v1.0",
+        family="Device",
         fabricante="Custom Assembly",
         location="G-M-10",
         tipo_almacenamiento="Gaveta",
@@ -173,6 +180,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Sistema Potencia BLDC",
         description="Módulo de potencia completo para control de motor BLDC",
         version="v1.0",
+        family="Device",
         fabricante="Custom Assembly",
         location="G-M-05",
         tipo_almacenamiento="Almacén",
@@ -191,6 +199,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Módulo de Adquisición de Datos",
         description="Adquisición analógica con conversión + comunicaciones",
         version="v1.0",
+        family="Device",
         fabricante="Custom Assembly",
         location="G-M-11",
         tipo_almacenamiento="Almacén",
@@ -214,6 +223,7 @@ SEED_SPECS: list[_SeedSpec] = [
             "via Sistema Potencia BLDC → Etapa Driver."
         ),
         version="v0.9",
+        family="Bundle",
         fabricante="Custom Assembly",
         location="G-M-12",
         tipo_almacenamiento="Almacén",
@@ -232,6 +242,7 @@ SEED_SPECS: list[_SeedSpec] = [
         name="Estación Meteorológica",
         description="Sistema autónomo con sensores + comunicaciones + alimentación regulada",
         version="v1.3",
+        family="Bundle",
         fabricante="Custom Assembly",
         location="G-M-13",
         tipo_almacenamiento="Almacén",
@@ -307,6 +318,7 @@ async def _seed(reset: bool) -> int:
                     name=spec.name,
                     description=spec.description,
                     version=spec.version,
+                    family=spec.family,
                     fabricante=spec.fabricante,
                     location=spec.location,
                     tipo_almacenamiento=spec.tipo_almacenamiento,

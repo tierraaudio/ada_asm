@@ -14,9 +14,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 from uuid import UUID, uuid4
 
 from app.domain.entities.component import NatoScoreValue, TierValue
+
+ModuleFamilyValue = Literal["Board", "Device", "Bundle", "Case"]
 
 
 @dataclass
@@ -26,6 +29,7 @@ class Module:
     name: str = ""
     description: str | None = None
     version: str = "v1.0"
+    family: ModuleFamilyValue = "Board"
     fabricante: str | None = None
     location: str | None = None
     tipo_almacenamiento: str | None = None

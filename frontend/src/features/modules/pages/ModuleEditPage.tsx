@@ -19,6 +19,7 @@ import { TIPO_ALMACENAMIENTO_VALUES } from "@/features/shared/enums";
 import { cn } from "@/lib/utils/cn";
 
 import { AddChildModal } from "../components/AddChildModal";
+import { MODULE_FAMILY_VALUES } from "../types";
 import { useModuleDetail } from "../hooks/use-module-detail";
 import {
   useAddChild,
@@ -36,6 +37,10 @@ const formSchema = z.object({
   name: z.string().trim().min(1, "Nombre obligatorio").max(200),
   description: z.string().optional(),
   version: z.string().trim().max(40).optional(),
+  family: z
+    .string()
+    .min(1, "Familia obligatoria")
+    .refine((v) => (MODULE_FAMILY_VALUES as readonly string[]).includes(v), "Familia inválida"),
   fabricante: z.string().trim().max(120).optional(),
   location: z.string().trim().max(100).optional(),
   tipo_almacenamiento: z
@@ -56,6 +61,7 @@ const EMPTY_DEFAULTS: FormValues = {
   name: "",
   description: "",
   version: "v1.0",
+  family: "Board",
   fabricante: "",
   location: "",
   tipo_almacenamiento: "",
@@ -94,6 +100,7 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
       name: m.name,
       description: m.description ?? "",
       version: m.version,
+      family: m.family,
       fabricante: m.fabricante ?? "",
       location: m.location ?? "",
       tipo_almacenamiento: m.tipo_almacenamiento ?? "",
@@ -112,6 +119,7 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
       sku: values.sku.trim(),
       name: values.name.trim(),
       description: values.description?.trim() ? values.description.trim() : null,
+      family: values.family,
       fabricante: values.fabricante?.trim() ? values.fabricante.trim() : null,
       location: values.location?.trim() ? values.location.trim() : null,
       tipo_almacenamiento: values.tipo_almacenamiento?.trim()
@@ -199,7 +207,7 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
         )}
 
         <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
-          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
             <FormField label="SKU" error={errors.sku?.message}>
               <input
                 {...register("sku")}
@@ -210,6 +218,29 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
             </FormField>
             <FormField label="Versión" error={errors.version?.message}>
               <input {...register("version")} type="text" className={inputCls} placeholder="v1.0" />
+            </FormField>
+            <FormField label="Familia" error={errors.family?.message}>
+              <Controller
+                control={control}
+                name="family"
+                render={({ field }) => (
+                  <Select
+                    {...(field.value ? { value: field.value } : {})}
+                    onValueChange={(v) => field.onChange(v)}
+                  >
+                    <SelectTrigger className={inputCls}>
+                      <SelectValue placeholder="Selecciona familia…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MODULE_FAMILY_VALUES.map((v) => (
+                        <SelectItem key={v} value={v}>
+                          {v}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
             </FormField>
           </div>
           <div className="mt-4">
