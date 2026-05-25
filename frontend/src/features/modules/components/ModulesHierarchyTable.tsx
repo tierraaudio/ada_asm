@@ -33,7 +33,7 @@ function stockMinForModule(m: ModuleSummary): number {
 export function ModulesHierarchyTable({ rows, expandable = true }: ModulesHierarchyTableProps) {
   return (
     <div className="overflow-hidden rounded-md border border-border bg-white">
-      <table className="w-full text-sm">
+      <table className="w-full table-fixed text-sm">
         <colgroup>
           <col className="w-[30%]" />
           <col className="w-[9%]" />
@@ -108,10 +108,10 @@ function ModuleRow({ module, depth, expandable }: ModuleRowProps) {
             ) : (
               <span className="inline-block size-5" />
             )}
-            <span className="inline-flex size-7 items-center justify-center rounded-md bg-brand/10 text-brand">
+            <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-text-secondary">
               <Box className="size-3.5" />
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-text-primary">{module.name}</p>
               {module.description && (
                 <p className="truncate text-xs text-text-secondary">{module.description}</p>
@@ -212,10 +212,10 @@ function ChildRow({ child, depth }: { child: ModuleChild; depth: number }) {
     <tr className={cn("border-t border-border hover:bg-muted/20")}>
       <td className="px-3 py-2">
         <div className="flex items-center gap-2" style={{ paddingLeft: depth * 20 + 25 }}>
-          <span className="inline-flex size-7 items-center justify-center rounded-md bg-brand/10 text-brand">
+          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand">
             <FamilyIcon className="size-3.5" />
           </span>
-          <span className="text-sm text-text-primary">{c.name}</span>
+          <span className="min-w-0 flex-1 truncate text-sm text-text-primary">{c.name}</span>
         </div>
       </td>
       <td className="px-3 py-2 text-text-secondary">Componente</td>
