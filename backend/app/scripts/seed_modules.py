@@ -263,12 +263,13 @@ async def _seed(reset: bool) -> int:
             return 2
 
         if reset:
-            # Wipe module-level stock_events too (XOR ensures we don't touch
-            # the component-level rows).
+            # Plain DELETEs (not TRUNCATE ... CASCADE) so the component-level
+            # stock_events keep their rows. A TRUNCATE on `modules` with
+            # CASCADE would also empty the *entire* stock_events table via
+            # the module_id FK chain.
             await session.execute(text("DELETE FROM stock_events WHERE module_id IS NOT NULL"))
-            await session.execute(
-                text("TRUNCATE module_children, modules RESTART IDENTITY CASCADE")
-            )
+            await session.execute(text("DELETE FROM module_children"))
+            await session.execute(text("DELETE FROM modules"))
             await session.commit()
 
         # Resolve components by mpn
