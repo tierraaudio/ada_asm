@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_db_session, require_user
-from app.api.v1.schemas.components import ComponentSummaryResponse
+from app.api.v1.schemas.components import ComponentSummaryResponse, SupplierStockSummaryEntry
 from app.api.v1.schemas.modules import (
     AddChildRequest,
     ModuleChildResponse,
@@ -49,6 +49,9 @@ from app.infrastructure.repositories.component_repository import (
 )
 from app.infrastructure.repositories.stock_event_repository import (
     SqlAlchemyStockEventRepository,
+)
+from app.infrastructure.repositories.supplier_stock_repository import (
+    SqlAlchemySupplierStockRepository,
 )
 
 router = APIRouter(prefix="/modules", tags=["modules"])
@@ -111,6 +114,8 @@ async def _hydrate_child(session: AsyncSession, child: ModuleChild) -> ModuleChi
         if comp is not None:
             # Hydrate current price for the summary (same flow as scoring alts).
             await comp_repo._hydrate_current_prices([comp])
+            stock_repo = SqlAlchemySupplierStockRepository(session)
+            summary_by_component = await stock_repo.latest_summary_for_components([comp.id])
             child_component_summary = ComponentSummaryResponse(
                 id=comp.id,
                 mpn=comp.mpn,
@@ -124,6 +129,12 @@ async def _hydrate_child(session: AsyncSession, child: ModuleChild) -> ModuleChi
                 tier=comp.tier,
                 stock=comp.stock,
                 current_price_per_100_eur=comp.current_price_per_100_eur,
+                supplier_stock_summary=[
+                    SupplierStockSummaryEntry(
+                        supplier_id=sid, supplier_name=sname, quantity=qty
+                    )
+                    for sid, sname, qty in summary_by_component.get(comp.id, [])
+                ],
             )
 
     return ModuleChildResponse(
@@ -141,7 +152,11 @@ async def _hydrate_child(session: AsyncSession, child: ModuleChild) -> ModuleChi
 
 async def _bundle_to_response(session: AsyncSession, bundle: ModuleDetailBundle) -> ModuleResponse:
     hydrated_children = [await _hydrate_child(session, c) for c in bundle.children]
-    parent_summaries = [_module_summary(p) for p in bundle.parents]
+    svc = _service(session)
+    parent_summaries: list[ModuleSummaryResponse] = []
+    for p in bundle.parents:
+        parent_agg = await svc.compute_aggregates(p.id, module_stock=p.stock)
+        parent_summaries.append(_module_summary(p, parent_agg))
     base = {
         "id": bundle.module.id,
         "sku": bundle.module.sku,
@@ -458,3 +473,19 @@ async def get_component_purchases_summary(
         )
         for r in rows
     ]
+
+
+@router.get("/{module_id}/projects-using")
+async def list_projects_using_module_endpoint(
+    module_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[Any]:
+    """Projects that hold this module as a direct child (BOM edge).
+
+    Drives the "Usado en proyectos" section on the module detail.
+    """
+    from app.api.v1.routers.projects import list_projects_using_module
+
+    await _service(session).get(module_id)
+    return [s.model_dump() for s in await list_projects_using_module(session, module_id)]

@@ -1,0 +1,24 @@
+{
+  "status": "OK",
+  "data": {
+    "products": {
+      "elements": [
+        {
+          "product_status": "ok",
+          "symbol": "NE555P",
+          "ean": "",
+          "customer_symbol": "",
+          "category": { "id": 112875, "name": "Watchdog and reset circuits" },
+          "manufacturer_symbols": ["NE555P"],
+          "manufacturer": { "id": 77, "name": "TEXAS INSTRUMENTS" },
+          "description": "IC: peripheral circuit; astable,monostable,RC timer; 500kHz",
+          "multiples": 1,
+          "minimal_amount": 1,
+          "unit": { "id": "ST", "short_name": "pcs" }
+        }
+      ]
+    },
+    "parameters": null,
+    "counters": null
+  }
+}

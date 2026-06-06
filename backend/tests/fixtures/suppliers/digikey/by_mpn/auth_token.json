@@ -1,0 +1,6 @@
+{
+  "access_token": "fake-bearer-token-for-tests",
+  "token_type": "Bearer",
+  "expires_in": 600,
+  "refresh_token": ""
+}

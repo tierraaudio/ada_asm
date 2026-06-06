@@ -158,9 +158,124 @@ class InvalidChildReferenceError(DomainError):
     http_status = 422
 
 
+# ---------- Projects + Customers ----------
+
+
+class ProjectNotFoundError(DomainError):
+    code = "PROJECT_NOT_FOUND"
+    http_status = 404
+
+
+class ProjectCodeAlreadyRegisteredError(DomainError):
+    code = "PROJECT_CODE_ALREADY_REGISTERED"
+    http_status = 409
+
+
+class CustomerNotFoundError(DomainError):
+    code = "CUSTOMER_NOT_FOUND"
+    http_status = 404
+
+
+class CustomerHoldedIdAlreadyRegisteredError(DomainError):
+    code = "CUSTOMER_HOLDED_ID_ALREADY_REGISTERED"
+    http_status = 409
+
+
 # ---------- Misc ----------
 
 
 class RateLimitExceededError(DomainError):
     code = "RATE_LIMIT_EXCEEDED"
     http_status = 429
+
+
+# ---------- Supplier integration (change `supplier-sync`) ----------
+#
+# These are RAISED by the adapters in `app/infrastructure/suppliers/*` and
+# CAUGHT by the lookup service / Celery sync task. Each subclass carries the
+# corresponding `supplier_sync_errors.error_code` so the task can persist a
+# typed audit row without a second mapping table.
+
+
+class SupplierError(DomainError):
+    """Base class for adapter-side failures. NOT for "no match found" — that
+    is signalled by `fetch_by_mpn` returning `None`."""
+
+    code = "SUPPLIER_ERROR"
+    http_status = 502
+    error_code: str = "UNKNOWN"
+
+
+class SupplierAuthError(SupplierError):
+    code = "SUPPLIER_AUTH_FAILED"
+    error_code = "AUTH_FAILED"
+
+
+class SupplierTransportError(SupplierError):
+    """Anything HTTP 5xx from the supplier (excluding timeouts)."""
+
+    code = "SUPPLIER_HTTP_5XX"
+    error_code = "HTTP_5XX"
+
+
+class SupplierTimeoutError(SupplierError):
+    code = "SUPPLIER_TIMEOUT"
+    error_code = "TIMEOUT"
+
+
+class SupplierParseError(SupplierError):
+    """Schema drift — the adapter could not parse the response payload."""
+
+    code = "SUPPLIER_PARSE_ERROR"
+    error_code = "PARSE_ERROR"
+
+
+class SupplierRateLimitedError(SupplierError):
+    """The supplier rejected the request because we are over our per-window
+    quota (e.g. DigiKey 429 once the daily cap is exhausted)."""
+
+    code = "SUPPLIER_RATE_LIMITED"
+    http_status = 429
+    error_code = "RATE_LIMITED"
+
+
+class FxUnavailableError(SupplierError):
+    """The daily ECB FX rate is missing and the live source is unreachable —
+    `price_eur` cannot be computed; row is stored with original currency
+    only."""
+
+    code = "FX_UNAVAILABLE"
+    http_status = 503
+    error_code = "FX_UNAVAILABLE"
+
+
+# ---------- Lookup endpoint (change `supplier-sync`) ----------
+
+
+class ComponentMpnNotFoundError(DomainError):
+    """At least one supplier was consulted successfully but none returned
+    data for the requested MPN."""
+
+    code = "COMPONENT_MPN_NOT_FOUND"
+    http_status = 404
+
+
+class SupplierLookupUnavailableError(DomainError):
+    """Every enabled supplier raised a transport-level error — we can say
+    nothing about whether the MPN exists."""
+
+    code = "SUPPLIER_LOOKUP_UNAVAILABLE"
+    http_status = 502
+
+
+class SupplierNotEnabledError(DomainError):
+    """An ad-hoc trigger was requested for a supplier that is either absent
+    from `SUPPLIER_SYNC_ENABLED_SUPPLIERS` or unconfigured."""
+
+    code = "SUPPLIER_NOT_ENABLED"
+    http_status = 422
+
+
+class SupplierSyncRunNotFoundError(DomainError):
+    code = "SUPPLIER_SYNC_RUN_NOT_FOUND"
+    http_status = 404

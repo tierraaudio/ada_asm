@@ -1,0 +1,6 @@
+{
+  "access_token": "eyJ0eXAiOiJKV1MiLCJhbGciOiJSUzI1NiJ9.fake-payload.fake-signature",
+  "token_type": "Bearer",
+  "expires_in": 300,
+  "refresh_token": ""
+}

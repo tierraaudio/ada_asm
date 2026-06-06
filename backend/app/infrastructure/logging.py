@@ -29,6 +29,35 @@ def _add_request_id(
     return event_dict
 
 
+def _add_trace_context(
+    _: Any,
+    __: str,
+    event_dict: MutableMapping[str, Any],
+) -> MutableMapping[str, Any]:
+    """Inject the active OpenTelemetry span's `trace_id` + `span_id` into
+    every log record so App Insights correlates logs with traces.
+
+    No-op when OpenTelemetry is not configured (the import resolves but
+    the global tracer provider is a NoOp) or when no span is active.
+    Lazy import so the structlog pipeline keeps working even if OTel is
+    not installed at all (e.g. in a stripped-down build).
+    """
+
+    try:
+        from opentelemetry import trace
+    except ImportError:
+        return event_dict
+
+    span = trace.get_current_span()
+    ctx = span.get_span_context()
+    if ctx.is_valid:
+        # W3C-format hex strings so App Insights' correlation works
+        # without extra parsing on the ingestion side.
+        event_dict["trace_id"] = format(ctx.trace_id, "032x")
+        event_dict["span_id"] = format(ctx.span_id, "016x")
+    return event_dict
+
+
 def configure_logging(env: str, log_level: str) -> None:
     """Configure structlog and the stdlib logger.
 
@@ -47,6 +76,7 @@ def configure_logging(env: str, log_level: str) -> None:
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         _add_request_id,
+        _add_trace_context,
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
     ]

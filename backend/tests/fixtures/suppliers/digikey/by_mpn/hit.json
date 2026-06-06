@@ -1,0 +1,43 @@
+{
+  "Products": [
+    {
+      "ManufacturerProductNumber": "NE555P",
+      "Manufacturer": { "Id": 296, "Name": "Texas Instruments" },
+      "Description": {
+        "ProductDescription": "IC OSC SINGLE TIMER 100KHZ 8-DIP",
+        "DetailedDescription": "555 Type, Timer/Oscillator (Single) IC 100kHz 8-PDIP"
+      },
+      "Category": {
+        "CategoryId": 32,
+        "ParentId": 0,
+        "Name": "Integrated Circuits (ICs)"
+      },
+      "DatasheetUrl": "https://www.ti.com/lit/ds/symlink/na555.pdf",
+      "ProductUrl": "https://www.digikey.com/en/products/detail/texas-instruments/NE555P/277057",
+      "PhotoUrl": "https://media.digikey.com/Photos/Texas%20Instruments/MFG_NE555P.jpg",
+      "QuantityAvailable": 26735,
+      "UnitPrice": 0.43,
+      "ProductStatus": { "Id": 0, "Status": "Active" },
+      "ProductVariations": [
+        {
+          "DigiKeyProductNumber": "296-NE555P-ND",
+          "PackageType": { "Id": 6, "Name": "Tube" },
+          "StandardPricing": [
+            { "BreakQuantity": 1, "UnitPrice": 0.43, "TotalPrice": 0.43 },
+            { "BreakQuantity": 10, "UnitPrice": 0.304, "TotalPrice": 3.04 },
+            { "BreakQuantity": 50, "UnitPrice": 0.2526, "TotalPrice": 12.63 },
+            { "BreakQuantity": 100, "UnitPrice": 0.2365, "TotalPrice": 23.65 },
+            { "BreakQuantity": 250, "UnitPrice": 0.2196, "TotalPrice": 54.9 },
+            { "BreakQuantity": 500, "UnitPrice": 0.20934, "TotalPrice": 104.67 },
+            { "BreakQuantity": 1000, "UnitPrice": 0.20092, "TotalPrice": 200.92 },
+            { "BreakQuantity": 2500, "UnitPrice": 0.19225, "TotalPrice": 480.625 }
+          ],
+          "MinimumOrderQuantity": 1,
+          "StandardPackage": 50
+        }
+      ]
+    }
+  ],
+  "ProductsCount": 1,
+  "ExactMatches": []
+}

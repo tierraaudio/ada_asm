@@ -1,14 +1,14 @@
 """Celery application factory.
 
-No tasks are registered in the bootstrap skeleton; the worker and beat
-containers boot, connect to Redis, and stay running with an empty task
-registry. Per-task modules will register themselves with ``celery_app`` as
-they are introduced by the User Stories that need them.
+Tasks register themselves with ``celery_app`` via the ``imports``
+configuration below. The Beat schedule is the single place where
+periodic invocations are declared.
 """
 
 from __future__ import annotations
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import get_settings
 
@@ -27,5 +27,20 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
-    beat_schedule={},
+    # Modules whose `@celery_app.task` decorations register tasks on the
+    # registry. Workers + beat need to import these on boot or the
+    # registry is empty and tasks fail with KeyError.
+    imports=("app.infrastructure.tasks.supplier_sync",),
+    beat_schedule={
+        # Daily supplier sync at the configured UTC hour. Enqueues one
+        # `sync_one_supplier` task per enabled supplier so they run in
+        # parallel on the worker pool.
+        "supplier-sync-daily": {
+            "task": "supplier_sync.run_daily_sync",
+            "schedule": crontab(
+                hour=str(_settings.supplier_sync_daily_hour_utc),
+                minute="0",
+            ),
+        },
+    },
 )

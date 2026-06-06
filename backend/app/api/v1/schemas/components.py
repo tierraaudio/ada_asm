@@ -45,6 +45,7 @@ class ComponentResponse(BaseModel):
     updated_at: datetime
     # Server-computed read-only fields.
     current_price_per_100_eur: Decimal | None = None
+    supplier_stock_summary: list[SupplierStockSummaryEntry] = Field(default_factory=list)
 
 
 class ComponentCreateRequest(BaseModel):
@@ -106,6 +107,21 @@ class SupplierResponse(BaseModel):
     name: str
 
 
+class SupplierStockSummaryEntry(BaseModel):
+    """Latest stock snapshot for one (component, supplier) pair.
+
+    Embedded in `ComponentResponse` / `ComponentSummaryResponse` so list
+    tables can colour the stock badge (warning vs critical) and render the
+    per-supplier breakdown in its hover tooltip without an extra round trip.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    supplier_id: UUID
+    supplier_name: str
+    quantity: int
+
+
 # ----- NATO scoring (per-execution audit trail) -----
 
 
@@ -142,6 +158,7 @@ class ComponentSummaryResponse(BaseModel):
     tier: TierLiteral
     stock: int
     current_price_per_100_eur: Decimal | None = None
+    supplier_stock_summary: list[SupplierStockSummaryEntry] = Field(default_factory=list)
 
 
 class ScoringAlternativeResponse(BaseModel):

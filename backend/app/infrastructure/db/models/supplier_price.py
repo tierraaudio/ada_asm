@@ -13,6 +13,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    String,
     UniqueConstraint,
     text,
 )
@@ -62,3 +63,11 @@ class SupplierPriceModel(Base, TimestampMixin):
     qty_tier: Mapped[int] = mapped_column(Integer, nullable=False)
     price: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
     valid_from: Mapped[date] = mapped_column(Date, nullable=False)
+    price_original: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 4),
+        nullable=True,
+    )
+    currency_original: Mapped[str | None] = mapped_column(
+        String(3),
+        nullable=True,
+    )

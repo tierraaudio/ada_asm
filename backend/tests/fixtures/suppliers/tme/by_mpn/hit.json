@@ -1,0 +1,29 @@
+{
+  "Status": "OK",
+  "Data": {
+    "ProductList": [
+      {
+        "Symbol": "NE555-DIP8",
+        "OriginalSymbol": "NE555P",
+        "Producer": "Texas Instruments",
+        "Description": "IC timer SOIC8 SMD",
+        "Category": "Integrated circuits / Linear ICs / Timers",
+        "Stock": 8520,
+        "Unit": "pcs",
+        "PhotoUrl": "https://ce.tme.eu/products_images/...jpg",
+        "ProductInformationPage": "https://www.tme.eu/en/details/ne555-dip8/timers-2/texas-instruments/",
+        "DocumentUrl": "https://www.tme.eu/Document/.../NE555P.pdf",
+        "MinAmount": 1,
+        "PriceList": [
+          { "Amount": 1, "PriceValue": 0.42, "PriceBase": 1, "Special": false },
+          { "Amount": 10, "PriceValue": 0.36, "PriceBase": 1, "Special": false },
+          { "Amount": 100, "PriceValue": 0.28, "PriceBase": 1, "Special": false },
+          { "Amount": 1000, "PriceValue": 0.22, "PriceBase": 1, "Special": false }
+        ]
+      }
+    ],
+    "Amount": 1,
+    "Page": 1,
+    "PageSize": 20
+  }
+}

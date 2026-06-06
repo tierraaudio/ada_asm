@@ -1,0 +1,28 @@
+{
+  "Errors": [],
+  "SearchResults": {
+    "NumberOfResult": 1,
+    "Parts": [
+      {
+        "Availability": "1240 In Stock",
+        "AvailabilityInStock": "1240",
+        "Category": "Clock & Timer ICs",
+        "DataSheetUrl": "https://www.mouser.com/datasheet/2/308/1/NBC12429FA_D-2316881.pdf",
+        "Description": "Clock Generator 0.025/700MHz LVPECL VCO 28-Pin LQFP T/R",
+        "FactoryStock": "5000",
+        "Manufacturer": "onsemi",
+        "ManufacturerPartNumber": "NBC12429FAR2G",
+        "MouserPartNumber": "863-NBC12429FAR2G",
+        "PriceBreaks": [
+          { "Quantity": 1, "Price": "$5.00", "Currency": "USD" },
+          { "Quantity": 10, "Price": "$4.50", "Currency": "USD" },
+          { "Quantity": 100, "Price": "$3.80", "Currency": "USD" },
+          { "Quantity": 1000, "Price": "$3.10", "Currency": "USD" }
+        ],
+        "ProductDetailUrl": "https://www.mouser.com/ProductDetail/onsemi/NBC12429FAR2G",
+        "LifecycleStatus": "Active",
+        "ROHSStatus": "RoHS Compliant"
+      }
+    ]
+  }
+}

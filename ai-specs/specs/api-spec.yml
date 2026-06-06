@@ -350,6 +350,36 @@ paths:
         "404":
           $ref: "#/components/responses/ComponentNotFound"
 
+  /api/v1/components/{component_id}/parents:
+    parameters:
+      - in: path
+        name: component_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [components]
+      summary: Modules that hold this component as a direct child
+      description: |
+        Drives the "Pertenece a" section on the component detail page. Returns
+        hydrated module summaries (with `precio_total`, `aggregated_nato_score`,
+        `aggregated_tier`, `aggregated_expires_at`, `buildable_stock`) so the
+        FE renders them with the same canonical modules hierarchy table used
+        in the modules list and "Contiene" sections.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of `ModuleSummary` — one entry per direct parent module.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ModuleSummary" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ComponentNotFound"
+
   /api/v1/components/{component_id}/nato-scorings:
     parameters:
       - in: path
@@ -568,8 +598,650 @@ paths:
       responses:
         "200":
           description: "ModulePriceHistoryResponse with series of {date, price} points"
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ModulePriceHistoryResponse" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "404":
           description: MODULE_NOT_FOUND
+
+  /api/v1/modules/{module_id}/stock-events:
+    parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [modules]
+      summary: Module-level stock events (fabricated / delivered) ordered by `occurred_at DESC`
+      description: |
+        Drives the "Histórico de fabricación" modal. Returns events with
+        `module_id` set and `kind in ('fabricated', 'delivered')`. Supports
+        pagination.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Paginated `StockEvent` rows for this module.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, page_size]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: "#/components/schemas/StockEvent" }
+                  total: { type: integer, minimum: 0 }
+                  page: { type: integer, minimum: 1 }
+                  page_size: { type: integer, minimum: 1 }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: MODULE_NOT_FOUND
+
+  /api/v1/modules/{module_id}/component-purchases-summary:
+    parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [modules]
+      summary: Aggregated supplier spend across descendant components
+      description: |
+        For each supplier that has been purchased from for any descendant
+        component of this module, returns total qty + total cost (EUR).
+        Drives the "Proveedor más comprado" pane on the module detail and
+        the "Historial de fabricación" modal.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of `SupplierPurchaseSummary` rows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SupplierPurchaseSummary" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: MODULE_NOT_FOUND
+
+  /api/v1/modules/{module_id}/projects-using:
+    parameters:
+      - in: path
+        name: module_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [modules]
+      summary: Projects that hold this module as a direct child
+      description: |
+        Drives the "Usado en proyectos" section on the module detail. Returns
+        hydrated ProjectSummary rows.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of `ProjectSummary` rows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProjectSummary" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: MODULE_NOT_FOUND
+
+  /api/v1/components/{component_id}/projects-using:
+    parameters:
+      - in: path
+        name: component_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [components]
+      summary: Projects that hold this component as a direct child
+      description: |
+        Drives the "Usado en proyectos" section on the component detail.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of `ProjectSummary` rows.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProjectSummary" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/ComponentNotFound"
+
+  /api/v1/projects:
+    get:
+      tags: [projects]
+      summary: List projects (catalogue), aggregates hydrated server-side
+      description: |
+        Default behaviour excludes `Archived` rows. Pass `include_archived=true`
+        to lift the exclusion. `status[]` is repeatable and, when provided,
+        replaces the default filter entirely.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Case-insensitive over `code`, `name`, `customer.name`.
+        - in: query
+          name: status
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/ProjectStatus" }
+          style: form
+          explode: true
+        - in: query
+          name: include_archived
+          schema: { type: boolean, default: false }
+        - in: query
+          name: customer_id
+          schema: { type: array, items: { type: string, format: uuid } }
+          style: form
+          explode: true
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+      responses:
+        "200":
+          description: PaginatedProjects — each item carries aggregates + customer hydrated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PaginatedProjects" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      tags: [projects]
+      summary: Create a project
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectCreate" }
+      responses:
+        "201":
+          description: ProjectResponse (hydrated)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectResponse" }
+        "409":
+          description: PROJECT_CODE_ALREADY_REGISTERED
+        "422":
+          description: Validation errors.
+
+  /api/v1/projects/{project_id}:
+    parameters:
+      - in: path
+        name: project_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [projects]
+      summary: Project detail (aggregates + children + customer hydrated)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: ProjectResponse
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectResponse" }
+        "404":
+          description: PROJECT_NOT_FOUND
+    patch:
+      tags: [projects]
+      summary: Partial update — code is mutable; transition to Delivered auto-fills fecha_entrega_real
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectUpdate" }
+      responses:
+        "200":
+          description: ProjectResponse
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectResponse" }
+        "404":
+          description: PROJECT_NOT_FOUND
+        "409":
+          description: PROJECT_CODE_ALREADY_REGISTERED
+    delete:
+      tags: [projects]
+      summary: Soft-delete — sets status='Archived'
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Archived (idempotent)
+        "404":
+          description: PROJECT_NOT_FOUND
+
+  /api/v1/projects/{project_id}/children:
+    parameters:
+      - in: path
+        name: project_id
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [projects]
+      summary: Add a project→(module|component) edge
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AddProjectChildRequest" }
+      responses:
+        "201":
+          description: ProjectChildResponse (hydrated)
+        "404":
+          description: PROJECT_NOT_FOUND or INVALID_CHILD_REFERENCE
+        "409":
+          description: CHILD_ALREADY_PRESENT
+        "422":
+          description: XOR violation or validation errors.
+
+  /api/v1/projects/{project_id}/children/{child_id}:
+    parameters:
+      - in: path
+        name: project_id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: child_id
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [projects]
+      summary: Patch quantity / notes / sort_order on an existing edge
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateProjectChildRequest" }
+      responses:
+        "200":
+          description: ProjectChildResponse (re-hydrated)
+        "404":
+          description: PROJECT_NOT_FOUND or child missing
+    delete:
+      tags: [projects]
+      summary: Remove an edge (referenced entity is NOT touched)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Removed (idempotent)
+
+  /api/v1/projects/{project_id}/price-history:
+    parameters:
+      - in: path
+        name: project_id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: query
+        name: period
+        schema: { type: string, enum: [week, month, year], default: year }
+    get:
+      tags: [projects]
+      summary: Aggregated price time-series (server-computed)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: ProjectPriceHistoryResponse
+        "404":
+          description: PROJECT_NOT_FOUND
+
+  /api/v1/projects/{project_id}/stock-events:
+    parameters:
+      - in: path
+        name: project_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [projects]
+      summary: Stock events tied to this project (consumption + delivered)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: page_size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        "200":
+          description: Paginated StockEvent rows ordered by `occurred_at DESC`.
+        "404":
+          description: PROJECT_NOT_FOUND
+
+  /api/v1/projects/{project_id}/interest-links:
+    parameters:
+      - in: path
+        name: project_id
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [projects]
+      summary: Create an interest link for a project
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectInterestLinkCreate" }
+      responses:
+        "201":
+          description: ProjectInterestLink
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectInterestLink" }
+        "404":
+          description: PROJECT_NOT_FOUND
+        "422":
+          description: Validation errors.
+
+  /api/v1/projects/{project_id}/interest-links/{link_id}:
+    parameters:
+      - in: path
+        name: project_id
+        required: true
+        schema: { type: string, format: uuid }
+      - in: path
+        name: link_id
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [projects]
+      summary: Patch an interest link (name / url / sort_order)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectInterestLinkUpdate" }
+      responses:
+        "200":
+          description: ProjectInterestLink
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectInterestLink" }
+        "404":
+          description: PROJECT_NOT_FOUND or link missing
+    delete:
+      tags: [projects]
+      summary: Remove an interest link
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Removed (idempotent on missing)
+
+  /api/v1/customers:
+    get:
+      tags: [customers]
+      summary: List all customers (no pagination yet)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of Customer rows
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Customer" }
+    post:
+      tags: [customers]
+      summary: Create a customer
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerCreate" }
+      responses:
+        "201":
+          description: Customer
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Customer" }
+        "409":
+          description: CUSTOMER_HOLDED_ID_ALREADY_REGISTERED
+
+  /api/v1/customers/{customer_id}:
+    parameters:
+      - in: path
+        name: customer_id
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [customers]
+      summary: Single customer
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Customer
+        "404":
+          description: CUSTOMER_NOT_FOUND
+    patch:
+      tags: [customers]
+      summary: Partial update
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CustomerUpdate" }
+      responses:
+        "200":
+          description: Customer
+        "404":
+          description: CUSTOMER_NOT_FOUND
+        "409":
+          description: CUSTOMER_HOLDED_ID_ALREADY_REGISTERED
+    delete:
+      tags: [customers]
+      summary: Delete a customer (projects.customer_id becomes NULL)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+
+  /api/v1/config:
+    get:
+      tags: [config]
+      summary: Runtime config exposed to the FE (Holded base URL)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: ConfigResponse
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfigResponse" }
+
+  /api/v1/components/lookup:
+    get:
+      tags: [components]
+      summary: Look up a component by MPN across all enabled suppliers
+      description: >
+        Walks `SUPPLIER_LOOKUP_PRIORITY` and merges quotes progressively
+        (first non-null wins per scalar field). Empty strings from a
+        higher-priority supplier are treated as missing so a later
+        supplier with a real value can fill the gap. Result is cached in
+        Redis under `supplier_lookup:{lower(mpn)}` for
+        `SUPPLIER_LOOKUP_CACHE_TTL_SECONDS` (default 900). Use this to
+        pre-fill the "Nuevo componente" form by MPN. Introduced by the
+        `supplier-sync` change.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: mpn
+          required: true
+          schema: { type: string, minLength: 3, maxLength: 60 }
+          description: Manufacturer part number (case-insensitive, trimmed).
+        - in: query
+          name: force_refresh
+          required: false
+          schema: { type: boolean, default: false }
+          description: Bypass the Redis cache and re-query every enabled supplier.
+      responses:
+        "200":
+          description: Lookup succeeded — at least one supplier returned data.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LookupResponse" }
+        "401": { description: Unauthenticated. }
+        "404":
+          description: At least one supplier responded but none had a match.
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string, enum: [COMPONENT_MPN_NOT_FOUND] }
+        "422":
+          description: MPN failed validation (too short, too long, etc.).
+        "502":
+          description: Every consulted supplier raised a transport error.
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string, enum: [SUPPLIER_LOOKUP_UNAVAILABLE] }
+
+  /api/v1/supplier-sync/runs:
+    get:
+      tags: [supplier-sync]
+      summary: List recent supplier sync runs
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - in: query
+          name: supplier
+          schema:
+            type: string
+            enum: [mouser, digikey, tme, farnell, rs]
+      responses:
+        "200":
+          description: Paginated list of runs, ordered by `started_at DESC`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SupplierSyncRunResponse" }
+        "401": { description: Unauthenticated. }
+    post:
+      tags: [supplier-sync]
+      summary: Enqueue an ad-hoc supplier sync (no waiting for the daily Beat)
+      description: >
+        Pre-creates the `supplier_sync_runs` row HTTP-side so the
+        operator gets the real `run_id` back synchronously, then
+        enqueues `sync_one_supplier.delay(code, run_id)` on Celery. Poll
+        `GET /api/v1/supplier-sync/runs/{run_id}` for completion. Fails
+        with 422 `SUPPLIER_NOT_ENABLED` when the supplier is not listed
+        in `SUPPLIER_SYNC_ENABLED_SUPPLIERS` or has no credentials.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: supplier
+          required: true
+          schema:
+            type: string
+            enum: [mouser, digikey, tme, farnell, rs]
+      responses:
+        "202":
+          description: Sync task enqueued.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TriggerSyncResponse" }
+        "401": { description: Unauthenticated. }
+        "422":
+          description: Supplier not enabled or has no credentials.
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string, enum: [SUPPLIER_NOT_ENABLED] }
+
+  /api/v1/supplier-sync/runs/{run_id}/errors:
+    get:
+      tags: [supplier-sync]
+      summary: Per-component errors captured during one sync run
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: run_id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+      responses:
+        "200":
+          description: Errors for the run, ordered by `occurred_at DESC`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SupplierSyncErrorResponse" }
+        "404":
+          description: Unknown run id.
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string, enum: [SUPPLIER_SYNC_RUN_NOT_FOUND] }
 
 components:
   securitySchemes:
@@ -693,8 +1365,25 @@ components:
           type: string
           nullable: true
           description: Server-computed (latest 100u price from preferred supplier).
+        supplier_stock_summary:
+          type: array
+          description: |
+            Latest snapshot per supplier — server-hydrated in a single batched query.
+            Drives the `<StockStatusBadge>` colour and tooltip on list/hierarchy tables
+            without an N+1 round trip. Empty array means no supplier inventory has ever
+            been recorded (not "unknown").
+          items:
+            $ref: "#/components/schemas/SupplierStockSummaryEntry"
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    SupplierStockSummaryEntry:
+      type: object
+      required: [supplier_id, supplier_name, quantity]
+      properties:
+        supplier_id: { type: string, format: uuid }
+        supplier_name: { type: string }
+        quantity: { type: integer, minimum: 0 }
 
     ComponentDetail:
       allOf:
@@ -802,15 +1491,34 @@ components:
     StockEvent:
       type: object
       description: |
-        Append-only ledger row. Some fields are kind-specific (see `kind`).
-        Purchase rows fill supplier_*/unit_cost/total_cost/currency; consumption
-        rows fill project_id + project_name_snapshot.
-      required:
-        [id, component_id, kind, quantity, occurred_at, currency, created_at, updated_at]
+        Append-only ledger row. Polymorphic owner: exactly one of `component_id` /
+        `module_id` is non-null per row (DB-level XOR CHECK).
+
+        Kind dictates which fields are populated:
+          * `purchase`     — component-level restock from a supplier.
+            Fills: component_id, supplier_id, unit_cost, total_cost, currency.
+          * `consumption`  — component allocated to a project.
+            Fills: component_id, project_id, project_name_snapshot.
+          * `fabricated`   — module assembled in-house. Adds units to the module's stock.
+            Fills: module_id, unit_cost, total_cost (computed cost per assembled unit).
+          * `delivered`    — module shipped to a customer. Removes units from stock.
+            Fills: module_id, customer_id_holded, customer_name_snapshot.
+      required: [id, kind, quantity, occurred_at, currency, created_at, updated_at]
       properties:
         id: { type: string, format: uuid }
-        component_id: { type: string, format: uuid }
-        kind: { type: string, enum: [purchase, consumption] }
+        component_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set for component-level events (`purchase`, `consumption`). Null for module events.
+        module_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set for module-level events (`fabricated`, `delivered`). Null for component events.
+        kind:
+          type: string
+          enum: [purchase, consumption, fabricated, delivered]
         quantity: { type: integer, minimum: 1 }
         occurred_at: { type: string, format: date }
         notes: { type: string, nullable: true }
@@ -821,8 +1529,214 @@ components:
         currency: { type: string, minLength: 3, maxLength: 3 }
         project_id: { type: string, format: uuid, nullable: true }
         project_name_snapshot: { type: string, nullable: true }
+        customer_id_holded:
+          type: string
+          nullable: true
+          maxLength: 64
+          description: "`delivered` only — Holded customer ID for the module shipment."
+        customer_name_snapshot:
+          type: string
+          nullable: true
+          maxLength: 200
+          description: "`delivered` only — denormalised customer display name for audit."
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+
+    # ----- Modules -----
+
+    Module:
+      type: object
+      description: A reusable assembly catalogue entry (intermediate node of the asset tree).
+      required: [id, sku, name, version, family, stock, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string, maxLength: 100 }
+        name: { type: string, maxLength: 200 }
+        description: { type: string, nullable: true }
+        version: { type: string, maxLength: 40 }
+        family:
+          type: string
+          enum: [Board, Device, Bundle, Case]
+          description: DB-enforced enum.
+        fabricante: { type: string, nullable: true, maxLength: 120 }
+        location: { type: string, nullable: true, maxLength: 100 }
+        tipo_almacenamiento: { type: string, nullable: true, maxLength: 80 }
+        stock: { type: integer, minimum: 0, description: Assembled units in the warehouse. }
+        notas: { type: string, nullable: true }
+        fecha_creacion: { type: string, format: date, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ModuleSummary:
+      type: object
+      description: |
+        `Module` extended with server-computed aggregates over its descendant
+        components. Aggregates are hydrated on every list/detail/parents read
+        and are never persisted. Empty modules return `precio_total=null`,
+        `aggregated_*=null`, `buildable_stock=0`.
+      allOf:
+        - $ref: "#/components/schemas/Module"
+        - type: object
+          properties:
+            precio_total:
+              type: string
+              nullable: true
+              description: Decimal sum of `descendant.current_price_per_100_eur × quantity / 100` (EUR).
+            aggregated_nato_score:
+              type: string
+              enum: ["A+", A, B, C, D, F]
+              nullable: true
+              description: Worst (lexicographic min `F < D < C < B < A < A+`) score across descendants.
+            aggregated_tier:
+              type: integer
+              enum: [1, 2, 3, 4]
+              nullable: true
+              description: Worst (numeric min, Tier 1 = worst) tier across descendants.
+            aggregated_expires_at:
+              type: string
+              format: date
+              nullable: true
+              description: Earliest scoring expiration across descendants.
+            buildable_stock:
+              type: integer
+              minimum: 0
+              description: |
+                How many full units of this module can be built from current component
+                stock. `min_over_descendants(floor(descendant.stock / quantity_required))`.
+
+    ModuleChild:
+      type: object
+      description: |
+        One edge in the module DAG. XOR — exactly one of `child_module_id` /
+        `child_component_id` is non-null. When `child_module` / `child_component`
+        is hydrated, it carries the embedded summary for that child.
+      required: [id, parent_module_id, quantity, sort_order]
+      properties:
+        id: { type: string, format: uuid }
+        parent_module_id: { type: string, format: uuid }
+        child_module_id: { type: string, format: uuid, nullable: true }
+        child_component_id: { type: string, format: uuid, nullable: true }
+        quantity: { type: integer, minimum: 1 }
+        sort_order: { type: integer }
+        notes: { type: string, nullable: true }
+        child_module:
+          allOf:
+            - $ref: "#/components/schemas/ModuleSummary"
+          nullable: true
+        child_component:
+          allOf:
+            - $ref: "#/components/schemas/ComponentSummary"
+          nullable: true
+
+    ModuleResponse:
+      type: object
+      description: Module detail — extends `ModuleSummary` with hydrated children + parents.
+      allOf:
+        - $ref: "#/components/schemas/ModuleSummary"
+        - type: object
+          required: [children, parents]
+          properties:
+            children:
+              type: array
+              items: { $ref: "#/components/schemas/ModuleChild" }
+            parents:
+              type: array
+              items: { $ref: "#/components/schemas/ModuleSummary" }
+
+    PaginatedModules:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ModuleSummary" }
+        total: { type: integer, minimum: 0 }
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1 }
+
+    ModuleCreate:
+      type: object
+      required: [sku, name]
+      properties:
+        sku: { type: string, minLength: 1, maxLength: 100 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, nullable: true }
+        version: { type: string, maxLength: 40 }
+        family: { type: string, enum: [Board, Device, Bundle, Case] }
+        fabricante: { type: string, nullable: true, maxLength: 120 }
+        location: { type: string, nullable: true, maxLength: 100 }
+        tipo_almacenamiento: { type: string, nullable: true, maxLength: 80 }
+        stock: { type: integer, minimum: 0 }
+        notas: { type: string, nullable: true }
+        fecha_creacion: { type: string, format: date, nullable: true }
+
+    ModuleUpdate:
+      type: object
+      description: All fields optional; immutable fields (id, created_at, updated_at) ignored.
+      properties:
+        sku: { type: string, maxLength: 100 }
+        name: { type: string, maxLength: 200 }
+        description: { type: string, nullable: true }
+        version: { type: string, maxLength: 40 }
+        family: { type: string, enum: [Board, Device, Bundle, Case] }
+        fabricante: { type: string, nullable: true, maxLength: 120 }
+        location: { type: string, nullable: true, maxLength: 100 }
+        tipo_almacenamiento: { type: string, nullable: true, maxLength: 80 }
+        stock: { type: integer, minimum: 0 }
+        notas: { type: string, nullable: true }
+        fecha_creacion: { type: string, format: date, nullable: true }
+
+    AddChildRequest:
+      type: object
+      description: |
+        Adds one edge to a module's children. Exactly one of `child_module_id` /
+        `child_component_id` MUST be set (XOR enforced by the BE; 422 otherwise).
+        Cycles among module nodes are rejected by `ModuleService` before insert.
+      required: [quantity]
+      properties:
+        child_module_id: { type: string, format: uuid }
+        child_component_id: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        sort_order: { type: integer }
+        notes: { type: string, nullable: true }
+
+    UpdateChildRequest:
+      type: object
+      description: Patch an existing edge. All fields optional.
+      properties:
+        quantity: { type: integer, minimum: 1 }
+        sort_order: { type: integer }
+        notes: { type: string, nullable: true }
+
+    ModulePriceHistoryPoint:
+      type: object
+      required: [date, price]
+      properties:
+        date: { type: string, format: date }
+        price:
+          type: string
+          description: Decimal as string; the module's `precio_total` at that date.
+
+    ModulePriceHistoryResponse:
+      type: object
+      required: [period, points]
+      properties:
+        period: { type: string, enum: [week, month, year] }
+        points:
+          type: array
+          items: { $ref: "#/components/schemas/ModulePriceHistoryPoint" }
+
+    SupplierPurchaseSummary:
+      type: object
+      description: |
+        Aggregated supplier spend across all descendant components of a module.
+        Drives the "Proveedor más comprado" pane on the module detail / historial.
+      required: [supplier_name, qty, cost]
+      properties:
+        supplier_id: { type: string, format: uuid, nullable: true }
+        supplier_name: { type: string }
+        qty: { type: integer, minimum: 0 }
+        cost: { type: string, description: Decimal as string (EUR). }
 
     PaginatedStockEvents:
       type: object
@@ -858,7 +1772,7 @@ components:
 
     ComponentSummary:
       type: object
-      description: Lightweight subset of Component embedded in cross-references (e.g. scoring alternatives).
+      description: Lightweight subset of Component embedded in cross-references (scoring alternatives, module children, etc.).
       required: [id, mpn, name, family, nato_score, tier, stock]
       properties:
         id: { type: string, format: uuid }
@@ -867,11 +1781,17 @@ components:
         name: { type: string }
         family: { type: string }
         fabricante: { type: string, nullable: true }
+        location: { type: string, nullable: true, maxLength: 100 }
         country_of_origin: { type: string, nullable: true, minLength: 2, maxLength: 2 }
         nato_score: { type: string, enum: ["A+", A, B, C, D, F] }
         tier: { type: integer, enum: [1, 2, 3, 4] }
         stock: { type: integer, minimum: 0 }
         current_price_per_100_eur: { type: string, nullable: true }
+        supplier_stock_summary:
+          type: array
+          description: Same shape and semantics as on `Component`.
+          items:
+            $ref: "#/components/schemas/SupplierStockSummaryEntry"
 
     ScoringClassification:
       type: object
@@ -978,6 +1898,385 @@ components:
       required: [status]
       properties:
         status: { type: string, enum: [queued] }
+
+    # ===== Projects + Customers =====
+
+    ProjectStatus:
+      type: string
+      enum: [Presupuestado, Esperando, En proceso, Completado, Archivado]
+      description: |
+        Lifecycle status — DB-enforced (CHECK) and shared with the FE labels verbatim.
+        Soft-delete transitions to `Archivado`. The PATCH endpoint auto-fills
+        `fecha_entrega_real` with today's date when the status changes to
+        `Completado` and the body does not provide an explicit value.
+
+    Customer:
+      type: object
+      description: Id-link to Holded; the FE renders `holded_id` as a clickable badge.
+      required: [id, holded_id, name, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        holded_id: { type: string, maxLength: 64 }
+        name: { type: string, maxLength: 200 }
+        holded_url: { type: string, nullable: true, maxLength: 500 }
+        notas: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    CustomerCreate:
+      type: object
+      required: [holded_id, name]
+      properties:
+        holded_id: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        holded_url: { type: string, nullable: true, maxLength: 500 }
+        notas: { type: string, nullable: true }
+
+    CustomerUpdate:
+      type: object
+      properties:
+        holded_id: { type: string, minLength: 1, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        holded_url: { type: string, nullable: true, maxLength: 500 }
+        notas: { type: string, nullable: true }
+
+    Project:
+      type: object
+      description: Top of the asset tree. Soft-delete only (transition to Archivado).
+      required: [id, code, name, status, tags, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, maxLength: 40, description: "Surfaced in the UI as `Clave`." }
+        name: { type: string, maxLength: 200 }
+        description: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        customer_id: { type: string, format: uuid, nullable: true }
+        icon:
+          type: string
+          nullable: true
+          maxLength: 8
+          description: Single emoji char/cluster — rendered in the list row icon cell and detail header.
+        color:
+          type: string
+          nullable: true
+          maxLength: 7
+          description: "Hex `#rrggbb`. Used as visual accent (10% bg on the emoji)."
+        tags:
+          type: array
+          items: { type: string }
+          description: Free-text labels (e.g. `power`, `motor`, `automotive`).
+        version: { type: string, nullable: true, maxLength: 40 }
+        fecha_inicio: { type: string, format: date, nullable: true }
+        fecha_entrega_estimada: { type: string, format: date, nullable: true }
+        fecha_entrega_real: { type: string, format: date, nullable: true }
+        notas: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProjectSummary:
+      type: object
+      description: Project + server-computed aggregates + embedded customer summary.
+      allOf:
+        - $ref: "#/components/schemas/Project"
+        - type: object
+          properties:
+            customer:
+              allOf:
+                - $ref: "#/components/schemas/Customer"
+              nullable: true
+            precio_total:
+              type: string
+              nullable: true
+              description: Decimal as string (EUR).
+            aggregated_nato_score:
+              type: string
+              enum: ["A+", A, B, C, D, F]
+              nullable: true
+            aggregated_tier:
+              type: integer
+              enum: [1, 2, 3, 4]
+              nullable: true
+            aggregated_expires_at:
+              type: string
+              format: date
+              nullable: true
+            buildable_stock:
+              type: integer
+              minimum: 0
+
+    ProjectChild:
+      type: object
+      description: |
+        Project BOM edge. XOR — exactly one of `child_module_id` /
+        `child_component_id` is non-null. Hydrated `child_module` /
+        `child_component` summaries surface in `ProjectResponse.children`.
+      required: [id, parent_project_id, quantity, sort_order]
+      properties:
+        id: { type: string, format: uuid }
+        parent_project_id: { type: string, format: uuid }
+        child_module_id: { type: string, format: uuid, nullable: true }
+        child_component_id: { type: string, format: uuid, nullable: true }
+        quantity: { type: integer, minimum: 1 }
+        sort_order: { type: integer }
+        notes: { type: string, nullable: true }
+        child_module:
+          allOf:
+            - $ref: "#/components/schemas/ModuleSummary"
+          nullable: true
+        child_component:
+          allOf:
+            - $ref: "#/components/schemas/ComponentSummary"
+          nullable: true
+
+    ProjectResponse:
+      type: object
+      description: Detail bundle — ProjectSummary + hydrated children + interest links.
+      allOf:
+        - $ref: "#/components/schemas/ProjectSummary"
+        - type: object
+          required: [children, interest_links]
+          properties:
+            children:
+              type: array
+              items: { $ref: "#/components/schemas/ProjectChild" }
+            interest_links:
+              type: array
+              items: { $ref: "#/components/schemas/ProjectInterestLink" }
+
+    ProjectInterestLink:
+      type: object
+      description: |
+        Sub-entity of `Project` — feeds the "Enlaces de interés" surface on both
+        the detail and edit pages. CRUD is exposed via dedicated sub-resource
+        endpoints (`/api/v1/projects/{id}/interest-links*`).
+      required: [id, project_id, name, url, sort_order, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        project_id: { type: string, format: uuid }
+        name: { type: string, maxLength: 200 }
+        url: { type: string, maxLength: 2000 }
+        sort_order: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ProjectInterestLinkCreate:
+      type: object
+      required: [name, url]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        url: { type: string, minLength: 1, maxLength: 2000 }
+        sort_order: { type: integer }
+
+    ProjectInterestLinkUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 200 }
+        url: { type: string, minLength: 1, maxLength: 2000 }
+        sort_order: { type: integer }
+
+    PaginatedProjects:
+      type: object
+      required: [items, total, page, page_size]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/ProjectSummary" }
+        total: { type: integer, minimum: 0 }
+        page: { type: integer, minimum: 1 }
+        page_size: { type: integer, minimum: 1 }
+
+    ProjectCreate:
+      type: object
+      required: [code, name]
+      properties:
+        code: { type: string, minLength: 1, maxLength: 40 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        customer_id: { type: string, format: uuid, nullable: true }
+        icon: { type: string, nullable: true, maxLength: 8 }
+        color: { type: string, nullable: true, maxLength: 7 }
+        tags:
+          type: array
+          items: { type: string }
+        version: { type: string, nullable: true, maxLength: 40 }
+        fecha_inicio: { type: string, format: date, nullable: true }
+        fecha_entrega_estimada: { type: string, format: date, nullable: true }
+        fecha_entrega_real: { type: string, format: date, nullable: true }
+        notas: { type: string, nullable: true }
+
+    ProjectUpdate:
+      type: object
+      description: All fields optional; `code` IS mutable.
+      properties:
+        code: { type: string, minLength: 1, maxLength: 40 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        customer_id: { type: string, format: uuid, nullable: true }
+        icon: { type: string, nullable: true, maxLength: 8 }
+        color: { type: string, nullable: true, maxLength: 7 }
+        tags:
+          type: array
+          items: { type: string }
+        version: { type: string, nullable: true, maxLength: 40 }
+        fecha_inicio: { type: string, format: date, nullable: true }
+        fecha_entrega_estimada: { type: string, format: date, nullable: true }
+        fecha_entrega_real: { type: string, format: date, nullable: true }
+        notas: { type: string, nullable: true }
+
+    AddProjectChildRequest:
+      type: object
+      required: [quantity]
+      properties:
+        child_module_id: { type: string, format: uuid }
+        child_component_id: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1 }
+        notes: { type: string, nullable: true }
+        sort_order: { type: integer }
+
+    UpdateProjectChildRequest:
+      type: object
+      properties:
+        quantity: { type: integer, minimum: 1 }
+        notes: { type: string, nullable: true }
+        sort_order: { type: integer }
+
+    ProjectPriceHistoryResponse:
+      type: object
+      required: [project_id, period, series]
+      properties:
+        project_id: { type: string, format: uuid }
+        period: { type: string, enum: [week, month, year] }
+        series:
+          type: array
+          items:
+            type: object
+            required: [date, price]
+            properties:
+              date: { type: string, format: date }
+              price: { type: string }
+
+    ConfigResponse:
+      type: object
+      required: [holded_base_url]
+      properties:
+        holded_base_url:
+          type: string
+          description: Built into the customer link (`${holded_base_url}/contact/{holded_id}`).
+
+    # ---------- Supplier integration (change `supplier-sync`) ----------
+    SupplierCode:
+      type: string
+      enum: [mouser, digikey, tme, farnell, rs]
+    LookupFields:
+      type: object
+      description: >
+        Merged "headline" view used to pre-fill the new-component form.
+        Each field is the first non-null + non-empty value found in
+        priority order across the consulted suppliers.
+      properties:
+        name: { type: string, nullable: true }
+        description: { type: string, nullable: true }
+        manufacturer: { type: string, nullable: true }
+        family_hint: { type: string, nullable: true }
+        datasheet_url: { type: string, nullable: true }
+        package: { type: string, nullable: true }
+        current_price_per_100_eur:
+          type: number
+          format: float
+          nullable: true
+          description: >
+            EUR cost for 100 units, computed from the largest price break
+            whose `quantity <= 100`. NULL when no supplier returned a
+            qualifying break.
+    SupplierPriceBreakResponse:
+      type: object
+      required: [quantity, price_original, currency_original]
+      properties:
+        quantity: { type: integer, minimum: 1 }
+        price_original: { type: number, format: float }
+        currency_original: { type: string, minLength: 3, maxLength: 3 }
+        price_eur: { type: number, format: float, nullable: true }
+    SupplierData:
+      type: object
+      required: [supplier]
+      properties:
+        supplier: { $ref: "#/components/schemas/SupplierCode" }
+        supplier_sku: { type: string, nullable: true }
+        supplier_product_url: { type: string, nullable: true }
+        stock: { type: integer, nullable: true }
+        price_breaks:
+          type: array
+          items: { $ref: "#/components/schemas/SupplierPriceBreakResponse" }
+    LookupResponse:
+      type: object
+      required: [mpn, found, fields, supplier_data, sources_consulted, sources_succeeded, missing_fields]
+      properties:
+        mpn: { type: string }
+        found: { type: boolean }
+        fields: { $ref: "#/components/schemas/LookupFields" }
+        supplier_data:
+          type: array
+          items: { $ref: "#/components/schemas/SupplierData" }
+        sources_consulted:
+          type: array
+          items: { $ref: "#/components/schemas/SupplierCode" }
+        sources_succeeded:
+          type: array
+          items: { $ref: "#/components/schemas/SupplierCode" }
+        missing_fields:
+          type: array
+          items: { type: string }
+    SyncRunStatus:
+      type: string
+      enum: [running, success, partial, failed]
+    SyncErrorCode:
+      type: string
+      enum:
+        - RATE_LIMITED
+        - NOT_FOUND
+        - HTTP_5XX
+        - PARSE_ERROR
+        - AUTH_FAILED
+        - FX_UNAVAILABLE
+        - TIMEOUT
+        - UNKNOWN
+    SupplierSyncRunResponse:
+      type: object
+      required: [id, supplier, started_at, components_processed, components_updated, errors_count, status]
+      properties:
+        id: { type: string, format: uuid }
+        supplier: { $ref: "#/components/schemas/SupplierCode" }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        components_processed: { type: integer, minimum: 0 }
+        components_updated: { type: integer, minimum: 0 }
+        errors_count: { type: integer, minimum: 0 }
+        status: { $ref: "#/components/schemas/SyncRunStatus" }
+        error_summary: { type: string, nullable: true }
+    SupplierSyncErrorResponse:
+      type: object
+      required: [id, run_id, component_id, supplier, error_code, error_message, occurred_at]
+      properties:
+        id: { type: string, format: uuid }
+        run_id: { type: string, format: uuid }
+        component_id: { type: string, format: uuid }
+        supplier: { $ref: "#/components/schemas/SupplierCode" }
+        error_code: { $ref: "#/components/schemas/SyncErrorCode" }
+        error_message: { type: string }
+        occurred_at: { type: string, format: date-time }
+    TriggerSyncResponse:
+      type: object
+      required: [run_id, task_id]
+      properties:
+        run_id:
+          type: string
+          format: uuid
+          description: ID of the `supplier_sync_runs` row created.
+        task_id:
+          type: string
+          description: Celery task ID for stronger correlation.
 
   responses:
     Unauthorized:

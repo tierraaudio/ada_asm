@@ -22,10 +22,78 @@ Represents an authenticated person who can access the ADA ASM application.
 
 ### 2. Project
 
-The top of the asset hierarchy. Sourced bidirectionally with Holded — created either inside ADA ASM (push to Holded) or polled from Holded (created in ADA ASM). Aggregates the Modules and Components that comprise the project's bill of materials.
+The top of the asset hierarchy. Aggregates the Modules and Components that comprise the project's bill of materials. Linked to a Holded customer via the `Customer` entity (see below). Soft-delete is the only delete operation (`status='Archived'`); rows are preserved so historical `stock_events` remain traceable.
 
-- **Status**: Not yet implemented.
-- **Introduced by**: User Story `Creación de proyecto en ASM automático desde Holded`.
+- **Status**: ✅ Implemented in `project-management` (migrations `20260526_0900` + `20260526_1500`).
+- **Table**: `projects`.
+- **Columns**:
+  - `id` UUIDv4, PK
+  - `code` `varchar(40)`, not null — case-insensitive UNIQUE via `lower(code)`. User-typed, editable, no auto-generation. Surfaced in the UI as "Clave".
+  - `name` `varchar(200)`, not null
+  - `description` `text`, nullable
+  - `status` `varchar(20)`, not null, default `'Presupuestado'` — CHECK in `('Presupuestado', 'Esperando', 'En proceso', 'Completado', 'Archivado')`. Spanish enum matches the FE labels directly (no translation layer).
+  - `customer_id` UUIDv4, nullable, FK → `customers.id` ON DELETE SET NULL
+  - `icon` `varchar(8)`, nullable — single emoji char/cluster. Free input; FE renders with the project's `color` as a 10%-opacity background.
+  - `color` `varchar(7)`, nullable — hex `#rrggbb`. Used as visual accent in the list row icon cell and in the detail header.
+  - `tags` `varchar[]` (PostgreSQL `text[]`), not null, default `'{}'` — free-text labels (e.g. `power`, `motor`, `automotive`).
+  - `version` `varchar(40)`, nullable — free-text version string (e.g. `v1.0`, `v2.1`).
+  - `fecha_inicio` `date`, nullable
+  - `fecha_entrega_estimada` `date`, nullable
+  - `fecha_entrega_real` `date`, nullable — auto-filled with today's date when a PATCH transitions `status` to `Completado` and no explicit value is provided.
+  - `notas` `text`, nullable
+  - `created_at` / `updated_at` `timestamptz`
+- **Indexes**: `uq_projects_code_lower`, `ix_projects_name_lower`, `ix_projects_status`, `ix_projects_customer_id`.
+
+### 2a. ProjectChild
+
+An edge in the project BOM. Mirrors `ModuleChild` exactly: each row points from a `parent_project_id` to **exactly one** of (`child_module_id`, `child_component_id`) — XOR CHECK. The same `(parent, child)` pair is unique (one edge per pair); to repeat a hijo `N` times, raise `quantity`. No cycle detection is needed — projects can't be hijos.
+
+- **Status**: ✅ Implemented in `project-management` (migration `20260526_0900`).
+- **Table**: `project_children`.
+- **Columns**:
+  - `id` UUIDv4, PK
+  - `parent_project_id` UUIDv4, FK → `projects.id` ON DELETE CASCADE
+  - `child_module_id` UUIDv4, nullable, FK → `modules.id` ON DELETE CASCADE
+  - `child_component_id` UUIDv4, nullable, FK → `components.id` ON DELETE CASCADE
+  - `quantity` `smallint`, not null, CHECK `> 0`
+  - `sort_order` `integer`, not null, default `0`
+  - `notes` `text`, nullable
+  - `created_at` / `updated_at` `timestamptz`
+- **Constraints**:
+  - CHECK XOR: `(child_module_id IS NOT NULL)::int + (child_component_id IS NOT NULL)::int = 1`
+- **Partial UNIQUE indexes**:
+  - `uq_project_children_parent_child_module (parent_project_id, child_module_id) WHERE child_module_id IS NOT NULL`
+  - `uq_project_children_parent_child_component (parent_project_id, child_component_id) WHERE child_component_id IS NOT NULL`
+- **Non-unique indexes**: `(parent_project_id, sort_order)`, `(child_module_id)`, `(child_component_id)`.
+
+### 2c. ProjectInterestLink
+
+Sub-entity of `Project` — the rows that power the "Enlaces de interés" surface. Each row is a `{name, url}` pair the user wants pinned to a project (datasheets, references, internal docs…). CRUD is exposed via dedicated sub-resource endpoints and the FE renders the same component in the detail and edit pages.
+
+- **Status**: ✅ Implemented in `project-management` (migration `20260526_1500`).
+- **Table**: `project_interest_links`.
+- **Columns**:
+  - `id` UUIDv4, PK
+  - `project_id` UUIDv4, NOT NULL, FK → `projects.id` ON DELETE CASCADE
+  - `name` `varchar(200)`, not null
+  - `url` `varchar(2000)`, not null
+  - `sort_order` `integer`, not null, default `0`
+  - `created_at` / `updated_at` `timestamptz`
+- **Indexes**: `ix_project_interest_links_project_order (project_id, sort_order)`.
+
+### 2b. Customer
+
+Thin id-link entity that anchors a project to a Holded customer. `holded_id` is the business key (case-insensitive UNIQUE) and `name` is denormalised so the UI doesn't depend on Holded availability. The actual Holded sync ships in a separate, future US.
+
+- **Status**: ✅ Implemented in `project-management` (migration `20260526_0900`).
+- **Table**: `customers`.
+- **Columns**:
+  - `id` UUIDv4, PK
+  - `holded_id` `varchar(64)`, not null — case-insensitive UNIQUE via `lower(holded_id)`.
+  - `name` `varchar(200)`, not null
+  - `holded_url` `varchar(500)`, nullable — explicit override; when null, the FE builds `${HOLDED_BASE_URL}/contact/{holded_id}`.
+  - `notas` `text`, nullable
+  - `created_at` / `updated_at` `timestamptz`
 
 ### 3. Module
 
@@ -41,6 +109,7 @@ Aggregates (`precio_total`, `aggregated_nato_score`, `aggregated_tier`, `aggrega
   - `name` `varchar(200)`, not null
   - `description` `text`, nullable
   - `version` `varchar(40)`, not null, default `'v1.0'` — free-text, no implicit versioning
+  - `family` `varchar(40)`, not null, default `'Board'` — CHECK in `('Board', 'Device', 'Bundle', 'Case')` (DB-enforced enum)
   - `fabricante` `varchar(120)`, nullable
   - `location` `varchar(100)`, nullable — e.g. `G-M-01`
   - `tipo_almacenamiento` `varchar(80)`, nullable — FE-enforced enum `Gaveta | Almacén`
@@ -49,6 +118,7 @@ Aggregates (`precio_total`, `aggregated_nato_score`, `aggregated_tier`, `aggrega
   - `fecha_creacion` `date`, nullable
   - `created_at` / `updated_at` `timestamptz`
 - **Indexes**: unique functional `uq_modules_sku_lower (lower(sku))`; `ix_modules_name_lower (lower(name))`.
+- **Later migration**: `family` column added in `20260525_2000_modules_family.py` (default `'Board'` for back-fill, CHECK constraint enforced at DB level).
 
 ### 3a. ModuleChild
 
@@ -115,6 +185,7 @@ A leaf in the asset tree representing a single electronic part. Carries identify
   - `nato_score` `varchar(4)`, not null — CHECK in `('A+', 'A', 'B', 'C', 'D', 'F')`. Cached from the active scoring.
   - `country_of_origin` `varchar(2)`, nullable — ISO 3166-1 alpha-2
   - `proveedor_preferente_id` UUIDv4, nullable, FK → `suppliers.id` ON DELETE SET NULL
+  - `last_supplier_sync_at` `timestamptz`, nullable — last time the supplier sync (change `supplier-sync`, migration `20260528_1330`) wrote a `supplier_prices` or `supplier_stocks` row for this component. NULL on components that have never been synced.
   - `created_at` / `updated_at` `timestamptz`, server-defaulted to `now()`
 - **Indexes**: unique functional `uq_components_mpn_lower`, plus per-column `lower(...)` indexes on `sku`, `name`, `family` for case-insensitive search; `ix_components_proveedor_preferente_id`.
 
@@ -143,6 +214,8 @@ Time-series of catalogue prices broken down by `(component, supplier, quantity-t
   - `qty_tier` `smallint`, not null — CHECK in `(1, 10, 100, 1000)` (price-break columns from the catalogue)
   - `price` `numeric(12,4)`, not null — CHECK `>= 0`, EUR
   - `valid_from` `date`, not null — date the snapshot was taken
+  - `price_original` `numeric(12,4)`, nullable — supplier's native price BEFORE FX conversion (change `supplier-sync`, migration `20260528_1330`). Filled by the daily sync. NULL for historical rows or when FX conversion was identity (e.g. supplier already quoted EUR).
+  - `currency_original` `varchar(3)`, nullable — ISO 4217 of `price_original`. NULL on historical rows.
   - `created_at` / `updated_at` `timestamptz`
 - **Indexes**: composite `(component_id, supplier_id, qty_tier, valid_from DESC)`; `(component_id, valid_from DESC)` for chart queries.
 
@@ -163,25 +236,33 @@ Time-series of supplier-side stock availability (the "Stock disponible en provee
 
 ### 8. StockEvent
 
-Append-only ledger of every quantity-affecting event on the internal warehouse — `purchase` (restock from a supplier) or `consumption` (allocated to a project). Drives the "Historial de compras" modal (Stock interno con eventos line chart, Proveedor más comprado bar chart, Estadísticas de compra, Alertas y recomendaciones) and is the source of truth for derived metrics (weighted FIFO cost of the current stock, supplier spend aggregates). Supersedes the original `component_purchases` table from the first draft of `component-management`; the previous table was dropped in the same change.
+Append-only ledger of every quantity-affecting event on the internal warehouse — for **components** (`purchase`, `consumption`) or **modules** (`fabricated`, `delivered`). Drives the "Historial de compras" modal on the component detail and the "Histórico de fabricación" modal on the module detail. Source of truth for derived metrics: weighted FIFO cost of the current stock, supplier spend aggregates, "Proveedor más comprado" across module descendants.
 
-- **Status**: ✅ Implemented in `component-management` (migration `20260524_1200`).
+Polymorphic owner: each row carries **exactly one** of `component_id` / `module_id` — enforced via XOR CHECK constraint.
+
+- **Status**: ✅ Implemented in `component-management` (migration `20260524_1200`); extended to module-level events in `module-management` (migration `20260525_1800_stock_events_module_level.py`).
 - **Table**: `stock_events`.
 - **Columns**:
   - `id` UUIDv4, PK
-  - `component_id` UUIDv4, FK → `components.id` ON DELETE CASCADE
-  - `kind` `varchar(16)`, not null — CHECK in `('purchase', 'consumption')`
+  - `component_id` UUIDv4, **nullable**, FK → `components.id` ON DELETE CASCADE
+  - `module_id` UUIDv4, **nullable**, FK → `modules.id` ON DELETE CASCADE
+  - `kind` `varchar(16)`, not null — CHECK in `('purchase', 'consumption', 'fabricated', 'delivered')`
+    - `purchase`, `consumption` → component-level (component_id set)
+    - `fabricated`, `delivered` → module-level (module_id set)
   - `quantity` `integer`, not null — CHECK `> 0` (sign is implied by `kind`)
   - `occurred_at` `date`, not null
   - `notes` `text`, nullable
   - `supplier_id` UUIDv4, nullable, FK → `suppliers.id` ON DELETE SET NULL — required when `kind='purchase'`, null otherwise
-  - `unit_cost` `numeric(12,4)`, nullable, EUR — purchase only
-  - `total_cost` `numeric(14,4)`, nullable, EUR — purchase only (precomputed = `quantity × unit_cost`)
+  - `unit_cost` `numeric(12,4)`, nullable, EUR — `purchase` / `fabricated` (computed cost per unit assembled)
+  - `total_cost` `numeric(14,4)`, nullable, EUR — `purchase` / `fabricated` (precomputed = `quantity × unit_cost`)
   - `currency` `varchar(3)`, not null, default `'EUR'`
-  - `project_id` UUIDv4, nullable — consumption only (FK lands when the Project entity ships)
+  - `project_id` UUIDv4, nullable — `consumption` only. FK → `projects.id` ON DELETE SET NULL (materialised in `project-management` migration `20260526_0900`).
   - `project_name_snapshot` `varchar(200)`, nullable — denormalised so the audit trail survives project renames/deletes
+  - `customer_id_holded` `varchar(64)`, nullable — `delivered` only (Holded customer ID for the module shipment)
+  - `customer_name_snapshot` `varchar(200)`, nullable — `delivered` only, denormalised for audit
   - `created_at` / `updated_at` `timestamptz`
-- **Indexes**: composite `(component_id, occurred_at DESC)`; partial `(supplier_id) WHERE kind='purchase'`.
+- **Constraints**: XOR CHECK on `(component_id IS NOT NULL)::int + (module_id IS NOT NULL)::int = 1`.
+- **Indexes**: composite `(component_id, occurred_at DESC)` (component path); `(module_id, occurred_at DESC)` (module path); partial `(supplier_id) WHERE kind='purchase'`.
 
 ### 9. ComponentNatoScoring
 
@@ -271,6 +352,45 @@ Single-use token redeemable to set a new password. The token itself never travel
   - `created_at` / `updated_at`
 - **Indexes**: `ix_password_reset_tokens_user_id`, unique `ix_password_reset_tokens_token_hash`.
 
+### 14. SupplierSyncRun
+
+Audit telemetry for the daily Celery sync (change `supplier-sync`). One row per `sync_one_supplier` invocation — daily Beat-triggered AND ad-hoc operator triggers (`POST /api/v1/supplier-sync/runs?supplier=...`). Drives the admin "Recent runs" view and the per-supplier success/failure timeline.
+
+- **Status**: ✅ Implemented in `supplier-sync` (migration `20260528_1330`).
+- **Table**: `supplier_sync_runs`.
+- **Columns**:
+  - `id` UUIDv4, PK, `server_default gen_random_uuid()`
+  - `supplier` `varchar(32)`, not null — CHECK in `('mouser', 'digikey', 'tme', 'farnell', 'rs')`
+  - `started_at` `timestamptz`, not null, default `now()`
+  - `finished_at` `timestamptz`, nullable — set when the task finalises
+  - `components_processed` `integer`, not null, default 0 — components walked (whether or not the supplier had data)
+  - `components_updated` `integer`, not null, default 0 — components for which a `supplier_prices` / `supplier_stocks` row was written
+  - `errors_count` `integer`, not null, default 0
+  - `status` `varchar(16)`, not null, default `'running'` — CHECK in `('running', 'success', 'partial', 'failed')`
+    - `success`: errors_count == 0 and at least one component processed.
+    - `partial`: some errors, some updates — the daily sync proceeds best-effort.
+    - `failed`: every component errored (or every consulted component failed).
+  - `error_summary` `text`, nullable — short free-text summary set when `status='failed'` so the admin view can show the top-level cause without opening the per-error table.
+  - `created_at` `timestamptz`, not null, default `now()`
+- **Indexes**: `(supplier, started_at DESC)` for the per-supplier timeline; `(status)` for "find all currently-running" queries.
+
+### 15. SupplierSyncError
+
+Per-component error captured by the daily sync (change `supplier-sync`). One row per `(run, component, error)`. The Celery task continues after each failure and records the typed error code (`HTTP_5XX`, `AUTH_FAILED`, `RATE_LIMITED`, etc.); the `error_code` set is the same union the adapter exceptions carry. Drives the per-run drill-down (`GET /api/v1/supplier-sync/runs/{id}/errors`).
+
+- **Status**: ✅ Implemented in `supplier-sync` (migration `20260528_1330`).
+- **Table**: `supplier_sync_errors`.
+- **Columns**:
+  - `id` UUIDv4, PK, `server_default gen_random_uuid()`
+  - `run_id` UUIDv4, not null, FK → `supplier_sync_runs.id` ON DELETE CASCADE
+  - `component_id` UUIDv4, not null, FK → `components.id` ON DELETE CASCADE
+  - `supplier` `varchar(32)`, not null — CHECK in `('mouser', 'digikey', 'tme', 'farnell', 'rs')`
+  - `error_code` `varchar(64)`, not null — CHECK in `('RATE_LIMITED', 'NOT_FOUND', 'HTTP_5XX', 'PARSE_ERROR', 'AUTH_FAILED', 'FX_UNAVAILABLE', 'TIMEOUT', 'UNKNOWN')`
+  - `error_message` `text`, not null — bounded to 2000 chars at the application layer
+  - `occurred_at` `timestamptz`, not null, default `now()`
+- **Indexes**: `(run_id, occurred_at DESC)` for the per-run drill-down; `(component_id)` for "all failures on this MPN" queries.
+- **Retention**: not pruned automatically — when the volume becomes a concern, add a daily cleanup task (out of scope for the initial change).
+
 ## Conventions to apply in each upcoming migration
 
 - **Primary keys**: UUIDv4, `server_default text("gen_random_uuid()")` (uses `pgcrypto`).
@@ -311,4 +431,9 @@ ComponentNatoScoring 1───* ScoringClassification
 ComponentNatoScoring 1───* ScoringAlternative
 ScoringAlternative *───1 Component  (alternative_component_id)
 ScoringClassification 0..1───1 Component (reference_component_id; XOR reference_url)
+
+SupplierSyncRun  1───* SupplierSyncError
+SupplierSyncError *───1 Component  (component_id)
+  -- The run row is the per-(supplier, invocation) audit; the error rows
+  -- attach to the specific components whose fetch failed during the run.
 ```

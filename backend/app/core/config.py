@@ -43,6 +43,27 @@ class Settings(BaseSettings):
         description="Base URL of the frontend, used to build password-reset links",
     )
 
+    holded_base_url: str = Field(
+        default="https://app.holded.com",
+        description=(
+            "Base URL of the Holded app. The customer link on the Project entity "
+            "builds `${holded_base_url}/contact/{holded_id}` unless the Customer "
+            "row provides an explicit `holded_url` override."
+        ),
+    )
+
+    # ---- Cloud observability (change `cloud-deployment-azure`) ----
+    #
+    # When set, `app/infrastructure/observability.py::init()` wires the
+    # OpenTelemetry SDK with the Azure Monitor exporter. When absent,
+    # init() is a no-op so local dev is unchanged.
+    applicationinsights_connection_string: str | None = Field(default=None)
+
+    # Used as the `service.environment` resource attribute on every span
+    # so App Insights can split metrics by environment without a custom
+    # dimension on each emit.
+    environment_name: str = Field(default="local")
+
     smtp_host: str | None = Field(default=None)
     smtp_port: int = Field(default=587)
     smtp_username: str | None = Field(default=None)
@@ -55,11 +76,61 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed CORS origins",
     )
 
+    # ---- Supplier integration (change `supplier-sync`) ----
+    #
+    # Each supplier ships disabled until BOTH (a) its credentials are present
+    # AND (b) its code is listed in `supplier_sync_enabled_suppliers`. The
+    # registry layer (`app/infrastructure/suppliers/registry.py`) is the
+    # single place that enforces this gate.
+    mouser_api_key: str | None = Field(default=None)
+
+    digikey_client_id: str | None = Field(default=None)
+    digikey_client_secret: str | None = Field(default=None)
+    digikey_oauth_token_url: str = Field(
+        default="https://api.digikey.com/v1/oauth2/token",
+    )
+
+    tme_token: str | None = Field(default=None)
+    tme_app_secret: str | None = Field(default=None)
+
+    farnell_api_key: str | None = Field(default=None)
+    farnell_store_id: str = Field(default="uk.farnell.com")
+
+    rs_api_key: str | None = Field(default=None)
+
+    supplier_sync_enabled_suppliers: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["mouser", "digikey", "tme", "farnell"],
+        description=(
+            "Comma-separated supplier codes that may be queried. "
+            "RS Online is excluded by default until its App ID arrives."
+        ),
+    )
+    supplier_lookup_priority: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["mouser", "digikey", "tme", "farnell", "rs"],
+        description=(
+            "Order in which the `/components/lookup` endpoint walks suppliers. "
+            "Higher priority suppliers win on overlapping fields during the merge."
+        ),
+    )
+    supplier_lookup_cache_ttl_seconds: int = Field(default=900)
+    supplier_sync_daily_hour_utc: int = Field(default=3, ge=0, le=23)
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_cors_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator(
+        "supplier_sync_enabled_suppliers",
+        "supplier_lookup_priority",
+        mode="before",
+    )
+    @classmethod
+    def _split_supplier_list(cls, value: object) -> object:
+        if isinstance(value, str):
+            return [item.strip().lower() for item in value.split(",") if item.strip()]
         return value
 
 

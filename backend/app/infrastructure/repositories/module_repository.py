@@ -233,6 +233,24 @@ class SqlAlchemyModuleRepository:
         )
         return [_to_entity(r) for r in rows]
 
+    async def list_parents_of_component(self, child_component_id: UUID) -> list[Module]:
+        rows = (
+            (
+                await self._session.execute(
+                    select(ModuleModel)
+                    .join(
+                        ModuleChildModel,
+                        ModuleChildModel.parent_module_id == ModuleModel.id,
+                    )
+                    .where(ModuleChildModel.child_component_id == child_component_id)
+                    .order_by(ModuleModel.name)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        return [_to_entity(r) for r in rows]
+
     async def get_child(self, child_id: UUID) -> ModuleChild | None:
         row = (
             await self._session.execute(

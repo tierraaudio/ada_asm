@@ -426,6 +426,95 @@ async def delete_project(
 - Refresh tokens stored hashed (Argon2id) in `refresh_tokens` table with `user_id`, `expires_at`, `revoked_at`.
 - Access tokens are NOT stored.
 
+## External-Supplier Adapter Pattern
+
+Introduced by the `supplier-sync` change. Every distributor integration (Mouser, DigiKey, TME, Farnell, RS, and future suppliers) MUST follow the same shape so the lookup endpoint and the daily Celery sync can iterate them uniformly.
+
+### Where files live
+
+```
+app/
+├── domain/
+│   ├── entities/supplier_quote.py          # SupplierQuote + SupplierPriceBreak value objects
+│   └── repositories/supplier_adapter.py    # SupplierAdapter Protocol
+└── infrastructure/
+    ├── rate_limit.py                       # Redis token-bucket helper
+    ├── fx.py                               # ECB daily-rate helper (currency conversion)
+    └── suppliers/
+        ├── registry.py                     # enabled_adapters() + lookup_adapters_in_priority_order()
+        ├── mouser.py
+        ├── digikey.py
+        ├── tme.py
+        ├── farnell.py
+        └── rs.py
+```
+
+### Adapter contract
+
+- Implement the `SupplierAdapter` Protocol: `code: SupplierCode` literal + `async fetch_by_mpn(mpn: str) -> SupplierQuote | None`.
+- Return `None` when the supplier responded but has no record of the MPN — DO NOT raise.
+- Raise a typed `SupplierError` subclass (`SupplierAuthError`, `SupplierTransportError`, `SupplierTimeoutError`, `SupplierParseError`, `SupplierRateLimitedError`, `FxUnavailableError`) for transport / auth / parse failures. The Celery sync writes the corresponding `error_code` to `supplier_sync_errors` directly from `exc.error_code`.
+- Call `await rate_limit.acquire(f"supplier:{self.code}", per_minute)` before every outbound HTTP call. Pick a `per_minute` budget that stays safely under the supplier's published cap (e.g. DigiKey 1000/day → 60/min; Farnell Basic 2/sec → 100/min).
+- Normalise prices to EUR via `await fx.to_eur(amount, currency)`. The helper short-circuits when `currency == "EUR"` (no I/O); if FX is unreachable, store `price_eur=None` and keep `price_original` + `currency_original` so re-conversion is possible later.
+- Always reify the MPN matching: when the supplier returns multiple candidates, pick the one whose manufacturer-MPN field (`ManufacturerProductNumber`, `OriginalSymbol`, `translatedManufacturerPartNumber`, etc.) matches the queried MPN case-insensitively-trimmed before falling back to "first result".
+
+### Adding a new supplier
+
+1. **Adapter**: new file under `app/infrastructure/suppliers/<code>.py` implementing the Protocol. Use one of the existing adapters as a template (Mouser is the simplest; DigiKey shows OAuth2; TME shows OAuth2 + two-step search→data; Farnell shows query-string-key + per-store currency mapping).
+2. **SupplierCode**: extend the `Literal` in `app/domain/entities/supplier_quote.py` AND mirror it in the migration's CHECK constraint, the API spec, and the contract test's `_ADAPTER_CASES`.
+3. **Registry**: extend `_has_credentials` and `_build_adapter` in `app/infrastructure/suppliers/registry.py`.
+4. **Settings**: add env vars to `app/core/config.py`, `.env.example`, and the three `environment:` blocks in `docker-compose.yml` (backend, celery_worker, celery_beat).
+5. **Tests**: fixtures under `tests/fixtures/suppliers/<code>/by_mpn/{hit,miss,auth_failed}.json`; per-adapter unit test file mirroring the existing ones; the parameterised contract test (`tests/unit/suppliers/test_adapter_contract.py`) auto-fails until the new code is added to `_ADAPTER_CASES`.
+
+### Why this shape
+
+- A single Protocol means the lookup endpoint's merge loop and the Celery sync task can both iterate `enabled_adapters()` without per-supplier branches.
+- Centralising rate-limiting in Redis (not per-process) survives Celery's multi-worker fan-out.
+- Centralising EUR conversion means the `supplier_prices` table's `price` column is always comparable across suppliers, regardless of where each supplier quotes natively.
+
+## Cloud configuration (change `cloud-deployment-azure`)
+
+When running in Azure Container Apps, the backend behaviour is unchanged from local except for how it discovers configuration. The conventions below MUST hold for any code that reads env vars or talks to external dependencies.
+
+### Secrets
+
+- **Every secret comes from Key Vault**, surfaced as a Container App `secretRef:` and exposed to the container as an env var. The code reads `os.getenv("...")` or `settings.<field>` exactly as it does locally — there is no Key Vault SDK in the application code.
+- **Never log full secret values.** structlog's existing redaction is sufficient because we don't pass secrets into `log.info(...)` anywhere; respect that.
+- **Never store a secret in a literal string** in the codebase, in `.env.example`, in a Bicep template, or in a GitHub Actions secret. The chain is `Key Vault → Container App secret → env var → settings`.
+
+### Database connections
+
+- The Azure FQDN looks like `pg-ada-asm-prod.postgres.database.azure.com`.
+- The connection URL MUST include `?sslmode=require` (sync driver) or `?ssl=require` (async driver). The Postgres server is configured with `require_secure_transport=on` and refuses unencrypted connections.
+- `asyncpg` and `psycopg` both support these parameters natively — no code change is required beyond constructing the URL correctly.
+
+### Redis connections
+
+- The Azure FQDN looks like `redis-ada-asm-prod.redis.cache.windows.net`.
+- The URL MUST use the `rediss://` scheme (TLS) on port `6380`. Non-TLS port `6379` is disabled at the server level.
+- `redis.asyncio.from_url("rediss://...")` and Celery's broker URL handling both support this natively.
+
+### OpenTelemetry
+
+- The module `app/infrastructure/observability.py::init(app)` is the single entry point. Call it from `app/main.py` AFTER routers are mounted, and from any one-shot script (cron, seed) before doing real work.
+- `init()` is a no-op when `APPLICATIONINSIGHTS_CONNECTION_STRING` is empty — local dev and tests are untouched.
+- When configured, the SDK auto-instruments FastAPI, httpx, SQLAlchemy, and Celery. **Do not add manual span instrumentation** to existing code paths; the auto-instrumentation covers them.
+- Custom spans are appropriate for: business-meaningful work units (e.g. the supplier sync's per-component loop), batch jobs, and rare-path operations. Use `from opentelemetry import trace; with trace.get_tracer(__name__).start_as_current_span("name"): ...`.
+- Logs emitted while a span is active automatically carry the `trace_id` and `span_id` (the `_add_trace_context` processor in `app/infrastructure/logging.py`). Do NOT add the IDs manually to log calls.
+
+### Sampling
+
+- Prod: 100% of HTTP root spans, 10% of SQL child spans.
+- Dev: 100% of everything.
+- The knob is the `TraceIdRatioBased` sampler in `observability.init`. Adjust the ratio there if App Insights ingestion costs become a concern (the 5 GB/month free tier covers us today).
+
+### What NOT to do in cloud code
+
+- Do not call the Azure SDK from the backend. Configuration arrives via env vars only.
+- Do not write to the local filesystem expecting persistence — Container Apps replicas are stateless and may scale to zero at any time. Use Postgres, Redis, or Key Vault for state.
+- Do not assume the backend has a fixed IP. The Container Apps environment has a stable outbound IP (used to whitelist Postgres), but the inbound IP rotates.
+- Do not bypass the deploy workflow with `az containerapp update` from a developer laptop in production. Use `Actions → deploy-backend → Run workflow → environment=prod`.
+
 ## Logging
 
 - **structlog** with JSON output in production, console renderer in dev.

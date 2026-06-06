@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_db_session, require_user
+from app.api.v1.routers.modules import _module_summary
 from app.api.v1.schemas.components import (
     ComponentCreateRequest,
     ComponentDetailResponse,
@@ -23,6 +24,7 @@ from app.api.v1.schemas.components import (
     ScoringAlternativeResponse,
     ScoringClassificationResponse,
 )
+from app.api.v1.schemas.modules import ModuleSummaryResponse
 from app.api.v1.schemas.stock_events import (
     PaginatedStockEvents,
     StockEventResponse,
@@ -37,6 +39,7 @@ from app.application.services.components_service import (
     ComponentsService,
     ComponentUpdate,
 )
+from app.application.services.modules_service import ModuleService
 from app.application.services.nato_scoring_service import (
     AlternativeInput,
     ClassificationInput,
@@ -51,6 +54,9 @@ from app.infrastructure.db.models.supplier import SupplierModel
 from app.infrastructure.db.models.user import UserModel
 from app.infrastructure.repositories.component_repository import (
     SqlAlchemyComponentRepository,
+)
+from app.infrastructure.repositories.module_repository import (
+    SqlAlchemyModuleRepository,
 )
 from app.infrastructure.repositories.nato_scoring_repository import (
     SqlAlchemyNatoScoringRepository,
@@ -140,13 +146,23 @@ async def _scoring_to_response(session: AsyncSession, bundle: ScoringBundle) -> 
         # `_hydrate_current_prices` fills `current_price_per_100_eur`.
         await component_repo._hydrate_current_prices(alt_entities)
     alt_by_id = {c.id: c for c in alt_entities}
+    # Batched supplier-stock summary so the alternative chip can colour its
+    # stock badge correctly without an N+1 round trip.
+    alt_stock_summary = await SqlAlchemySupplierStockRepository(
+        session
+    ).latest_summary_for_components([c.id for c in alt_entities])
 
     alternatives_resp: list[ScoringAlternativeResponse] = []
     for a in bundle.alternatives:
         embed: ComponentSummaryResponse | None = None
         comp = alt_by_id.get(cast(UUID, a.alternative_component_id))
         if comp is not None:
-            embed = ComponentSummaryResponse.model_validate(comp)
+            base = ComponentSummaryResponse.model_validate(comp).model_dump()
+            base["supplier_stock_summary"] = [
+                {"supplier_id": sid, "supplier_name": sname, "quantity": qty}
+                for sid, sname, qty in alt_stock_summary.get(comp.id, [])
+            ]
+            embed = ComponentSummaryResponse.model_validate(base)
         alternatives_resp.append(
             ScoringAlternativeResponse(
                 id=a.id,
@@ -208,8 +224,22 @@ async def list_components(
         locations=location,
     )
     result = await _service(session).list(filters=filters, page=page, page_size=page_size)
+    # Batched supplier-stock summary so every row's stock badge can colour /
+    # tooltip itself without an N+1 round trip per component.
+    stock_repo = SqlAlchemySupplierStockRepository(session)
+    summary_by_component = await stock_repo.latest_summary_for_components(
+        [c.id for c in result.items]
+    )
+    items: list[ComponentResponse] = []
+    for c in result.items:
+        base = ComponentResponse.model_validate(c).model_dump()
+        base["supplier_stock_summary"] = [
+            {"supplier_id": sid, "supplier_name": sname, "quantity": qty}
+            for sid, sname, qty in summary_by_component.get(c.id, [])
+        ]
+        items.append(ComponentResponse.model_validate(base))
     return PaginatedComponents(
-        items=[ComponentResponse.model_validate(c) for c in result.items],
+        items=items,
         total=result.total,
         page=result.page,
         page_size=result.page_size,
@@ -260,7 +290,16 @@ async def get_component(
     scoring_response: NatoScoringResponse | None = None
     if bundle is not None:
         scoring_response = await _scoring_to_response(session, bundle)
+    # Hydrate supplier-stock summary so the detail header's stock badge
+    # behaves identically to the list / hierarchy ones.
+    stock_summary = await SqlAlchemySupplierStockRepository(session).latest_summary_for_components(
+        [component.id]
+    )
     base = ComponentResponse.model_validate(component).model_dump()
+    base["supplier_stock_summary"] = [
+        {"supplier_id": sid, "supplier_name": sname, "quantity": qty}
+        for sid, sname, qty in stock_summary.get(component.id, [])
+    ]
     return ComponentDetailResponse(**base, current_nato_scoring=scoring_response)
 
 
@@ -465,3 +504,50 @@ async def list_stock_events(
     return PaginatedStockEvents(
         items=items, total=page_data.total, page=page_data.page, page_size=page_data.page_size
     )
+
+
+@router.get(
+    "/{component_id}/parents",
+    response_model=list[ModuleSummaryResponse],
+)
+async def list_component_parents(
+    component_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[ModuleSummaryResponse]:
+    """Modules that hold this component as a direct child.
+
+    Returns hydrated summaries (with `precio_total`, NATO / tier aggregates,
+    etc.) so the FE can render them with the canonical modules hierarchy
+    table — matching the "Pertenece a" surface on module detail pages.
+    """
+    await _service(session).get(component_id)
+    module_repo = SqlAlchemyModuleRepository(session)
+    module_svc = ModuleService(session)
+    parents = await module_repo.list_parents_of_component(component_id)
+    summaries: list[ModuleSummaryResponse] = []
+    for p in parents:
+        agg = await module_svc.compute_aggregates(p.id, module_stock=p.stock)
+        summaries.append(_module_summary(p, agg))
+    return summaries
+
+
+@router.get(
+    "/{component_id}/projects-using",
+)
+async def list_projects_using_component_endpoint(
+    component_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> list[Any]:
+    """Projects that hold this component as a direct child (BOM edge).
+
+    Returns hydrated `ProjectSummary` rows so the FE can render the "Usado
+    en proyectos" section beneath "Pertenece a" on the component detail.
+    """
+    # Local import to avoid a circular import at module load time
+    # (projects router imports from this module too).
+    from app.api.v1.routers.projects import list_projects_using_component
+
+    await _service(session).get(component_id)
+    return [s.model_dump() for s in await list_projects_using_component(session, component_id)]

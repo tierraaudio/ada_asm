@@ -1,0 +1,24 @@
+{
+  "status": "OK",
+  "data": {
+    "elements": [
+      {
+        "symbol": "NE555P",
+        "unit": { "id": "ST", "short_name": "pcs" },
+        "stock_quantity": 17997,
+        "prices": {
+          "elements": [
+            { "amount": 1, "price": 0.39, "special": false },
+            { "amount": 10, "price": 0.291, "special": false },
+            { "amount": 100, "price": 0.213, "special": false },
+            { "amount": 1000, "price": 0.185, "special": false }
+          ],
+          "tax": { "type": "VAT", "rate": 21.0 },
+          "currency": "EUR",
+          "type": "NET"
+        },
+        "deliveries": null
+      }
+    ]
+  }
+}
