@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities.supplier_stock import SupplierStock
+from app.infrastructure.db.models.supplier import SupplierModel
 from app.infrastructure.db.models.supplier_stock import SupplierStockModel
 
 
@@ -48,6 +50,44 @@ class SqlAlchemySupplierStockRepository:
             if current is None or s.snapshot_at > current.snapshot_at:
                 latest_by_supplier[sid] = s
         return list(latest_by_supplier.values())
+
+    async def latest_summary_for_components(
+        self, component_ids: Iterable[UUID]
+    ) -> dict[UUID, list[tuple[UUID, str, int]]]:
+        """Batched: most recent (supplier, quantity) per component, with name.
+
+        Single round trip using PostgreSQL `DISTINCT ON` over
+        `(component_id, supplier_id)` ordered by `snapshot_at DESC`. Avoids
+        the N+1 that would result from calling `latest_for_component` per row.
+
+        Returns `{component_id: [(supplier_id, supplier_name, quantity), ...]}`.
+        Components without any snapshot are absent from the dict (callers
+        default to an empty list).
+        """
+        ids = list(component_ids)
+        if not ids:
+            return {}
+        stmt = (
+            select(
+                SupplierStockModel.component_id,
+                SupplierStockModel.supplier_id,
+                SupplierStockModel.quantity,
+                SupplierModel.name,
+            )
+            .join(SupplierModel, SupplierModel.id == SupplierStockModel.supplier_id)
+            .where(SupplierStockModel.component_id.in_(ids))
+            .distinct(SupplierStockModel.component_id, SupplierStockModel.supplier_id)
+            .order_by(
+                SupplierStockModel.component_id,
+                SupplierStockModel.supplier_id,
+                SupplierStockModel.snapshot_at.desc(),
+            )
+        )
+        result = await self._session.execute(stmt)
+        out: dict[UUID, list[tuple[UUID, str, int]]] = {}
+        for component_id, supplier_id, quantity, supplier_name in result.all():
+            out.setdefault(component_id, []).append((supplier_id, supplier_name, quantity))
+        return out
 
     async def save(self, stock: SupplierStock) -> SupplierStock:
         row = SupplierStockModel(

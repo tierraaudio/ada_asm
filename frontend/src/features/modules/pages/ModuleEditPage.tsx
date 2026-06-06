@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
-import { Box, Component as ComponentIcon, Plus, Save, Trash2, X } from "lucide-react";
+import { Calendar, MapPin, Package, Plus, Save } from "lucide-react";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { z } from "zod";
 
 import { DashboardLayout } from "@/app/layout/DashboardLayout";
@@ -16,10 +17,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TIPO_ALMACENAMIENTO_VALUES } from "@/features/shared/enums";
+import { useDetailNavPush } from "@/features/shared/nav/DetailNavControls";
+import { useDetailNavStack } from "@/features/shared/nav/DetailNavStack";
+import { DetailPageHeader } from "@/features/shared/nav/DetailPageHeader";
 import { cn } from "@/lib/utils/cn";
 
 import { AddChildModal } from "../components/AddChildModal";
-import { MODULE_FAMILY_VALUES } from "../types";
+import { ModulesHierarchyTable } from "../components/ModulesHierarchyTable";
 import { useModuleDetail } from "../hooks/use-module-detail";
 import {
   useAddChild,
@@ -27,6 +31,14 @@ import {
   useRemoveChild,
   useUpdateModule,
 } from "../hooks/use-module-mutations";
+import { MODULE_FAMILY_VALUES } from "../types";
+
+function formatDdMmYyyy(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const datePart = iso.split("T")[0] ?? iso;
+  const [y = "????", m = "??", d = "??"] = datePart.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 interface ModuleEditPageProps {
   mode: "create" | "edit";
@@ -72,8 +84,11 @@ const EMPTY_DEFAULTS: FormValues = {
 export function ModuleEditPage({ mode }: ModuleEditPageProps) {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isEdit = mode === "edit";
   const [pickerOpen, setPickerOpen] = useState(false);
+  const { reset: resetNavStack } = useDetailNavStack();
+  useDetailNavPush();
 
   const detailQuery = useModuleDetail(isEdit ? id : undefined);
   const create = useCreateModule();
@@ -114,36 +129,62 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
     else navigate("/modules");
   };
 
-  const onSubmit = handleSubmit(async (values) => {
-    const payload: Record<string, unknown> = {
-      sku: values.sku.trim(),
-      name: values.name.trim(),
-      description: values.description?.trim() ? values.description.trim() : null,
-      family: values.family,
-      fabricante: values.fabricante?.trim() ? values.fabricante.trim() : null,
-      location: values.location?.trim() ? values.location.trim() : null,
-      tipo_almacenamiento: values.tipo_almacenamiento?.trim()
-        ? values.tipo_almacenamiento.trim()
-        : null,
-      stock: values.stock,
-      notas: values.notas?.trim() ? values.notas.trim() : null,
-    };
-    if (values.version?.trim()) payload["version"] = values.version.trim();
-    try {
-      if (isEdit && id) {
-        await update.mutateAsync({ id, payload: payload as Record<string, never> });
-        navigate(`/modules/${id}`);
-      } else {
-        const created = await create.mutateAsync(
-          payload as unknown as { sku: string; name: string },
-        );
-        navigate(`/modules/${created.id}`);
+  const onClose = () => {
+    resetNavStack();
+    navigate("/modules");
+  };
+
+  const submitWith = (afterCreate: "detail" | "edit_open_picker") =>
+    handleSubmit(async (values) => {
+      const payload: Record<string, unknown> = {
+        sku: values.sku.trim(),
+        name: values.name.trim(),
+        description: values.description?.trim() ? values.description.trim() : null,
+        family: values.family,
+        fabricante: values.fabricante?.trim() ? values.fabricante.trim() : null,
+        location: values.location?.trim() ? values.location.trim() : null,
+        tipo_almacenamiento: values.tipo_almacenamiento?.trim()
+          ? values.tipo_almacenamiento.trim()
+          : null,
+        stock: values.stock,
+        notas: values.notas?.trim() ? values.notas.trim() : null,
+      };
+      if (values.version?.trim()) payload["version"] = values.version.trim();
+      try {
+        if (isEdit && id) {
+          await update.mutateAsync({ id, payload: payload as Record<string, never> });
+          if (afterCreate === "edit_open_picker") setPickerOpen(true);
+          else navigate(`/modules/${id}`);
+        } else {
+          const created = await create.mutateAsync(
+            payload as unknown as { sku: string; name: string },
+          );
+          if (afterCreate === "edit_open_picker") {
+            navigate(`/modules/${created.id}/edit?add_child=1`);
+          } else {
+            navigate(`/modules/${created.id}`);
+          }
+        }
+      } catch (err) {
+        // Surfaced in the banner below via mutation.error state.
+        console.error(err);
       }
-    } catch (err) {
-      // Surfaced in the banner below via mutation.error state.
-      console.error(err);
-    }
-  });
+    });
+
+  const onSubmit = submitWith("detail");
+  const onSaveAndAddChild = submitWith("edit_open_picker");
+
+  // Auto-open the Add-child picker after a "save & add child" hand-off from
+  // the create form.
+  useEffect(() => {
+    if (!isEdit) return;
+    if (searchParams.get("add_child") !== "1") return;
+    if (!detailQuery.data) return;
+    setPickerOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete("add_child");
+    setSearchParams(next, { replace: true });
+  }, [isEdit, detailQuery.data, searchParams, setSearchParams]);
 
   const submitError =
     create.error && isAxiosError(create.error) && create.error.response?.status === 409
@@ -177,25 +218,21 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
         className="mx-auto flex w-full max-w-[1920px] flex-col gap-6"
         aria-label={isEdit ? "Editar módulo" : "Nuevo módulo"}
       >
-        <header className="flex items-center justify-between">
-          <button
-            type="button"
-            aria-label="Cerrar"
-            onClick={onCancel}
-            className="inline-flex size-9 items-center justify-center rounded-md text-text-secondary hover:bg-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          >
-            <X className="size-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-              Cancelar
-            </Button>
-            <Button type="submit" size="sm" disabled={isSubmitting || (isEdit && !isDirty)}>
-              <Save className="size-4" />
-              {isEdit ? "Guardar cambios" : "Crear módulo"}
-            </Button>
-          </div>
-        </header>
+        <DetailPageHeader
+          closeTo="/modules"
+          onClose={onClose}
+          rightSlot={
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+                Cancelar
+              </Button>
+              <Button type="submit" size="sm" disabled={isSubmitting || (isEdit && !isDirty)}>
+                <Save className="size-4" />
+                {isEdit ? "Guardar cambios" : "Crear módulo"}
+              </Button>
+            </>
+          }
+        />
 
         {submitError && (
           <div
@@ -207,7 +244,8 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
         )}
 
         <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
-          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
+          {/* Row 1: SKU + Versión */}
+          <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
             <FormField label="SKU" error={errors.sku?.message}>
               <input
                 {...register("sku")}
@@ -219,32 +257,11 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
             <FormField label="Versión" error={errors.version?.message}>
               <input {...register("version")} type="text" className={inputCls} placeholder="v1.0" />
             </FormField>
-            <FormField label="Familia" error={errors.family?.message}>
-              <Controller
-                control={control}
-                name="family"
-                render={({ field }) => (
-                  <Select
-                    {...(field.value ? { value: field.value } : {})}
-                    onValueChange={(v) => field.onChange(v)}
-                  >
-                    <SelectTrigger className={inputCls}>
-                      <SelectValue placeholder="Selecciona familia…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {MODULE_FAMILY_VALUES.map((v) => (
-                        <SelectItem key={v} value={v}>
-                          {v}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-            </FormField>
           </div>
+
+          {/* Row 2: Nombre */}
           <div className="mt-4">
-            <FormField label="Nombre del módulo" error={errors.name?.message}>
+            <FormField label="Nombre" error={errors.name?.message}>
               <input
                 {...register("name")}
                 type="text"
@@ -253,6 +270,8 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
               />
             </FormField>
           </div>
+
+          {/* Row 3: Descripción */}
           <div className="mt-4">
             <FormField label="Descripción" error={errors.description?.message}>
               <textarea
@@ -263,16 +282,29 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
             </FormField>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-3">
-            <FormField label="Fabricante" error={errors.fabricante?.message}>
-              <input
-                {...register("fabricante")}
-                type="text"
-                className={inputCls}
-                placeholder="Custom Assembly"
+          {/* Row 4: Audit strip — only in edit mode */}
+          {isEdit && module && (
+            <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-2 border-t border-border pt-4 md:grid-cols-4">
+              <ReadonlyField
+                icon={<Calendar className="size-3.5" />}
+                label="Fecha de creación"
+                value={formatDdMmYyyy(module.fecha_creacion)}
               />
-            </FormField>
-            <FormField label="Ubicación" error={errors.location?.message}>
+              <ReadonlyField
+                icon={<Calendar className="size-3.5" />}
+                label="Última modificación"
+                value={formatDdMmYyyy(module.updated_at)}
+              />
+            </div>
+          )}
+
+          {/* Row 5: Ubicación + Tipo almacenamiento + Familia */}
+          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2 lg:grid-cols-3">
+            <FormField
+              label="Ubicación"
+              icon={<MapPin className="size-3.5" />}
+              error={errors.location?.message}
+            >
               <input
                 {...register("location")}
                 type="text"
@@ -280,7 +312,11 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
                 placeholder="G-M-01"
               />
             </FormField>
-            <FormField label="Tipo almacenamiento" error={errors.tipo_almacenamiento?.message}>
+            <FormField
+              label="Tipo almacenamiento"
+              icon={<Package className="size-3.5" />}
+              error={errors.tipo_almacenamiento?.message}
+            >
               <Controller
                 control={control}
                 name="tipo_almacenamiento"
@@ -304,9 +340,45 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
                 )}
               />
             </FormField>
+            <FormField
+              label="Familia"
+              icon={<Package className="size-3.5" />}
+              error={errors.family?.message}
+            >
+              <Controller
+                control={control}
+                name="family"
+                render={({ field }) => (
+                  <Select
+                    {...(field.value ? { value: field.value } : {})}
+                    onValueChange={(v) => field.onChange(v)}
+                  >
+                    <SelectTrigger className={inputCls}>
+                      <SelectValue placeholder="Selecciona familia…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MODULE_FAMILY_VALUES.map((v) => (
+                        <SelectItem key={v} value={v}>
+                          {v}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </FormField>
           </div>
 
-          <div className="mt-4">
+          {/* Row 6: Fabricante + Stock (ensamblados) */}
+          <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+            <FormField label="Fabricante" error={errors.fabricante?.message}>
+              <input
+                {...register("fabricante")}
+                type="text"
+                className={inputCls}
+                placeholder="Custom Assembly"
+              />
+            </FormField>
             <FormField label="Stock (ensamblados)" error={errors.stock?.message}>
               <input
                 {...register("stock")}
@@ -319,68 +391,45 @@ export function ModuleEditPage({ mode }: ModuleEditPageProps) {
           </div>
         </section>
 
-        {isEdit && module && (
-          <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-                Contiene
-              </h2>
-              <Button type="button" variant="outline" size="sm" onClick={() => setPickerOpen(true)}>
-                <Plus className="size-4" />
-                Añadir hijo
-              </Button>
-            </div>
-            {module.children.length === 0 ? (
-              <p className="text-sm text-text-secondary">Sin hijos todavía.</p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {module.children.map((c) => {
-                  const isModuleChild = c.child_module !== null;
-                  const label = isModuleChild
-                    ? `${c.child_module!.sku} · ${c.child_module!.name}`
-                    : `${c.child_component!.mpn} · ${c.child_component!.name}`;
-                  return (
-                    <li key={c.id} className="flex items-center justify-between py-2">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={cn(
-                            "inline-flex size-6 items-center justify-center rounded",
-                            isModuleChild ? "bg-brand/10 text-brand" : "text-text-secondary",
-                          )}
-                        >
-                          {isModuleChild ? (
-                            <Box className="size-3.5" />
-                          ) : (
-                            <ComponentIcon className="size-3.5" />
-                          )}
-                        </span>
-                        <div>
-                          <p className="text-sm text-text-primary">{label}</p>
-                          <p className="text-xs text-text-secondary">Cantidad: {c.quantity}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label="Eliminar hijo"
-                        onClick={() => removeChild.mutate({ id: module.id, childId: c.id })}
-                        className="inline-flex size-7 items-center justify-center rounded-md text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-        )}
+        <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
+              Contiene
+            </h2>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isSubmitting}
+              onClick={() => {
+                if (isEdit && module) setPickerOpen(true);
+                else void onSaveAndAddChild();
+              }}
+            >
+              <Plus className="size-4" />
+              Añadir hijo
+            </Button>
+          </div>
+          <ModulesHierarchyTable
+            directChildren={module?.children ?? []}
+            expandable
+            emptyMessage="Sin hijos todavía."
+            {...(isEdit && module
+              ? {
+                  onRemoveChild: (childId: string) =>
+                    removeChild.mutate({ id: module.id, childId }),
+                }
+              : {})}
+          />
+        </section>
       </form>
 
       {isEdit && module && (
         <AddChildModal
           open={pickerOpen}
           onOpenChange={setPickerOpen}
-          parentModuleId={module.id}
+          parentId={module.id}
+          parentLabel={module.name}
           existingChildren={module.children}
           onConfirm={async (input) => {
             await addChild.mutateAsync({
@@ -404,20 +453,44 @@ const inputCls =
 
 interface FormFieldProps {
   label: string;
+  icon?: ReactNode | undefined;
   error?: string | undefined;
   children: React.ReactNode;
 }
 
-function FormField({ label, error, children }: FormFieldProps) {
+function FormField({ label, icon, error, children }: FormFieldProps) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-text-primary">{label}</label>
+      <label className="flex items-center gap-1.5 text-sm font-medium text-text-primary">
+        {icon && <span className="text-text-secondary">{icon}</span>}
+        {label}
+      </label>
       {children}
       {error && (
         <p role="alert" className="text-xs text-red-600">
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+function ReadonlyField({
+  icon,
+  label,
+  value,
+}: {
+  icon?: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-text-secondary">
+        {icon && <span className="text-text-secondary/70">{icon}</span>}
+        {label}
+      </span>
+      <span className="text-sm font-medium text-text-primary">{value}</span>
     </div>
   );
 }

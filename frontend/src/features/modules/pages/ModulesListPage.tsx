@@ -159,7 +159,7 @@ export function ModulesListPage() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-6 pt-6">
         <header>
           <h1 className="text-3xl font-semibold text-text-primary">Módulos</h1>
           <p className="mt-1 text-sm text-text-secondary">

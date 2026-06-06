@@ -32,6 +32,7 @@ const SAMPLE_ROW = {
   country_of_origin: "FR",
   proveedor_preferente_id: "sup-1",
   current_price_per_100_eur: "7.2000",
+  supplier_stock_summary: [],
   created_at: "2026-05-24T00:00:00Z",
   updated_at: "2026-05-24T00:00:00Z",
 };

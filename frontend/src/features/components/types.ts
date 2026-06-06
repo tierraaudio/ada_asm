@@ -31,6 +31,12 @@ export interface Supplier {
   name: string;
 }
 
+export interface SupplierStockSummaryEntry {
+  supplier_id: string;
+  supplier_name: string;
+  quantity: number;
+}
+
 export interface Component {
   id: string;
   mpn: string;
@@ -53,6 +59,9 @@ export interface Component {
   proveedor_preferente_id: string | null;
   /** Latest 100u price from the preferred supplier (read-only, server-computed). */
   current_price_per_100_eur: string | null;
+  /** Latest snapshot per supplier — fed into <StockStatusBadge>. Empty array
+   *  means no supplier inventory has ever been recorded (not "unknown"). */
+  supplier_stock_summary: SupplierStockSummaryEntry[];
   created_at: string;
   updated_at: string;
 }
@@ -84,6 +93,7 @@ export interface ComponentSummary {
   tier: TierValue;
   stock: number;
   current_price_per_100_eur: string | null;
+  supplier_stock_summary: SupplierStockSummaryEntry[];
 }
 
 export interface ScoringAlternative {

@@ -11,6 +11,10 @@ import { ComponentsListPage } from "@/features/components/pages/ComponentsListPa
 import { ModuleDetailPage } from "@/features/modules/pages/ModuleDetailPage";
 import { ModuleEditPage } from "@/features/modules/pages/ModuleEditPage";
 import { ModulesListPage } from "@/features/modules/pages/ModulesListPage";
+import { ProjectDetailPage } from "@/features/projects/pages/ProjectDetailPage";
+import { ProjectEditPage } from "@/features/projects/pages/ProjectEditPage";
+import { ProjectsListPage } from "@/features/projects/pages/ProjectsListPage";
+import { DetailNavStackProvider } from "@/features/shared/nav/DetailNavStack";
 
 const PlaceholderPage = ({ label = "ADA ASM placeholder" }: { label?: string }) => (
   <div className="flex h-full items-center justify-center">
@@ -26,6 +30,14 @@ const DashboardPlaceholder = ({ label }: { label?: string }) => (
 
 export const App = () => {
   return (
+    <DetailNavStackProvider>
+      <AppRoutes />
+    </DetailNavStackProvider>
+  );
+};
+
+const AppRoutes = () => {
+  return (
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<LoginPage />} />
@@ -35,10 +47,10 @@ export const App = () => {
       {/* Protected routes — destination pages land in their respective USs */}
       <Route element={<RequireAuth />}>
         <Route path="/" element={<DashboardPlaceholder />} />
-        <Route
-          path="/projects"
-          element={<DashboardPlaceholder label="Proyectos · próximamente" />}
-        />
+        <Route path="/projects" element={<ProjectsListPage />} />
+        <Route path="/projects/new" element={<ProjectEditPage mode="create" />} />
+        <Route path="/projects/:id" element={<ProjectDetailPage />} />
+        <Route path="/projects/:id/edit" element={<ProjectEditPage mode="edit" />} />
         <Route path="/modules" element={<ModulesListPage />} />
         <Route path="/modules/new" element={<ModuleEditPage mode="create" />} />
         <Route path="/modules/:id" element={<ModuleDetailPage />} />

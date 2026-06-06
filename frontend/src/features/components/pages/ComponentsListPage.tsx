@@ -1,4 +1,4 @@
-import { Eye, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -17,14 +17,13 @@ import { formatEuros } from "@/lib/format/currency";
 import { cn } from "@/lib/utils/cn";
 
 import { ComponentsFiltersDrawer } from "../components/ComponentsFiltersDrawer";
-import { ConfirmDeleteDialog } from "../components/ConfirmDeleteDialog";
 import { NatoScoreBadge } from "@/features/shared/badges/NatoScoreBadge";
 import { NatoScoreHelpPopover } from "@/features/shared/badges/NatoScoreHelpPopover";
 import { StockStatusBadge } from "@/features/shared/badges/StockStatusBadge";
 import { FamilyChip } from "@/features/shared/badges/FamilyChip";
+import { TruncatedText } from "@/features/shared/ui/TruncatedText";
 
-import { descriptionForFamily, iconForFamily } from "../family-icons";
-import { useDeleteComponent } from "../hooks/use-component-mutations";
+import { descriptionForFamily, iconForFamily, labelForFamily } from "../family-icons";
 import { useComponents } from "../hooks/use-components";
 import { useSuppliers } from "../hooks/use-suppliers";
 import {
@@ -104,7 +103,6 @@ export function ComponentsListPage() {
 
   const componentsQuery = useComponents({ filters, page, pageSize: PAGE_SIZE });
   const suppliersQuery = useSuppliers();
-  const deleteMutation = useDeleteComponent();
 
   const items = useMemo(() => componentsQuery.data?.items ?? [], [componentsQuery.data]);
   const total = componentsQuery.data?.total ?? 0;
@@ -134,7 +132,7 @@ export function ComponentsListPage() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-6 pt-6">
         <header>
           <h1 className="text-3xl font-semibold text-text-primary">Componentes</h1>
           <p className="mt-1 text-sm text-text-secondary">
@@ -222,9 +220,6 @@ export function ComponentsListPage() {
                       <NatoScoreHelpPopover />
                     </span>
                   </TableHead>
-                  <TableHead className="text-right text-xs font-bold uppercase tracking-wide">
-                    Acciones
-                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -235,7 +230,6 @@ export function ComponentsListPage() {
                     supplierNameById={
                       new Map((suppliersQuery.data ?? []).map((s) => [s.id, s.name]))
                     }
-                    onDelete={() => deleteMutation.mutateAsync(c.id)}
                     onView={() => navigate(`/components/${c.id}`)}
                   />
                 ))}
@@ -255,21 +249,32 @@ export function ComponentsListPage() {
   );
 }
 
+// Helper type — `onView` is required, `onDelete` removed (delete lives in detail).
 interface ComponentRowProps {
   component: Component;
   supplierNameById: Map<string, string>;
-  onDelete: () => Promise<void>;
   onView: () => void;
 }
 
-function ComponentRow({ component, supplierNameById, onDelete, onView }: ComponentRowProps) {
+function ComponentRow({ component, supplierNameById, onView }: ComponentRowProps) {
   const FamilyIcon = iconForFamily(component.family);
   const stockMin = effectiveStockMin(component);
   const supplierName = component.proveedor_preferente_id
     ? (supplierNameById.get(component.proveedor_preferente_id) ?? "—")
     : "—";
   return (
-    <TableRow>
+    <TableRow
+      role="button"
+      tabIndex={0}
+      onClick={onView}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onView();
+        }
+      }}
+      className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand/40"
+    >
       <TableCell>
         <span
           aria-hidden
@@ -282,9 +287,15 @@ function ComponentRow({ component, supplierNameById, onDelete, onView }: Compone
       </TableCell>
       <TableCell className="font-medium text-text-primary">{component.sku ?? "—"}</TableCell>
       <TableCell className="font-mono text-xs text-text-secondary">{component.mpn}</TableCell>
-      <TableCell className="text-text-primary">{component.name}</TableCell>
+      <TableCell className="overflow-hidden text-text-primary">
+        <TruncatedText text={component.name} className="text-sm" />
+      </TableCell>
       <TableCell>
-        <FamilyChip value={component.family} description={descriptionForFamily(component.family)} />
+        <FamilyChip
+          value={component.family}
+          label={labelForFamily(component.family)}
+          description={descriptionForFamily(component.family)}
+        />
       </TableCell>
       <TableCell className="font-mono text-xs text-text-primary">
         {component.location ?? "—"}
@@ -294,38 +305,17 @@ function ComponentRow({ component, supplierNameById, onDelete, onView }: Compone
         {formatEuros(component.current_price_per_100_eur)}
       </TableCell>
       <TableCell>
-        <StockStatusBadge stock={component.stock} stockMin={stockMin} supplierStock={[]} />
+        <StockStatusBadge
+          stock={component.stock}
+          stockMin={stockMin}
+          supplierStock={component.supplier_stock_summary.map((s) => ({
+            supplier: s.supplier_name,
+            quantity: s.quantity,
+          }))}
+        />
       </TableCell>
       <TableCell>
         <NatoScoreBadge value={component.nato_score} />
-      </TableCell>
-      <TableCell>
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-7"
-            aria-label="Ver componente"
-            onClick={onView}
-          >
-            <Eye className="size-4 text-text-secondary" />
-          </Button>
-          <ConfirmDeleteDialog
-            trigger={
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                aria-label="Eliminar componente"
-              >
-                <Trash2 className="size-4 text-red-600" />
-              </Button>
-            }
-            onConfirm={onDelete}
-          />
-        </div>
       </TableCell>
     </TableRow>
   );

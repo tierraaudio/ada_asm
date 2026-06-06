@@ -1,17 +1,24 @@
-import { Edit3, History, X } from "lucide-react";
+import { Edit3, History, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { DashboardLayout } from "@/app/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ConfirmDeleteDialog } from "@/features/components/components/ConfirmDeleteDialog";
+import { useModuleProjectsUsing } from "@/features/projects/hooks/use-projects-using";
 import { NatoScoringSummaryCard } from "@/features/shared/badges/NatoScoringSummaryCard";
+import { ProjectsHierarchyRow } from "@/features/shared/badges/ProjectsHierarchyRow";
 import type { NatoScoreValue } from "@/features/shared/enums";
+import { useDetailNavPush } from "@/features/shared/nav/DetailNavControls";
+import { useDetailNavStack } from "@/features/shared/nav/DetailNavStack";
+import { DetailPageHeader } from "@/features/shared/nav/DetailPageHeader";
 
 import { HistorialFabricacionModal } from "../components/HistorialFabricacionModal";
 import { ModuleHeaderCard } from "../components/ModuleHeaderCard";
 import { ModulesHierarchyTable } from "../components/ModulesHierarchyTable";
 import { useModuleDetail } from "../hooks/use-module-detail";
+import { useDeleteModule } from "../hooks/use-module-mutations";
 import {
   useModuleComponentPurchasesSummary,
   useModuleStockEvents,
@@ -91,9 +98,13 @@ export function ModuleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const query = useModuleDetail(id);
+  const deleteMutation = useDeleteModule();
+  const { reset: resetNavStack } = useDetailNavStack();
   const [fabricacionOpen, setFabricacionOpen] = useState(false);
   const stockEventsQuery = useModuleStockEvents(id, fabricacionOpen);
   const supplierSummaryQuery = useModuleComponentPurchasesSummary(id, fabricacionOpen);
+  const projectsUsingQuery = useModuleProjectsUsing(id);
+  useDetailNavPush();
 
   const auditTooltip = useMemo(
     () => (query.data ? buildAuditTooltip(query.data) : null),
@@ -119,25 +130,38 @@ export function ModuleDetailPage() {
   return (
     <DashboardLayout>
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-6">
-        <header className="flex items-center justify-between">
-          <button
-            type="button"
-            aria-label="Cerrar"
-            onClick={() => navigate("/modules")}
-            className="inline-flex size-9 items-center justify-center rounded-md text-text-secondary hover:bg-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          >
-            <X className="size-5" />
-          </button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/modules/${module.id}/edit`)}
-          >
-            <Edit3 className="size-4" />
-            Editar Módulo
-          </Button>
-        </header>
+        <DetailPageHeader
+          closeTo="/modules"
+          rightSlot={
+            <>
+              <ConfirmDeleteDialog
+                trigger={
+                  <Button type="button" variant="outline" size="sm">
+                    <Trash2 className="size-4 text-red-600" />
+                    Eliminar
+                  </Button>
+                }
+                title={`¿Eliminar el módulo «${module.name}»?`}
+                description="Esta acción no se puede deshacer. El módulo desaparece del catálogo y se borran sus relaciones con otros padres."
+                confirmLabel="Eliminar"
+                onConfirm={async () => {
+                  await deleteMutation.mutateAsync(module.id);
+                  resetNavStack();
+                  navigate("/modules");
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/modules/${module.id}/edit`)}
+              >
+                <Edit3 className="size-4" />
+                Editar Módulo
+              </Button>
+            </>
+          }
+        />
 
         <ModuleHeaderCard
           module={module}
@@ -187,25 +211,29 @@ export function ModuleDetailPage() {
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
             Pertenece a
           </h2>
-          {module.parents.length === 0 ? (
-            <p className="text-sm text-text-secondary">
-              Este módulo no pertenece a ningún módulo superior.
-            </p>
-          ) : (
-            <ul className="flex flex-wrap gap-2">
-              {module.parents.map((p) => (
-                <li key={p.id}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/modules/${p.id}`)}
-                    className="inline-flex items-center gap-2 rounded-md border border-border bg-white px-3 py-1.5 text-sm text-text-primary hover:border-brand hover:text-brand"
-                  >
-                    <span className="font-mono text-xs text-text-secondary">{p.sku}</span>
-                    {p.name}
-                  </button>
-                </li>
+          <ModulesHierarchyTable
+            rows={module.parents}
+            expandable
+            emptyMessage="Este módulo no pertenece a ningún módulo superior."
+          />
+        </section>
+
+        <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            Usado en proyectos
+          </h2>
+          {projectsUsingQuery.isLoading ? (
+            <p className="px-3 py-2 text-sm text-text-secondary">Cargando proyectos…</p>
+          ) : projectsUsingQuery.data && projectsUsingQuery.data.length > 0 ? (
+            <div>
+              {projectsUsingQuery.data.map((p) => (
+                <ProjectsHierarchyRow key={p.id} project={p} />
               ))}
-            </ul>
+            </div>
+          ) : (
+            <p className="px-3 py-2 text-sm text-text-secondary">
+              Este módulo no se usa todavía en ningún proyecto.
+            </p>
           )}
         </section>
       </div>

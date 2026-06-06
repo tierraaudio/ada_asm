@@ -59,6 +59,16 @@ class SqlAlchemyStockEventRepository:
         base = select(StockEventModel).where(StockEventModel.module_id == module_id)
         return await self._paginate(base, page=page, page_size=page_size)
 
+    async def list_for_project(
+        self,
+        *,
+        project_id: UUID,
+        page: int,
+        page_size: int,
+    ) -> StockEventPage:
+        base = select(StockEventModel).where(StockEventModel.project_id == project_id)
+        return await self._paginate(base, page=page, page_size=page_size)
+
     async def _paginate(
         self,
         base: Any,  # SQLAlchemy Select; kept loose to avoid generic gymnastics.

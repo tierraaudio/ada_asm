@@ -6,17 +6,18 @@ import { useUiStore } from "@/lib/stores/ui-store";
 import { loginInStore, renderWithProviders } from "@/tests/utils";
 
 describe("<DashboardLayout>", () => {
-  it("renders the Sidebar when expanded", () => {
+  it("always renders the Sidebar — collapsed it becomes a slim rail with the toggle", () => {
     loginInStore();
     useUiStore.setState({ sidebarCollapsed: false });
     renderWithProviders(<DashboardLayout>content</DashboardLayout>);
     expect(screen.getByTestId("app-sidebar")).toBeInTheDocument();
   });
 
-  it("does NOT render the Sidebar when collapsed", () => {
+  it("Sidebar stays mounted when collapsed (owns its own toggle)", () => {
     loginInStore();
     useUiStore.setState({ sidebarCollapsed: true });
     renderWithProviders(<DashboardLayout>content</DashboardLayout>);
-    expect(screen.queryByTestId("app-sidebar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("app-sidebar")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /expandir menú/i })).toBeInTheDocument();
   });
 });

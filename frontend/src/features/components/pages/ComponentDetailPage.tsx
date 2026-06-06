@@ -1,4 +1,4 @@
-import { ArrowLeft, Edit3, History } from "lucide-react";
+import { Edit3, History, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -15,6 +15,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { ComponentHeaderCard } from "../components/ComponentHeaderCard";
+import { ConfirmDeleteDialog } from "../components/ConfirmDeleteDialog";
 import { HistorialDeComprasModal } from "../components/HistorialDeComprasModal";
 import { HistoricoPreciosChart } from "@/features/shared/charts/HistoricoPreciosChart";
 import { NatoScoringModal } from "../components/NatoScoringModal";
@@ -22,8 +23,16 @@ import { NatoScoringSection } from "../components/NatoScoringSection";
 import { PreciosDeHoyTable } from "../components/PreciosDeHoyTable";
 import { StockDisponibleChart } from "../components/StockDisponibleChart";
 import { useComponentDetail } from "../hooks/use-component-detail";
+import { useDeleteComponent } from "../hooks/use-component-mutations";
+import { useComponentParents } from "../hooks/use-component-parents";
 import { useStockEvents, useSupplierPrices, useSupplierStocks } from "../hooks/use-supplier-data";
 import { useSuppliers } from "../hooks/use-suppliers";
+import { ModulesHierarchyTable } from "@/features/modules/components/ModulesHierarchyTable";
+import { useComponentProjectsUsing } from "@/features/projects/hooks/use-projects-using";
+import { ProjectsHierarchyRow } from "@/features/shared/badges/ProjectsHierarchyRow";
+import { useDetailNavPush } from "@/features/shared/nav/DetailNavControls";
+import { useDetailNavStack } from "@/features/shared/nav/DetailNavStack";
+import { DetailPageHeader } from "@/features/shared/nav/DetailPageHeader";
 
 type ModalKey = "historial" | "scoring" | "clasificar" | null;
 
@@ -31,11 +40,16 @@ export function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const detailQuery = useComponentDetail(id);
+  const deleteMutation = useDeleteComponent();
+  const { reset: resetNavStack } = useDetailNavStack();
   const suppliersQuery = useSuppliers();
   const pricesQuery = useSupplierPrices(id);
   const stocksQuery = useSupplierStocks(id);
   const stockEventsQuery = useStockEvents(id);
+  const parentsQuery = useComponentParents(id);
+  const projectsUsingQuery = useComponentProjectsUsing(id);
   const [openModal, setOpenModal] = useState<ModalKey>(null);
+  useDetailNavPush();
 
   if (!id || detailQuery.isLoading) {
     return (
@@ -63,21 +77,38 @@ export function ComponentDetailPage() {
   return (
     <DashboardLayout>
       <div className="mx-auto flex w-full max-w-[1920px] flex-col gap-6">
-        <header className="flex items-center justify-between">
-          <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/components")}>
-            <ArrowLeft className="size-4" />
-            Volver al catálogo
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/components/${component.id}/edit`)}
-          >
-            <Edit3 className="size-4" />
-            Editar Componente
-          </Button>
-        </header>
+        <DetailPageHeader
+          closeTo="/components"
+          rightSlot={
+            <>
+              <ConfirmDeleteDialog
+                trigger={
+                  <Button type="button" variant="outline" size="sm">
+                    <Trash2 className="size-4 text-red-600" />
+                    Eliminar
+                  </Button>
+                }
+                title={`¿Eliminar el componente «${component.name}»?`}
+                description="Esta acción no se puede deshacer. El componente desaparece del catálogo y se borran sus relaciones con módulos y proyectos."
+                confirmLabel="Eliminar"
+                onConfirm={async () => {
+                  await deleteMutation.mutateAsync(component.id);
+                  resetNavStack();
+                  navigate("/components");
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => navigate(`/components/${component.id}/edit`)}
+              >
+                <Edit3 className="size-4" />
+                Editar Componente
+              </Button>
+            </>
+          }
+        />
 
         <ComponentHeaderCard
           component={component}
@@ -134,6 +165,40 @@ export function ComponentDetailPage() {
             )}
           </DetailSection>
         </div>
+
+        <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            Pertenece a
+          </h2>
+          <ModulesHierarchyTable
+            rows={parentsQuery.data ?? []}
+            expandable
+            emptyMessage={
+              parentsQuery.isLoading
+                ? "Cargando módulos…"
+                : "Este componente no pertenece a ningún módulo."
+            }
+          />
+        </section>
+
+        <section className="rounded-lg border border-border bg-white p-4 shadow-sm">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-text-secondary">
+            Usado en proyectos
+          </h2>
+          {projectsUsingQuery.isLoading ? (
+            <p className="px-3 py-2 text-sm text-text-secondary">Cargando proyectos…</p>
+          ) : projectsUsingQuery.data && projectsUsingQuery.data.length > 0 ? (
+            <div>
+              {projectsUsingQuery.data.map((p) => (
+                <ProjectsHierarchyRow key={p.id} project={p} />
+              ))}
+            </div>
+          ) : (
+            <p className="px-3 py-2 text-sm text-text-secondary">
+              Este componente no se usa todavía en ningún proyecto.
+            </p>
+          )}
+        </section>
       </div>
 
       <HistorialDeComprasModal

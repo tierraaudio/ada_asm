@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
-import { Calendar, MapPin, Package, Save, X } from "lucide-react";
+import { Calendar, MapPin, Package, Save } from "lucide-react";
 import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -26,6 +26,9 @@ import { useComponentDetail } from "../hooks/use-component-detail";
 import { useCreateComponent, useUpdateComponent } from "../hooks/use-component-mutations";
 import { useStockEvents, useSupplierPrices, useSupplierStocks } from "../hooks/use-supplier-data";
 import { useSuppliers } from "../hooks/use-suppliers";
+import { useDetailNavPush } from "@/features/shared/nav/DetailNavControls";
+import { useDetailNavStack } from "@/features/shared/nav/DetailNavStack";
+import { DetailPageHeader } from "@/features/shared/nav/DetailPageHeader";
 
 interface ComponentEditPageProps {
   mode: "create" | "edit";
@@ -90,6 +93,8 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEdit = mode === "edit";
+  const { reset: resetNavStack } = useDetailNavStack();
+  useDetailNavPush();
 
   const detailQuery = useComponentDetail(isEdit ? id : undefined);
   const suppliersQuery = useSuppliers();
@@ -133,6 +138,11 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
       holded_id: c.holded_id ?? "",
     });
   }, [isEdit, detailQuery.data, reset]);
+
+  const onClose = () => {
+    resetNavStack();
+    navigate("/components");
+  };
 
   const onCancel = () => {
     if (isEdit && id) {
@@ -221,25 +231,21 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
         className="mx-auto flex w-full max-w-[1920px] flex-col gap-6"
         aria-label={isEdit ? "Editar componente" : "Nuevo componente"}
       >
-        <header className="flex items-center justify-between">
-          <button
-            type="button"
-            aria-label="Cerrar"
-            onClick={onCancel}
-            className="inline-flex size-9 items-center justify-center rounded-md text-text-secondary hover:bg-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          >
-            <X className="size-5" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-              Cancelar
-            </Button>
-            <Button type="submit" size="sm" disabled={isSubmitting || (isEdit && !isDirty)}>
-              <Save className="size-4" />
-              {isEdit ? "Guardar cambios" : "Crear componente"}
-            </Button>
-          </div>
-        </header>
+        <DetailPageHeader
+          closeTo="/components"
+          onClose={onClose}
+          rightSlot={
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+                Cancelar
+              </Button>
+              <Button type="submit" size="sm" disabled={isSubmitting || (isEdit && !isDirty)}>
+                <Save className="size-4" />
+                {isEdit ? "Guardar cambios" : "Crear componente"}
+              </Button>
+            </>
+          }
+        />
 
         {submitError && (
           <div

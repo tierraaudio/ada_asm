@@ -7,16 +7,24 @@ import { useComponents } from "@/features/components/hooks/use-components";
 import { cn } from "@/lib/utils/cn";
 
 import { useModules } from "../hooks/use-modules";
-import type { ModuleChild } from "../types";
-
 type Tab = "components" | "modules";
+
+/** Minimal structural shape that ModuleChild and ProjectChild both satisfy. */
+interface ExistingChild {
+  id: string;
+  child_module_id: string | null;
+  child_component_id: string | null;
+}
 
 interface AddChildModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  parentModuleId: string;
+  /** Parent entity id (a module or a project — caller owns the endpoint). */
+  parentId: string;
+  /** Optional label woven into the header copy ("Añadir hijo a {parentLabel}"). */
+  parentLabel?: string;
   /** Children already in the parent — used to grey "Ya añadido" rows. */
-  existingChildren: ModuleChild[];
+  existingChildren: ExistingChild[];
   onConfirm: (input: {
     child_module_id?: string;
     child_component_id?: string;
@@ -27,7 +35,8 @@ interface AddChildModalProps {
 export function AddChildModal({
   open,
   onOpenChange,
-  parentModuleId,
+  parentId,
+  parentLabel,
   existingChildren,
   onConfirm,
 }: AddChildModalProps) {
@@ -74,7 +83,9 @@ export function AddChildModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-[min(95vw,800px)] max-w-none overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-lg">Añadir hijo</DialogTitle>
+          <DialogTitle className="text-lg">
+            {parentLabel ? `Añadir hijo a ${parentLabel}` : "Añadir hijo"}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="flex gap-1 border-b border-border">
@@ -151,7 +162,7 @@ export function AddChildModal({
                 );
               })
             : modulesQuery.data?.items
-                .filter((m) => m.id !== parentModuleId)
+                .filter((m) => m.id !== parentId)
                 .map((m) => {
                   const already = existingModuleIds.has(m.id);
                   const selected = pending?.id === m.id;

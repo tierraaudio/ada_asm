@@ -1,4 +1,5 @@
 import { api } from "@/lib/api/client";
+import type { ModuleSummary } from "@/features/modules/types";
 
 import type {
   Component,
@@ -131,6 +132,11 @@ export const componentsApi = {
     const response = await api.get<Paginated<StockEvent>>(`${BASE}/${id}/stock-events`, {
       params: { page, page_size: pageSize },
     });
+    return response.data;
+  },
+
+  listParents: async (id: string): Promise<ModuleSummary[]> => {
+    const response = await api.get<ModuleSummary[]>(`${BASE}/${id}/parents`);
     return response.data;
   },
 };

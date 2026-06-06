@@ -56,3 +56,15 @@ const FAMILY_DESCRIPTIONS: Record<string, string> = {
 export function descriptionForFamily(family: string): string {
   return FAMILY_DESCRIPTIONS[family] ?? "Componente electrónico.";
 }
+
+/**
+ * Short display labels for families whose full name overflows the chip column.
+ * The semantic value (used in tooltips and APIs) stays unchanged.
+ */
+const FAMILY_DISPLAY_LABELS: Record<string, string> = {
+  "Fuentes de alimentación": "F. Alimentación",
+};
+
+export function labelForFamily(family: string): string {
+  return FAMILY_DISPLAY_LABELS[family] ?? family;
+}
