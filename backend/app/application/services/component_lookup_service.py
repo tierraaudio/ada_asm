@@ -43,10 +43,10 @@ def _cache_key(mpn: str) -> str:
     return f"{_CACHE_KEY_PREFIX}:{mpn.strip().lower()}"
 
 
-_client: "Redis | None" = None
+_client: Redis | None = None
 
 
-def _get_client() -> "Redis":
+def _get_client() -> Redis:
     global _client
     if _client is None:
         _client = redis_async.from_url(
@@ -56,7 +56,7 @@ def _get_client() -> "Redis":
     return _client
 
 
-def _set_client(client: "Redis | None") -> None:
+def _set_client(client: Redis | None) -> None:
     """Test seam: inject a fakeredis client and reset between tests."""
     global _client
     _client = client
@@ -82,7 +82,7 @@ def _price_per_100(quote: SupplierQuote) -> Decimal | None:
     return chosen.price_eur * 100
 
 
-def _quote_to_supplier_data(quote: SupplierQuote) -> "SupplierData":
+def _quote_to_supplier_data(quote: SupplierQuote) -> SupplierData:
     from app.api.v1.schemas.lookup import SupplierData, SupplierPriceBreakResponse
 
     return SupplierData(
@@ -102,7 +102,7 @@ def _quote_to_supplier_data(quote: SupplierQuote) -> "SupplierData":
     )
 
 
-def _merge_fields(quotes: list[SupplierQuote]) -> "LookupFields":
+def _merge_fields(quotes: list[SupplierQuote]) -> LookupFields:
     from app.api.v1.schemas.lookup import LookupFields
     """Progressive merge: for each scalar field, the FIRST non-null value
     encountered (priority order) wins. Later quotes only fill gaps."""
@@ -138,7 +138,7 @@ def _merge_fields(quotes: list[SupplierQuote]) -> "LookupFields":
     )
 
 
-def _missing_fields(fields: "LookupFields") -> list[str]:
+def _missing_fields(fields: LookupFields) -> list[str]:
     return [
         name
         for name, value in fields.model_dump().items()
@@ -146,8 +146,8 @@ def _missing_fields(fields: "LookupFields") -> list[str]:
     ]
 
 
-async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> "LookupResponse":
-    from app.api.v1.schemas.lookup import LookupResponse, SupplierData
+async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupResponse:
+    from app.api.v1.schemas.lookup import LookupResponse
     """Walk enabled suppliers in priority order and return a merged quote.
 
     Raises:
@@ -237,7 +237,7 @@ async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> "LookupResp
             settings.supplier_lookup_cache_ttl_seconds,
             response.model_dump_json(),
         )
-    except Exception as exc:  # noqa: BLE001 — cache write is best-effort
+    except Exception as exc:
         _log.warning("supplier_lookup.cache.write_failed mpn=%s err=%s", mpn, exc)
 
     return response

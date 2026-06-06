@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -129,7 +129,7 @@ async def _build_quote(part: dict[str, Any], *, mpn: str) -> SupplierQuote:
         price_original = _parse_price(str(raw_break.get("Price") or "0"))
         try:
             price_eur = await fx.to_eur(price_original, currency_original)
-        except Exception:  # noqa: BLE001 - any FX failure → keep original, drop EUR
+        except Exception:
             price_eur = None
         breaks.append(
             SupplierPriceBreak(
@@ -163,5 +163,5 @@ async def _build_quote(part: dict[str, Any], *, mpn: str) -> SupplierQuote:
         price_breaks=tuple(breaks),
         supplier_sku=part.get("MouserPartNumber"),
         supplier_product_url=part.get("ProductDetailUrl"),
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )

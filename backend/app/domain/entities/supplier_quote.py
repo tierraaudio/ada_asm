@@ -10,7 +10,7 @@ progressively; the daily sync task upserts each into the append-only
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -56,5 +56,5 @@ class SupplierQuote:
     supplier_sku: str | None = None
     supplier_product_url: str | None = None
     last_seen_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
     )

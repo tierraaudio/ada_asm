@@ -8,7 +8,7 @@ namespaces, isolated by per-test key prefixes).
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import uuid4
@@ -24,7 +24,6 @@ from app.domain.entities.supplier_quote import (
     SupplierPriceBreak,
     SupplierQuote,
 )
-from app.domain.repositories.supplier_adapter import SupplierAdapter
 
 pytestmark = pytest.mark.asyncio
 
@@ -46,7 +45,7 @@ class _FakeAdapter:
         self._raises = raises
         self.calls = 0
 
-    async def fetch_by_mpn(self, mpn: str) -> SupplierQuote | None:  # noqa: ARG002
+    async def fetch_by_mpn(self, mpn: str) -> SupplierQuote | None:
         self.calls += 1
         if self._raises is not None:
             raise self._raises
@@ -74,7 +73,7 @@ def _mouser_quote(mpn: str) -> SupplierQuote:
         ),
         supplier_sku="863-MOCK",
         supplier_product_url="https://www.mouser.es/ProductDetail/onsemi/MOCK",
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )
 
 
@@ -99,7 +98,7 @@ def _digikey_quote(mpn: str) -> SupplierQuote:
         ),
         supplier_sku="296-MOCK-ND",
         supplier_product_url="https://www.digikey.com/MOCK",
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )
 
 
@@ -127,7 +126,7 @@ def _patch_adapters(
     monkeypatch.setattr(
         component_lookup_service,
         "lookup_adapters_in_priority_order",
-        lambda settings=None: adapters,  # noqa: ARG005
+        lambda settings=None: adapters,
     )
 
 

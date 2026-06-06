@@ -15,7 +15,6 @@ import pytest_asyncio
 from app.core.exceptions import SupplierRateLimitedError
 from app.infrastructure import rate_limit
 
-
 pytestmark = pytest.mark.asyncio
 
 

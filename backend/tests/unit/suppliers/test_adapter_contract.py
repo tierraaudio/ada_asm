@@ -25,7 +25,6 @@ import pytest
 from app.domain.entities.supplier_quote import SupplierQuote
 from app.domain.repositories.supplier_adapter import SupplierAdapter
 
-
 _ADAPTER_CASES: list[tuple[str, str, dict[str, Any]]] = [
     (
         "mouser",

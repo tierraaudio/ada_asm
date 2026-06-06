@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -37,7 +37,7 @@ async def _seed_run(
                 components_processed=processed,
                 components_updated=updated,
                 errors_count=errors,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
             )
         )
         await session.flush()

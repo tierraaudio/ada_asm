@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 from uuid import UUID, uuid4
 
@@ -16,7 +16,7 @@ class SupplierSyncRun:
     id: UUID = field(default_factory=uuid4)
     supplier: SupplierCode = "mouser"
     started_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
     )
     finished_at: datetime | None = None
     components_processed: int = 0

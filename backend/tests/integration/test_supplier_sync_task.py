@@ -12,9 +12,9 @@ We use a fake adapter (no HTTP) but the entire DB write path is real:
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
@@ -99,7 +99,7 @@ def _quote_with_full_ladder(mpn: str) -> SupplierQuote:
         ),
         supplier_sku="TEST-SKU-1",
         supplier_product_url="https://example.com/p/test",
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )
 
 
@@ -121,7 +121,7 @@ async def _seed_component(*, mpn: str, name: str) -> UUID:
 
 
 async def test_run_for_supplier_persists_history_and_finalises_success(
-    api_client: AsyncClient,  # noqa: ARG001 — pulls in the autouse truncate fixture
+    api_client: AsyncClient,
 ) -> None:
     mpn = "TEST-SYNC-HAPPY"
     component_id = await _seed_component(mpn=mpn, name="Happy Test Component")
@@ -177,7 +177,7 @@ async def test_run_for_supplier_persists_history_and_finalises_success(
 
 
 async def test_run_for_supplier_records_typed_error_and_finalises_partial(
-    api_client: AsyncClient,  # noqa: ARG001
+    api_client: AsyncClient,
 ) -> None:
     happy_mpn = "TEST-SYNC-OK"
     bad_mpn = "TEST-SYNC-BAD"
@@ -219,7 +219,7 @@ async def test_run_for_supplier_records_typed_error_and_finalises_partial(
 
 
 async def test_run_for_supplier_handles_none_quote_without_writing(
-    api_client: AsyncClient,  # noqa: ARG001
+    api_client: AsyncClient,
 ) -> None:
     """When the adapter returns None (supplier has no record of this MPN),
     no price/stock rows are written and the run counters reflect that."""
@@ -252,7 +252,7 @@ async def test_run_for_supplier_handles_none_quote_without_writing(
 
 
 async def test_same_day_re_run_overwrites_prices_via_upsert(
-    api_client: AsyncClient,  # noqa: ARG001
+    api_client: AsyncClient,
 ) -> None:
     """Two consecutive syncs on the same day MUST collapse to a single
     `(component, supplier, qty_tier, valid_from)` row per tier — the
@@ -274,7 +274,7 @@ async def test_same_day_re_run_overwrites_prices_via_upsert(
             ),
         ),
         stock=12345,
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )
 
     await _run_for_supplier(

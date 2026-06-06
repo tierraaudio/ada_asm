@@ -74,10 +74,10 @@ return wait_ms
 _MAX_WAIT_MS = 60_000
 
 
-_client: "Redis | None" = None
+_client: Redis | None = None
 
 
-def _get_client() -> "Redis":
+def _get_client() -> Redis:
     global _client
     if _client is None:
         from app.core.config import get_settings
@@ -89,7 +89,7 @@ def _get_client() -> "Redis":
     return _client
 
 
-def _set_client(client: "Redis | None") -> None:
+def _set_client(client: Redis | None) -> None:
     """Test seam: inject a fakeredis client and reset between tests."""
     global _client
     _client = client

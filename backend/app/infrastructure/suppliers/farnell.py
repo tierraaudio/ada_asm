@@ -26,7 +26,7 @@ MPN matching:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -192,7 +192,7 @@ async def _build_quote(
             continue
         try:
             price_eur = await fx.to_eur(price_original, currency)
-        except Exception:  # noqa: BLE001 — keep break, drop EUR conversion
+        except Exception:
             price_eur = None
         breaks.append(
             SupplierPriceBreak(
@@ -234,5 +234,5 @@ async def _build_quote(
         price_breaks=tuple(breaks),
         supplier_sku=sku,
         supplier_product_url=_construct_product_url(sku, store_id),
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )

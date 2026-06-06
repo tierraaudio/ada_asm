@@ -18,7 +18,6 @@ import respx
 from app.core.exceptions import FxUnavailableError
 from app.infrastructure import fx
 
-
 pytestmark = pytest.mark.asyncio
 
 

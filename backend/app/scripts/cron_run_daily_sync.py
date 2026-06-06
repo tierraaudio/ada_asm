@@ -43,7 +43,7 @@ def main() -> int:
             enqueued,
         )
         return 0
-    except Exception:  # noqa: BLE001 — top-level boundary
+    except Exception:
         _log.exception("cron_run_daily_sync: failed with uncaught exception")
         return 2
 

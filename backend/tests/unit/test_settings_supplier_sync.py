@@ -12,7 +12,6 @@ import pytest
 
 from app.core.config import Settings
 
-
 _BASE_ENV: dict[str, str] = {
     "DATABASE_URL": "postgresql+asyncpg://x:y@db:5432/z",
     "CELERY_BROKER_URL": "redis://r:6379/0",

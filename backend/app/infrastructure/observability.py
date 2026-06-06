@@ -40,7 +40,7 @@ _log = logging.getLogger(__name__)
 _initialised = False
 
 
-def init(app: "FastAPI | None" = None, *, settings: Settings | None = None) -> bool:
+def init(app: FastAPI | None = None, *, settings: Settings | None = None) -> bool:
     """Initialise OpenTelemetry + Azure Monitor when configured.
 
     Returns True if instrumentation was actually wired, False if the env

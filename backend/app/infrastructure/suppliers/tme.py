@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -42,7 +42,7 @@ from app.domain.entities.supplier_quote import (
     SupplierPriceBreak,
     SupplierQuote,
 )
-from app.infrastructure import fx, rate_limit
+from app.infrastructure import rate_limit
 
 _BASE_URL = "https://api.tme.eu"
 _TOKEN_URL = f"{_BASE_URL}/auth/token"
@@ -295,5 +295,5 @@ async def _build_quote(
         price_breaks=tuple(breaks),
         supplier_sku=product.get("symbol"),
         supplier_product_url=product_url,
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )

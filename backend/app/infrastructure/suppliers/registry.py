@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 _log = logging.getLogger(__name__)
 
 
-def _has_credentials(code: "SupplierCode", settings: Settings) -> bool:
+def _has_credentials(code: SupplierCode, settings: Settings) -> bool:
     """Per-supplier credential presence check. Keeps the gate's "what counts
     as configured" rule colocated with the registry, NOT scattered across
     the adapters."""
@@ -50,7 +50,7 @@ def _has_credentials(code: "SupplierCode", settings: Settings) -> bool:
     return False
 
 
-def _build_adapter(code: "SupplierCode", settings: Settings) -> "SupplierAdapter":
+def _build_adapter(code: SupplierCode, settings: Settings) -> SupplierAdapter:
     """Lazy import + construct the concrete adapter for `code`."""
 
     if code == "mouser":
@@ -90,7 +90,7 @@ def _build_adapter(code: "SupplierCode", settings: Settings) -> "SupplierAdapter
 def enabled_adapters(
     *,
     settings: Settings | None = None,
-) -> list["SupplierAdapter"]:
+) -> list[SupplierAdapter]:
     """Return the active `SupplierAdapter` instances for the daily sync.
 
     Walks `supplier_sync_enabled_suppliers` and skips any code that has
@@ -120,7 +120,7 @@ def enabled_adapters(
 def lookup_adapters_in_priority_order(
     *,
     settings: Settings | None = None,
-) -> list["SupplierAdapter"]:
+) -> list[SupplierAdapter]:
     """Return adapters for the `/components/lookup` endpoint, ordered by
     `supplier_lookup_priority`. Same credential + enabled gates apply.
 

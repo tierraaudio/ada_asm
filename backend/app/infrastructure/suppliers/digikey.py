@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -241,7 +241,7 @@ async def _build_quote(
             continue
         try:
             price_eur = await fx.to_eur(price_original, _LOCALE_CURRENCY)
-        except Exception:  # noqa: BLE001 — keep raw, drop EUR
+        except Exception:
             price_eur = None
         breaks.append(
             SupplierPriceBreak(
@@ -281,5 +281,5 @@ async def _build_quote(
         price_breaks=tuple(breaks),
         supplier_sku=sku,
         supplier_product_url=product.get("ProductUrl"),
-        last_seen_at=datetime.now(timezone.utc),
+        last_seen_at=datetime.now(UTC),
     )

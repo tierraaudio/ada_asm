@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -99,7 +99,7 @@ def _pick_unit_price_for_tier(
 
 
 async def _ensure_supplier_row(
-    session: AsyncSession, code: "SupplierCode"
+    session: AsyncSession, code: SupplierCode
 ) -> UUID:
     """Look up or insert the `suppliers` row for an adapter `code` and
     return its UUID. Names are case-insensitive (the table has a
@@ -184,7 +184,7 @@ async def _record_error(
     *,
     run_id: UUID,
     component_id: UUID,
-    supplier: "SupplierCode",
+    supplier: SupplierCode,
     error: SupplierError,
 ) -> None:
     error_code = getattr(error, "error_code", "UNKNOWN") or "UNKNOWN"
@@ -201,7 +201,7 @@ async def _record_error(
 
 
 async def _create_run_row(
-    session: AsyncSession, supplier: "SupplierCode"
+    session: AsyncSession, supplier: SupplierCode
 ) -> UUID:
     run_id = uuid4()
     session.add(
@@ -237,7 +237,7 @@ async def _finalise_run(
     run = await session.get(SupplierSyncRunModel, run_id)
     if run is None:
         return
-    run.finished_at = datetime.now(timezone.utc)
+    run.finished_at = datetime.now(UTC)
     run.components_processed = processed
     run.components_updated = updated
     run.errors_count = errors
@@ -266,7 +266,7 @@ async def _run_for_supplier(
     """
 
     factory = get_session_factory()
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     processed = 0
     updated = 0
     errors = 0
@@ -313,7 +313,7 @@ async def _run_for_supplier(
                 )
                 await session.commit()
             continue
-        except Exception as exc:  # noqa: BLE001 — surface unknown errors as audit row
+        except Exception as exc:
             errors += 1
             _log.exception("supplier_sync.unknown_error supplier=%s mpn=%s", adapter.code, mpn)
             async with factory() as session:
@@ -344,7 +344,7 @@ async def _run_for_supplier(
             if wrote:
                 component = await session.get(ComponentModel, component_id)
                 if component is not None:
-                    component.last_supplier_sync_at = datetime.now(timezone.utc)
+                    component.last_supplier_sync_at = datetime.now(UTC)
                 updated += 1
             await session.commit()
 
@@ -376,7 +376,7 @@ def _build_adapter_for(code: str) -> SupplierAdapter | None:
 
 @celery_app.task(name="supplier_sync.sync_one_supplier", bind=True, max_retries=3)
 def sync_one_supplier(
-    self: object,  # noqa: ARG001
+    self: object,
     supplier_code: str,
     existing_run_id: str | None = None,
 ) -> str:
