@@ -112,7 +112,7 @@ def init(app: FastAPI | None = None, *, settings: Settings | None = None) -> boo
     # engine instance at init time; the instrumentor patches the create
     # path so all engines built after init are covered.
     SQLAlchemyInstrumentor().instrument()
-    CeleryInstrumentor().instrument()
+    CeleryInstrumentor().instrument()  # type: ignore[no-untyped-call]
 
     _initialised = True
     _log.info(

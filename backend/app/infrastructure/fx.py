@@ -56,18 +56,18 @@ def _today_utc() -> date:
     return datetime.now(UTC).date()
 
 
-async def _read_cached(client: Redis, currency: str, on_date: date) -> Decimal | None:
+async def _read_cached(client: Redis[bytes], currency: str, on_date: date) -> Decimal | None:
     raw = await client.get(_redis_key(currency, on_date))
     if raw is None:
         return None
     try:
-        return Decimal(raw)
+        return Decimal(raw.decode() if isinstance(raw, bytes) else raw)
     except (ArithmeticError, ValueError):
         return None
 
 
 async def _write_cached(
-    client: Redis,
+    client: Redis[bytes],
     currency: str,
     on_date: date,
     rate: Decimal,
@@ -121,7 +121,7 @@ def _parse_rates(xml_text: str) -> tuple[date, dict[str, Decimal]]:
     return rates_date, rates
 
 
-async def _fetch_and_cache_all(client: Redis) -> tuple[date, dict[str, Decimal]]:
+async def _fetch_and_cache_all(client: Redis[bytes]) -> tuple[date, dict[str, Decimal]]:
     try:
         async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as http:
             response = await http.get(ECB_DAILY_URL)
@@ -136,10 +136,10 @@ async def _fetch_and_cache_all(client: Redis) -> tuple[date, dict[str, Decimal]]
     return rates_date, rates
 
 
-_client: Redis | None = None
+_client: Redis[bytes] | None = None
 
 
-def _get_client() -> Redis:
+def _get_client() -> Redis[bytes]:
     global _client
     if _client is None:
         import redis.asyncio as redis_async
@@ -153,7 +153,7 @@ def _get_client() -> Redis:
     return _client
 
 
-def _set_client(client: Redis | None) -> None:
+def _set_client(client: Redis[bytes] | None) -> None:
     """Test seam: swap in fakeredis for unit tests."""
     global _client
     _client = client

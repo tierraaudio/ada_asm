@@ -124,7 +124,7 @@ class DigiKeyAdapter:
             raise SupplierParseError(f"DigiKey auth response shape: {exc}") from exc
 
         _token_cache[cache_key] = (access_token, time.time() + expires_in - 30)
-        return access_token
+        return str(access_token)
 
     async def fetch_by_mpn(self, mpn: str) -> SupplierQuote | None:
         await rate_limit.acquire(_BUCKET, _RATE_LIMIT_PER_MINUTE)

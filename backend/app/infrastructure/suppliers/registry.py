@@ -47,7 +47,7 @@ def _has_credentials(code: SupplierCode, settings: Settings) -> bool:
         return bool(settings.farnell_api_key)
     if code == "rs":
         return bool(settings.rs_api_key)
-    return False
+    return False  # type: ignore[unreachable]
 
 
 def _build_adapter(code: SupplierCode, settings: Settings) -> SupplierAdapter:
@@ -83,7 +83,7 @@ def _build_adapter(code: SupplierCode, settings: Settings) -> SupplierAdapter:
         from app.infrastructure.suppliers.rs import RsAdapter
 
         return RsAdapter(api_key=settings.rs_api_key or "")
-    msg = f"Unknown supplier code: {code}"
+    msg = f"Unknown supplier code: {code}"  # type: ignore[unreachable]
     raise ValueError(msg)
 
 

@@ -113,7 +113,7 @@ class TmeAdapter:
 
         # Refresh 30 s early to avoid using a token that expires mid-call.
         _token_cache[cache_key] = (access_token, time.time() + expires_in - 30)
-        return access_token
+        return str(access_token)
 
     async def fetch_by_mpn(self, mpn: str) -> SupplierQuote | None:
         # Two API calls share one rate-limit budget so we apply it twice.
@@ -125,7 +125,7 @@ class TmeAdapter:
         }
 
         # ---- Step 1: search ----
-        search_params: list[tuple[str, str]] = [
+        search_params: list[tuple[str, str | int | float | bool | None]] = [
             ("country", _DEFAULT_COUNTRY),
             ("language", _DEFAULT_LANGUAGE),
             ("phrase", mpn),
@@ -164,7 +164,7 @@ class TmeAdapter:
 
         # ---- Step 2: data (prices + stock) ----
         await rate_limit.acquire(_BUCKET, _RATE_LIMIT_PER_MINUTE)
-        data_params: list[tuple[str, str]] = [
+        data_params: list[tuple[str, str | int | float | bool | None]] = [
             ("country", _DEFAULT_COUNTRY),
             ("currency", _DEFAULT_CURRENCY),
             ("language", _DEFAULT_LANGUAGE),
@@ -185,7 +185,9 @@ class TmeAdapter:
 
 
 async def _get_json(
-    url: str, params: list[tuple[str, str]], headers: dict[str, str]
+    url: str,
+    params: list[tuple[str, str | int | float | bool | None]],
+    headers: dict[str, str],
 ) -> dict[str, Any]:
     """Shared GET wrapper that maps HTTP/transport errors to typed exceptions."""
 
@@ -209,9 +211,10 @@ async def _get_json(
         raise SupplierTransportError(f"TME HTTP {response.status_code}")
 
     try:
-        return response.json()
+        body: dict[str, Any] = response.json()
     except json.JSONDecodeError as exc:
         raise SupplierParseError(f"TME non-JSON response: {exc}") from exc
+    return body
 
 
 def _extract_price_breaks(data_row: dict[str, Any]) -> list[SupplierPriceBreak]:

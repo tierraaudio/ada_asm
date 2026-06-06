@@ -86,8 +86,8 @@ async def list_errors_for_run(
     return [
         SupplierSyncErrorResponse(
             id=e.id,
-            run_id=e.run_id,  # type: ignore[arg-type]
-            component_id=e.component_id,  # type: ignore[arg-type]
+            run_id=e.run_id,
+            component_id=e.component_id,
             supplier=e.supplier,
             error_code=e.error_code,
             error_message=e.error_message,

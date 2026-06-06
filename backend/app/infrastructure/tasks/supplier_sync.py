@@ -374,7 +374,7 @@ def _build_adapter_for(code: str) -> SupplierAdapter | None:
     return None
 
 
-@celery_app.task(name="supplier_sync.sync_one_supplier", bind=True, max_retries=3)
+@celery_app.task(name="supplier_sync.sync_one_supplier", bind=True, max_retries=3)  # type: ignore[untyped-decorator]
 def sync_one_supplier(
     self: object,
     supplier_code: str,
@@ -406,7 +406,7 @@ def sync_one_supplier(
     return str(run_id)
 
 
-@celery_app.task(name="supplier_sync.run_daily_sync")
+@celery_app.task(name="supplier_sync.run_daily_sync")  # type: ignore[untyped-decorator]
 def run_daily_sync() -> list[str]:
     """Beat-triggered orchestrator. Enqueues one `sync_one_supplier` task
     per enabled supplier so they run in parallel on the worker pool."""

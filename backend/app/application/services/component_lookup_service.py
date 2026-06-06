@@ -43,10 +43,10 @@ def _cache_key(mpn: str) -> str:
     return f"{_CACHE_KEY_PREFIX}:{mpn.strip().lower()}"
 
 
-_client: Redis | None = None
+_client: Redis[bytes] | None = None
 
 
-def _get_client() -> Redis:
+def _get_client() -> Redis[bytes]:
     global _client
     if _client is None:
         _client = redis_async.from_url(
@@ -56,7 +56,7 @@ def _get_client() -> Redis:
     return _client
 
 
-def _set_client(client: Redis | None) -> None:
+def _set_client(client: Redis[bytes] | None) -> None:
     """Test seam: inject a fakeredis client and reset between tests."""
     global _client
     _client = client
@@ -128,13 +128,13 @@ def _merge_fields(quotes: list[SupplierQuote]) -> LookupFields:
         take("current_price_per_100_eur", _price_per_100(quote))
 
     return LookupFields(
-        name=merged.get("name"),  # type: ignore[arg-type]
-        description=merged.get("description"),  # type: ignore[arg-type]
-        manufacturer=merged.get("manufacturer"),  # type: ignore[arg-type]
-        family_hint=merged.get("family_hint"),  # type: ignore[arg-type]
-        datasheet_url=merged.get("datasheet_url"),  # type: ignore[arg-type]
-        package=merged.get("package"),  # type: ignore[arg-type]
-        current_price_per_100_eur=merged.get("current_price_per_100_eur"),  # type: ignore[arg-type]
+        name=merged.get("name"),
+        description=merged.get("description"),
+        manufacturer=merged.get("manufacturer"),
+        family_hint=merged.get("family_hint"),
+        datasheet_url=merged.get("datasheet_url"),
+        package=merged.get("package"),
+        current_price_per_100_eur=merged.get("current_price_per_100_eur"),
     )
 
 
@@ -225,8 +225,8 @@ async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupRespo
         found=True,
         fields=fields,
         supplier_data=supplier_data,
-        sources_consulted=consulted,  # type: ignore[arg-type]
-        sources_succeeded=succeeded,  # type: ignore[arg-type]
+        sources_consulted=consulted,
+        sources_succeeded=succeeded,
         missing_fields=_missing_fields(fields),
     )
 
