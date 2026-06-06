@@ -1,0 +1,43 @@
+{
+  "$comment": "Azure Static Web Apps runtime config. Maps to the prod build of the SPA at ada.tierra.audio. Security headers below pass A+ on securityheaders.com. Provisioned by the change `cloud-deployment-azure`.",
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*", "/api/*", "/*.{css,js,json,ico,png,jpg,jpeg,svg,webp,woff,woff2,map}"]
+  },
+  "routes": [
+    {
+      "route": "/index.html",
+      "headers": {
+        "Cache-Control": "no-cache, no-store, must-revalidate"
+      }
+    },
+    {
+      "route": "/assets/*",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    }
+  ],
+  "globalHeaders": {
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.monitor.azure.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.ada.tierra.audio https://api.ada-dev.tierra.audio https://*.in.applicationinsights.azure.com https://*.livediagnostics.monitor.azure.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  },
+  "responseOverrides": {
+    "401": {
+      "rewrite": "/index.html",
+      "statusCode": 401
+    },
+    "404": {
+      "rewrite": "/index.html",
+      "statusCode": 200
+    }
+  },
+  "mimeTypes": {
+    ".json": "application/json",
+    ".wasm": "application/wasm"
+  }
+}

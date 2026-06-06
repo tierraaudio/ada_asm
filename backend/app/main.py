@@ -73,6 +73,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     api_errors.install(app)
     app.include_router(api_v1_router)
+
+    # Observability — OpenTelemetry → Azure Monitor (App Insights).
+    # No-op when `APPLICATIONINSIGHTS_CONNECTION_STRING` is absent so
+    # local dev and tests are unchanged. Init AFTER routers are mounted
+    # so FastAPI's auto-instrumentation can introspect the route table.
+    from app.infrastructure import observability
+
+    observability.init(app=app, settings=settings)
+
     return app
 
 

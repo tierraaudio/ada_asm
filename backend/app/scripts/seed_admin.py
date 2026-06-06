@@ -24,10 +24,32 @@ from app.infrastructure.security import hash_password
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Seed the first administrator user.")
-    parser.add_argument("--email", required=True)
-    parser.add_argument("--password", required=True)
+    # CLI args are optional in the cloud invocation path — the Container
+    # App Job (`caj-ada-asm-seed-admin-<env>`) sources email + password
+    # from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` env vars (mapped
+    # from Key Vault). Local CLI usage still requires both.
+    parser.add_argument("--email", default=None)
+    parser.add_argument("--password", default=None)
     parser.add_argument("--full-name", default="Admin User")
     return parser
+
+
+def _resolve_credentials(
+    cli_email: str | None, cli_password: str | None
+) -> tuple[str, str]:
+    """CLI args win over env. Env-only path supports the cloud Job."""
+    import os
+
+    email = cli_email or os.environ.get("SEED_ADMIN_EMAIL")
+    password = cli_password or os.environ.get("SEED_ADMIN_PASSWORD")
+    if not email or not password:
+        msg = (
+            "seed_admin: email and password are required. "
+            "Pass --email/--password OR set "
+            "SEED_ADMIN_EMAIL/SEED_ADMIN_PASSWORD env vars."
+        )
+        raise SystemExit(msg)
+    return email, password
 
 
 def _validate_password(password: str) -> None:
@@ -71,7 +93,8 @@ async def _seed(email: str, password: str, full_name: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
-    return asyncio.run(_seed(args.email, args.password, args.full_name))
+    email, password = _resolve_credentials(args.email, args.password)
+    return asyncio.run(_seed(email, password, args.full_name))
 
 
 if __name__ == "__main__":  # pragma: no cover

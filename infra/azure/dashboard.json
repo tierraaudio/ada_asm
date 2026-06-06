@@ -1,0 +1,80 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2020-09-01-preview/portalDashboard.json",
+  "_comment": "Tile layout for the ada_asm App Insights dashboard. Provisioned by modules/dashboard.bicep. Each tile pins a kusto query against the linked App Insights instance.",
+  "lenses": {
+    "0": {
+      "order": 0,
+      "parts": {
+        "0": {
+          "_comment": "Backend p50/p95/p99 latency tile",
+          "position": { "x": 0, "y": 0, "colSpan": 6, "rowSpan": 4 },
+          "metadata": {
+            "type": "Extension/AppInsightsExtension/PartType/AnalyticsLineChartPart",
+            "settings": {
+              "content": {
+                "Query": "requests | where cloud_RoleName == 'ada-asm-backend' | summarize p50=percentile(duration,50), p95=percentile(duration,95), p99=percentile(duration,99) by bin(timestamp, 5m)",
+                "Dimensions": { "xAxis": "timestamp" }
+              }
+            }
+          }
+        },
+        "1": {
+          "_comment": "Backend HTTP 5xx rate tile",
+          "position": { "x": 6, "y": 0, "colSpan": 6, "rowSpan": 4 },
+          "metadata": {
+            "type": "Extension/AppInsightsExtension/PartType/AnalyticsLineChartPart",
+            "settings": {
+              "content": {
+                "Query": "requests | where cloud_RoleName == 'ada-asm-backend' | summarize total=count(), errors=countif(resultCode startswith '5') by bin(timestamp, 5m) | extend error_rate = todouble(errors) / total"
+              }
+            }
+          }
+        },
+        "2": {
+          "_comment": "Supplier sync success rate per day",
+          "position": { "x": 0, "y": 4, "colSpan": 6, "rowSpan": 4 },
+          "metadata": {
+            "type": "Extension/AppInsightsExtension/PartType/AnalyticsLineChartPart",
+            "settings": {
+              "content": {
+                "Query": "customEvents | where name == 'supplier_sync.run.finalised' | summarize success=countif(customDimensions.status=='success'), total=count() by bin(timestamp, 1d), tostring(customDimensions.supplier)"
+              }
+            }
+          }
+        },
+        "3": {
+          "_comment": "Redis cache hit ratio on /components/lookup",
+          "position": { "x": 6, "y": 4, "colSpan": 6, "rowSpan": 4 },
+          "metadata": {
+            "type": "Extension/AppInsightsExtension/PartType/AnalyticsLineChartPart",
+            "settings": {
+              "content": {
+                "Query": "customEvents | where name in ('supplier_lookup.cache.hit', 'supplier_lookup.cache.miss') | summarize hits=countif(name=='supplier_lookup.cache.hit'), misses=countif(name=='supplier_lookup.cache.miss') by bin(timestamp, 1h) | extend hit_ratio = todouble(hits) / (hits + misses)"
+              }
+            }
+          }
+        },
+        "4": {
+          "_comment": "Frontend page views + bounce rate",
+          "position": { "x": 0, "y": 8, "colSpan": 12, "rowSpan": 4 },
+          "metadata": {
+            "type": "Extension/AppInsightsExtension/PartType/AnalyticsLineChartPart",
+            "settings": {
+              "content": {
+                "Query": "pageViews | summarize views=count(), unique_users=dcount(user_Id) by bin(timestamp, 1h), name | order by timestamp desc"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "metadata": {
+    "model": {
+      "timeRange": {
+        "value": { "relative": { "duration": 24, "timeUnit": 1 } },
+        "type": "MsPortalFx.Composition.Configuration.ValueTypes.TimeRange"
+      }
+    }
+  }
+}

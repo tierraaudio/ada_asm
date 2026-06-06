@@ -6,7 +6,12 @@ import { BrowserRouter } from "react-router-dom";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { App } from "@/App";
 import { AuthBootstrap } from "@/features/auth/AuthBootstrap";
+import { init as initTelemetry } from "@/lib/telemetry";
 import "@/styles/globals.css";
+
+// Telemetry first — wires Application Insights when configured. No-op
+// locally so `pnpm dev` keeps working without env tweaks.
+initTelemetry(import.meta.env.VITE_APP_INSIGHTS_CONNECTION_STRING);
 
 const queryClient = new QueryClient({
   defaultOptions: {

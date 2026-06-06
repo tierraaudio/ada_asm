@@ -1,0 +1,108 @@
+name: deploy-frontend
+
+# Push to `main` touching FE code → vitest + build + SWA deploy.
+# Manual dispatch supports targeting `dev` explicitly.
+#
+# Build env vars (`VITE_API_URL`, `VITE_APP_INSIGHTS_CONNECTION_STRING`)
+# are fetched from the Azure Key Vault for the target environment using
+# OIDC federated identity — no static GitHub secret for them.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "staticwebapp.config.json"
+      - ".github/workflows/deploy-frontend.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [dev, prod]
+        default: dev
+
+concurrency:
+  group: deploy-frontend-${{ github.event.inputs.environment || 'prod' }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TARGET_ENV: ${{ github.event.inputs.environment || 'prod' }}
+
+jobs:
+  quality-and-deploy:
+    name: vitest + build + SWA deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Vitest (with 80% coverage gate)
+        working-directory: frontend
+        run: pnpm test --run --coverage
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resolve build-time env vars from Key Vault
+        id: env
+        run: |
+          set -euo pipefail
+          KV="kv-ada-asm-${{ env.TARGET_ENV }}"
+          AI_CONN=$(az keyvault secret show --vault-name "$KV" --name app-insights-connection-string --query value -o tsv)
+          if [ "${{ env.TARGET_ENV }}" = "prod" ]; then
+            API_URL="https://api.ada.tierra.audio"
+          else
+            API_URL="https://api.ada-dev.tierra.audio"
+          fi
+          # Mask the connection string in workflow logs.
+          echo "::add-mask::$AI_CONN"
+          echo "ai_connection_string=$AI_CONN" >> "$GITHUB_OUTPUT"
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Build SPA
+        working-directory: frontend
+        env:
+          VITE_API_URL: ${{ steps.env.outputs.api_url }}
+          VITE_APP_INSIGHTS_CONNECTION_STRING: ${{ steps.env.outputs.ai_connection_string }}
+          VITE_ENV: ${{ env.TARGET_ENV }}
+        run: pnpm run build
+
+      - name: Resolve SWA deployment token
+        id: swa
+        run: |
+          KV="kv-ada-asm-${{ env.TARGET_ENV }}"
+          TOKEN=$(az keyvault secret show --vault-name "$KV" --name swa-deployment-token --query value -o tsv)
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to Static Web App
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          app_location: "frontend/dist"
+          api_location: ""
+          output_location: ""
+          skip_app_build: true

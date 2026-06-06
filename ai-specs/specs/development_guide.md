@@ -70,13 +70,43 @@ Inserts ten Figma-flavoured components (ACS712, BME280, ESP32-WROOM-32E, …) pl
 
 ### Seed sample modules (optional, dev only)
 
-After seeding components, populate the `/modules` catalogue with the three reusable assemblies from the Figma (Módulo Sensor Ambiental, Etapa Driver, Sistema Potencia BLDC) — the seed also wires the DAG (Sistema Potencia BLDC contains Etapa Driver as a sub-module + the STM32 MCU is shared with Sensor Ambiental):
+After seeding components, populate the `/modules` catalogue:
 
 ```bash
 docker compose run --rm backend python -m app.scripts.seed_modules
 ```
 
-Pass `--reset` to truncate `module_children` + `modules` first. The script exits with 3 if the referenced components aren't already seeded; exits with 2 if `modules` is non-empty without `--reset`.
+Inserts ten modules covering all four families (Board · Device · Bundle · Case) and wires the DAG between them (e.g. the Dron bundle contains the BLDC power system + DAQ device + sensor boards, sub-modules and shared leaf components, so the recursive aggregates and "Pertenece a" navigation have something to chew on). Also creates ~36 module-level `stock_events` with kinds `fabricated` (assembly cost lines) and `delivered` (customer shipments, denormalised customer name).
+
+Pass `--reset` to wipe module-level state before re-seeding: deletes `stock_events WHERE module_id IS NOT NULL` (component-level stock events are preserved), `module_children`, then `modules`. Exits with 3 if components aren't already seeded; exits with 2 if `modules` is non-empty without `--reset`.
+
+### Seed sample projects + customers (optional, dev only)
+
+After seeding components and modules, populate the `/projects` catalogue (top of the asset tree):
+
+```bash
+docker compose run --rm backend python -m app.scripts.seed_projects
+```
+
+Inserts 3 Holded-style customers (`HLD-CUST-001/002/003`) and 5 projects covering every status from the Spanish enum — `Presupuestado` (empty BOM), 2 × `En proceso` (mixed module + component BOMs), `Completado` (with `fecha_entrega_real` set), `Archivado`. Every project carries an `icon` (emoji), `color` (hex), `tags`, and `version`. Also writes ~6 interest links (`{name, url}`) across the projects so the "Enlaces de interés" surface has rows, and ~6 consumption `stock_events` so "Histórico de eventos" is populated.
+
+Pass `--reset` to wipe (in order) `stock_events WHERE project_id IS NOT NULL`, `project_children`, `projects`, and `customers` before re-seeding (modules + components survive). The `project_interest_links` rows are cascaded by the FK on `project_children → projects`, so they're wiped automatically. Exits with 3 if components or modules aren't seeded yet; exits with 2 if `projects` is non-empty without `--reset`.
+
+#### Project status enum
+
+The `projects.status` enum is in Spanish to match the FE labels verbatim — no translation layer in either direction:
+
+`Presupuestado` · `Esperando` · `En proceso` · `Completado` · `Archivado`
+
+Soft-delete (`DELETE /api/v1/projects/{id}`) transitions to `Archivado`. The PATCH endpoint auto-fills `fecha_entrega_real` with today's date when the status transitions to `Completado` and the request body does not provide an explicit value.
+
+### Env: `HOLDED_BASE_URL`
+
+The `Customer` entity is an id-link to Holded; the FE builds the customer URL as `${HOLDED_BASE_URL}/contact/{holded_id}` unless the row provides an explicit `holded_url` override.
+
+- **Default**: `https://app.holded.com`.
+- **Override**: set `HOLDED_BASE_URL` in `.env`.
+- **Surfaced to the FE**: `GET /api/v1/config` returns `{holded_base_url}`; the FE caches it via TanStack Query with a 10-minute `staleTime`.
 
 ### Password recovery in development
 
@@ -167,6 +197,117 @@ Two workflows live under `.github/workflows/`:
 ### Branch protection
 
 Intentionally **not** enabled. The project follows a direct-to-`main` workflow: commits and merges land on `main` without a required PR review or required status checks. CI still runs on every push to `main` (and on any PR that does get opened), and red CI is treated as a strong signal to revert or hotfix — but it does not mechanically block merges. Revisit if the team grows beyond direct trusted contributors.
+
+## 8b. Supplier sync (change `supplier-sync`)
+
+The backend monitors stock + prices across 5 distributors (Mouser, DigiKey, TME, Farnell, RS Online). A Celery Beat job hits each enabled supplier daily and a synchronous `/components/lookup?mpn=` endpoint pre-fills the new-component form.
+
+### Environment variables
+
+| Var | Purpose | Default / shape |
+|---|---|---|
+| `MOUSER_API_KEY` | Mouser Search API key. Whitelist your egress public IP at `mouser.com/api-hub/` when applying. | — |
+| `DIGIKEY_CLIENT_ID` / `DIGIKEY_CLIENT_SECRET` | OAuth2 client credentials from `developer.digikey.com`. Enable Product Information V4 on the app. | — |
+| `DIGIKEY_OAUTH_TOKEN_URL` | Token endpoint. | `https://api.digikey.com/v1/oauth2/token` |
+| `TME_TOKEN` / `TME_APP_SECRET` | **V2** uses HTTP Basic auth: `TME_TOKEN` is the 50-character string (Basic-auth username), `TME_APP_SECRET` is the 20-character string (password). The naming on TME's portal is misleading — what they call "Application secret" is the password here. | — |
+| `FARNELL_API_KEY` / `FARNELL_STORE_ID` | element14 Search API. Store ID drives the currency: `es.farnell.com` → EUR, `uk.farnell.com` → GBP (auto-converted via ECB FX). | `es.farnell.com` |
+| `RS_API_KEY` | Pending — RS does not self-serve. Email your RS commercial rep to request an App ID. | — |
+| `SUPPLIER_SYNC_ENABLED_SUPPLIERS` | Comma-separated supplier codes that may be queried. | `mouser,digikey,tme,farnell` (RS off until credentials arrive) |
+| `SUPPLIER_LOOKUP_PRIORITY` | Order in which `/components/lookup` walks suppliers. Higher priority wins on overlapping fields. | `mouser,digikey,tme,farnell,rs` |
+| `SUPPLIER_LOOKUP_CACHE_TTL_SECONDS` | Redis cache TTL for `/components/lookup`. | `900` |
+| `SUPPLIER_SYNC_DAILY_HOUR_UTC` | Beat schedule hour for the daily sync. | `3` |
+
+A supplier ships disabled if it is **absent from `SUPPLIER_SYNC_ENABLED_SUPPLIERS`** OR its credentials are not present in `.env`. The registry silently skips disabled suppliers (no crash) and logs an INFO line.
+
+### Inspecting and triggering syncs
+
+```bash
+# List the most recent sync runs (admin-only, requires bearer token):
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18000/api/v1/supplier-sync/runs?limit=20"
+
+# Drill into one run's per-component errors:
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18000/api/v1/supplier-sync/runs/<run_uuid>/errors"
+
+# Fire an ad-hoc sync for one supplier (returns 202 with `run_id` + `task_id`):
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18000/api/v1/supplier-sync/runs?supplier=mouser"
+```
+
+### Adapter onboarding — where to fetch credentials
+
+| Supplier | Portal | Auth model | Friction |
+|---|---|---|---|
+| Mouser | `mouser.com/api-hub/` | API key in query string; whitelist egress IP | 🟢 ~5 min (key by email) |
+| TME | `developers.tme.eu` (needs existing tme.eu customer account) | V2 OAuth2 client_credentials via HTTP Basic | 🟢 ~10 min (uses 600s temporary token from www.tme.eu) |
+| Farnell / element14 | `partner.element14.com` | API key in query string (`callInfo.apiKey`) | 🟡 ~15 min (self-serve) |
+| DigiKey | `developer.digikey.com` | OAuth2 client_credentials | 🟡 ~30-45 min (Sandbox → Production promote) |
+| RS Online | not self-serve — email RS commercial rep | App ID in header | 🔴 days |
+
+### Lookup endpoint
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:18000/api/v1/components/lookup?mpn=NE555P"
+```
+
+Walks the enabled suppliers in priority order, merges fields progressively (empty strings from a higher-priority supplier are treated as missing so the next supplier can fill the gap), and caches the result in Redis for 15 minutes. Pass `&force_refresh=true` to bypass.
+
+## 8c. Cloud deployment (Azure)
+
+The change `cloud-deployment-azure` introduced the Azure-hosted production environment. Everything lives in one Azure tenant under `westeurope`.
+
+### Topology
+
+```
+                ┌─ ada.tierra.audio ────────► Azure Static Web App (React SPA)
+internet ──────►│
+                └─ api.ada.tierra.audio ────► Azure Container App (FastAPI backend)
+                                              │
+                                              ├─► Azure Container App (Celery worker)
+                                              ├─► Container App Job: caj-ada-asm-<env>-beat-cron (KEDA cron 03:00 UTC daily)
+                                              ├─► Container App Job: caj-ada-asm-<env>-migrate (deploy-gated)
+                                              └─► Container App Job: caj-ada-asm-<env>-seed-admin (one-shot)
+
+                Postgres Flexible Server  ◄── all backend + worker + jobs
+                Azure Cache for Redis     ◄── broker, rate limit, FX cache, lookup cache
+                Key Vault                 ◄── all secrets, RBAC, soft-delete + purge
+                Application Insights      ◄── traces, RUM, logs, dashboard, 5xx alert
+```
+
+### IaC + deploy
+
+- Templates live under [`infra/azure/`](../../infra/azure/) — see its [README](../../infra/azure/README.md) for the layout, costs, and naming convention.
+- All resources are deployed via Bicep from `infra/azure/main.bicep`, parameterised by `dev` or `prod`.
+- Deploys run from GitHub Actions via OIDC Workload Identity Federation — **no long-lived service principal secrets** are stored in GitHub Secrets. The three deploy workflows are:
+  - [`.github/workflows/deploy-backend.yml`](../../.github/workflows/deploy-backend.yml) — runs on push to `main` touching `backend/**`.
+  - [`.github/workflows/deploy-frontend.yml`](../../.github/workflows/deploy-frontend.yml) — runs on push to `main` touching `frontend/**`.
+  - [`.github/workflows/deploy-infra.yml`](../../.github/workflows/deploy-infra.yml) — manual `workflow_dispatch` ONLY.
+
+### Env-var differences vs. local
+
+| Local (`.env`) | Cloud (Key Vault → Container Apps) |
+| --- | --- |
+| `JWT_SECRET=change-me-in-env` | `secretRef:jwt-secret` |
+| `DATABASE_URL=postgresql+asyncpg://ada_asm:ada_asm@postgres:5432/ada_asm` | `secretRef:database-url` (with `?ssl=require` on the Azure FQDN) |
+| `CELERY_BROKER_URL=redis://redis:6379/0` | `secretRef:celery-broker-url` (with `rediss://` for TLS) |
+| Supplier API keys plaintext in `.env` | `secretRef:<supplier>-*-key` |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` (absent → observability is no-op) | `secretRef:app-insights-connection-string` |
+| `ENVIRONMENT_NAME=local` | `ENVIRONMENT_NAME=dev` or `prod` |
+
+### Runbooks
+
+- [DNS cutover](../../infra/azure/RUNBOOK_DNS_CUTOVER.md) — the one-time procedure for moving `ada.tierra.audio` from the legacy `134.0.10.173` redirect to the new Azure infra.
+- [Secret rotation](../../infra/azure/RUNBOOK_SECRET_ROTATION.md) — per-secret rotation procedures with concrete `az` commands.
+- [Incident response](../../infra/azure/RUNBOOK_INCIDENT_RESPONSE.md) — what to do when the 5xx alert fires.
+
+### Celery Beat is gone
+
+The change `cloud-deployment-azure` REMOVED the `celery_beat` container from `docker-compose.yml`. The daily supplier sync is now invoked by:
+
+- **Cloud**: a KEDA cron Container App Job at 03:00 UTC.
+- **Local**: `make daily-sync` (calls `python -m app.scripts.cron_run_daily_sync`).
 
 ## 9. Where the rest of the documentation lives
 

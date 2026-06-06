@@ -127,6 +127,94 @@ frontend/
 └── .dockerignore
 ```
 
+## Shared Primitives (`features/shared/`)
+
+Cross-feature reusable React components live under `features/shared/`. **These are the source of truth — do NOT fork them per feature.** A feature that needs a behaviour close-but-different from a shared primitive should either extend the prop API of the existing primitive (preferred) or surface the need for refactor in PR review. The current catalogue:
+
+### `features/shared/badges/`
+Compositional building blocks for any catalogue surface (list rows, detail header, "Pertenece a" / "Usado en proyectos" sections):
+
+| Primitive | Used by | Notes |
+|---|---|---|
+| `FamilyChip` | components + modules tables, detail headers | Generic taxonomy chip with hover Tooltip + truncate + `title=` fallback. Accepts `label` override for shortening long names (e.g. "Fuentes de alimentación" → "F. Alimentación") while keeping the tooltip canonical. |
+| `NatoScoreBadge` | components, modules, projects (aggregated) | Score badge `A+ / A / B / C / D / F` with color mapping. |
+| `TierBadge` | components, modules detail, projects aggregated | Tier badge `1..4` (1 = worst). |
+| `StockStatusBadge` | components + modules + project rows | Stock-level pill with green / amber / red status and supplier-stock tooltip breakdown. Consumes the `supplier_stock_summary` server-hydrated payload. |
+| `NatoScoringSummaryCard` | component + module detail header | Right-side card showing aggregated NATO + tier + expiry. |
+| `ProjectsHierarchyRow` | component + module detail "Usado en proyectos" sections | Flat clickable row (no expand) that navigates to `/projects/{id}`. |
+
+### `features/shared/ui/`
+Generic UI primitives that don't belong to a domain badge:
+
+| Primitive | Used by | Notes |
+|---|---|---|
+| `TruncatedText` | every list / hierarchy table name cell | Single-line ellipsis + Radix Tooltip with full text on hover + `title=` fallback. Mandatory on any cell where the name could be clipped — keeps the UX identical across Projects · Modules · Components tables. |
+
+### `features/shared/nav/`
+Cross-page navigation chrome shared by all detail/edit pages:
+
+| Primitive | Used by | Notes |
+|---|---|---|
+| `DetailPageHeader` | Component + Module + Project detail/edit (8 pages) | Sticky top bar with `X` close + `<` `>` nav-stack controls + right action slot. Pinned with `top-0 z-10 -mx-6`; opaque background (`bg-page-bg`) plus a hairline bottom shadow so scrolled content can't bleed through. |
+| `DetailNavStack` (context provider) + `DetailNavControls` + `useDetailNavPush` | App.tsx (provider) · every detail/edit page (push) | In-memory back/forward stack capped at 15 entries — supports jumps like Component → "Pertenece a" → Module → "Usado en proyectos" → Project. Stack is reset when the user closes via the `X` and returns to a list. |
+
+### `features/shared/filters/`
+| Primitive | Used by | Notes |
+|---|---|---|
+| `FiltersDrawer` | Projects + Modules + Components lists | Generic drawer with `groups + value + onApply + onClear` props. Each filter group is `{ key, title, options: [{value,label}] }`. Used for `status[]` / `family[]` / `customer_id[]` / `tipo_almacenamiento[]` / `include_archived` toggle. |
+
+### `features/shared/charts/`
+| Primitive | Used by | Notes |
+|---|---|---|
+| `HistoricoPreciosChart` | component + module + project detail | Recharts line chart with `mode: "supplier-breakdown" \| "module-aggregate"`. |
+| `PeriodToggle` | the chart's parent | `week / month / year` switch. |
+
+### `features/shared/enums.ts` + `rubrics.ts`
+Constants of domain (NATO scores, tiers, storage types) and the human-readable rubric copy used by the badges' hover tooltips. **Do not redefine these in feature modules.**
+
+## Cross-feature primitives that live in a feature folder by historical accident
+
+A few primitives that started life inside a domain feature have become reused by other features. They are intentionally NOT moved to `features/shared/` because their internals couple to one entity, but their **public API is generic**:
+
+| Primitive | Lives in | Reused by | Public contract |
+|---|---|---|---|
+| `ModulesHierarchyTable` | `features/modules/components/` | modules list, module detail "Contiene", module edit "Contiene" (with `onRemoveChild`), project detail "Contiene", project edit "Contiene" (with `onRemoveChild`), component detail "Pertenece a" (via `rows` prop) | Polymorphic: accepts `rows: ModuleSummary[]` (top-level) **OR** `directChildren: HierarchyChild[]` (BOM edges with XOR child_module / child_component). Structural `HierarchyChild` type so both `ModuleChild` and `ProjectChild` satisfy it. `onRemoveChild` callback gates whether the inline "Acciones" column renders. |
+| `AddChildModal` | `features/modules/components/` | module edit "+ Añadir hijo", project edit "+ Añadir hijo" | Generalized props `parentId: string` + optional `parentLabel?: string` (no parent-kind discriminator — the callsite owns which mutation hook to call via `onConfirm`). |
+| `ConfirmDeleteDialog` | `features/components/components/` | every entity delete / archive / "Quitar de este padre" / "Eliminar enlace" | Generic confirm dialog with `title`, `description`, `confirmLabel`, `cancelLabel` props. Callers always pass explicit copy — no defaults rely on a single domain. |
+
+## Interaction Patterns (UX conventions)
+
+These are mandatory cross-the-app conventions established by the asset-tree changes. New surfaces should follow them.
+
+### 1. Row click navigates; no `Eye` button
+Every table row in the catalogue (`ProjectsListPage`, `ComponentsListPage`, `ModulesHierarchyTable`) is `role="button" tabIndex={0}` with `onClick` + `onKeyDown` (Enter / Space) that navigates to the entity detail page. There is no per-row eye button. Interactive descendants inside the row (chevron to expand, trash to detach) call `e.stopPropagation()` so the row's onClick doesn't fire.
+
+### 2. Delete / Archive lives in detail header only
+Destructive actions (`Eliminar componente`, `Eliminar módulo`, `Archivar proyecto`) only render inside the detail page's `DetailPageHeader` right slot — never as a per-row icon in lists. The dialog copy is always entity- and action-specific (never the generic "¿Eliminar componente?" default).
+
+**Exception**: in edit-mode hierarchy tables (where `onRemoveChild` is wired), the inline trash icon removes the parent→child *relationship* (not the entity). The dialog copy explicitly says "¿Quitar «X» de este padre?" + "Quitar".
+
+### 3. Detail and edit close via `X` → return to list + reset nav stack
+The `X` button in `DetailPageHeader` always navigates back to the entity's list (e.g. `/projects`) AND calls `resetNavStack()`. The `<` `>` arrows next to it move inside the in-session navigation stack.
+
+### 4. Sticky header
+The `DetailPageHeader` is `sticky top-0 z-10` with full-width background. Scrolling the page content scrolls underneath. Achieved by removing the `<main>` element's top padding (`px-6 pb-6` only) and the header negative-margining the side padding.
+
+### 5. Truncated names with tooltip
+Any name / description cell in a table uses `<TruncatedText>` so long names ellipsis-clip and reveal in a hover Tooltip with the full text.
+
+### 6. Soft-delete vs hard-delete
+Projects use soft-delete (transition to `Archivado` status). The list page filters Archived rows by default; the FiltersDrawer exposes an "Incluir archivados" toggle. Components and modules use hard-delete (no recovery).
+
+### 7. Spanish in UX, English in code
+Every user-visible string is in Spanish (labels, button text, dialog copy, empty states, validation messages). Code identifiers (variables, functions, types, classes, comments, log messages, file names) are in English. Enums that are user-visible (e.g. `ProjectStatus = "Presupuestado" | "En proceso" | ...`) intentionally use Spanish to match the labels verbatim and skip a translation layer.
+
+### 8. `Pertenece a` vs `Usado en proyectos`
+On a Component detail: "Pertenece a" lists modules that contain it; "Usado en proyectos" lists projects with a direct edge. On a Module detail: "Pertenece a" lists parent modules (DAG); "Usado en proyectos" lists projects with a direct edge to it. Two separate sections, two separate endpoints (`/parents` and `/projects-using`).
+
+### 9. Sub-entity CRUD inline
+The Project's "Enlaces de interés" is a sub-entity with full inline CRUD (add / edit / delete) directly inside both the detail and edit page header card (right column). Same component (`InterestLinksField`) drives both surfaces — disabled with a "save first" hint in create-mode.
+
 ## Coding Standards
 
 ### Language and Naming Conventions

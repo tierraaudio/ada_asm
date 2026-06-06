@@ -38,6 +38,8 @@ These files are the single source of truth:
 - `ai-specs/specs/data-model.md`
 - `ai-specs/specs/api-spec.yml`
 - `ai-specs/specs/development_guide.md`
+- `infra/azure/` — Bicep templates + runbooks for the Azure-hosted production environment (introduced by change `cloud-deployment-azure`).
+- `ai-specs/specs/development_guide.md`
 
 Templates are located under:
 

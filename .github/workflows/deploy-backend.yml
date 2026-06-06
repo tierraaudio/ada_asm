@@ -1,0 +1,171 @@
+name: deploy-backend
+
+# Triggers:
+# - Push to `main` touching backend code or this workflow file.
+# - Manual `workflow_dispatch` with an `environment` input (`dev` | `prod`).
+#
+# Pipeline:
+# 1. Run quality gates (ruff + mypy + pytest 80%) — fail fast.
+# 2. Build + push Docker image to GHCR.
+# 3. Authenticate to Azure via OIDC federated identity.
+# 4. Invoke the migrate Container App Job and wait — backend revision
+#    is NOT promoted if migration fails.
+# 5. Update the backend + worker Container Apps to the new image.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options: [dev, prod]
+        default: dev
+
+concurrency:
+  group: deploy-backend-${{ github.event.inputs.environment || 'prod' }}
+  cancel-in-progress: false # do NOT cancel a running deploy
+
+permissions:
+  id-token: write # OIDC token issuance
+  contents: read
+  packages: write # push to GHCR
+
+env:
+  TARGET_ENV: ${{ github.event.inputs.environment || 'prod' }}
+  IMAGE_REGISTRY: ghcr.io/tierraaudio
+  IMAGE_REPO: ghcr.io/tierraaudio/ada-asm-backend
+
+jobs:
+  quality:
+    name: lint + typecheck + tests
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ada_asm
+          POSTGRES_PASSWORD: ada_asm
+          POSTGRES_DB: ada_asm
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with: { version: latest }
+      - run: uv venv .venv && uv pip install -e ".[dev]"
+      - run: .venv/bin/ruff check .
+      - run: .venv/bin/mypy app/
+      - run: .venv/bin/alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+psycopg://ada_asm:ada_asm@localhost:5432/ada_asm
+      - run: .venv/bin/pytest tests/ --cov=app --cov-fail-under=80
+        env:
+          DATABASE_URL: postgresql+asyncpg://ada_asm:ada_asm@localhost:5432/ada_asm
+          CELERY_BROKER_URL: redis://localhost:6379/0
+          CELERY_RESULT_BACKEND: redis://localhost:6379/1
+          JWT_SECRET: ci-test-secret-${{ github.run_id }}
+
+  build-and-deploy:
+    name: build + migrate + deploy to ${{ github.event.inputs.environment || 'prod' }}
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_REPO }}:${{ github.sha }}
+            ${{ env.IMAGE_REPO }}:${{ env.TARGET_ENV }}-latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run migration job and wait
+        run: |
+          set -euo pipefail
+          RG="rg-ada-asm-${{ env.TARGET_ENV }}"
+          JOB="caj-ada-asm-${{ env.TARGET_ENV }}-migrate"
+          IMG="${{ env.IMAGE_REPO }}:${{ github.sha }}"
+          echo "Starting migrate job with $IMG"
+          EXECUTION=$(az containerapp job start \
+            --resource-group "$RG" \
+            --name "$JOB" \
+            --image "$IMG" \
+            --query "id" -o tsv)
+          echo "Execution: $EXECUTION"
+          # Poll until terminal state. Max 30 minutes.
+          for i in $(seq 1 60); do
+            STATUS=$(az containerapp job execution show \
+              --resource-group "$RG" \
+              --name "$JOB" \
+              --job-execution-name "$(basename "$EXECUTION")" \
+              --query "properties.status" -o tsv)
+            echo "[$i/60] status=$STATUS"
+            case "$STATUS" in
+              Succeeded) exit 0 ;;
+              Failed|Cancelled) exit 1 ;;
+              *) sleep 30 ;;
+            esac
+          done
+          echo "Migration timed out after 30 minutes"
+          exit 1
+
+      - name: Update backend Container App
+        run: |
+          RG="rg-ada-asm-${{ env.TARGET_ENV }}"
+          APP="ca-ada-asm-${{ env.TARGET_ENV }}-backend"
+          IMG="${{ env.IMAGE_REPO }}:${{ github.sha }}"
+          SUFFIX="r$(echo ${{ github.sha }} | head -c8)"
+          az containerapp update \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --image "$IMG" \
+            --revision-suffix "$SUFFIX"
+          # Multiple-revisions mode → flip 100% traffic to the new revision.
+          az containerapp ingress traffic set \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --revision-weight "latest=100"
+
+      - name: Update worker Container App
+        run: |
+          RG="rg-ada-asm-${{ env.TARGET_ENV }}"
+          APP="ca-ada-asm-${{ env.TARGET_ENV }}-worker"
+          IMG="${{ env.IMAGE_REPO }}:${{ github.sha }}"
+          SUFFIX="r$(echo ${{ github.sha }} | head -c8)"
+          az containerapp update \
+            --resource-group "$RG" \
+            --name "$APP" \
+            --image "$IMG" \
+            --revision-suffix "$SUFFIX"
