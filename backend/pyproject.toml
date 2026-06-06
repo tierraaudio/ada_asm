@@ -107,14 +107,14 @@ markers = ["unit: unit tests", "integration: integration tests", "e2e: end-to-en
 [tool.coverage.run]
 source = ["app"]
 branch = true
+concurrency = ["thread", "greenlet"]
 omit = ["app/__init__.py", "**/__init__.py"]
 
 [tool.coverage.report]
-# TEMP 79 (was 80): module-management section 4 sits at 79.85% because the
-# defensive branches in modules_service._collect_component_rollups (no-prefer
-# supplier, missing scoring) are hard to trigger end-to-end. Restore to 80
-# once section 12 adds the missing unit-test sweep.
-fail_under = 79
+# Coverage gate restored to 80 after the projects + customers integration
+# sweep + the `concurrency = ["thread", "greenlet"]` fix unblocked
+# coverage of every async router body.
+fail_under = 80
 show_missing = true
 skip_covered = false
 exclude_lines = [

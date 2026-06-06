@@ -117,7 +117,7 @@ class SqlAlchemyProjectRepository:
             stmt = stmt.where(ProjectModel.status.in_(list(filters.statuses)))
         elif not filters.include_archived:
             # Default behaviour — exclude Archived rows.
-            stmt = stmt.where(ProjectModel.status != "Archived")
+            stmt = stmt.where(ProjectModel.status != "Archivado")
 
         if filters.customer_ids:
             stmt = stmt.where(ProjectModel.customer_id.in_(list(filters.customer_ids)))
@@ -228,7 +228,7 @@ class SqlAlchemyProjectRepository:
         ).scalar_one_or_none()
         if row is None:
             return False
-        row.status = "Archived"
+        row.status = "Archivado"
         await self._session.flush()
         await self._session.commit()
         return True

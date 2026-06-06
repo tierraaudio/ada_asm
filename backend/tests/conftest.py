@@ -76,6 +76,8 @@ async def _truncate_auth_tables() -> AsyncIterator[None]:
                     "TRUNCATE TABLE refresh_tokens, "
                     "password_reset_tokens, scoring_alternatives, "
                     "scoring_classifications, component_nato_scorings, "
+                    "project_interest_links, project_children, projects, "
+                    "customers, "
                     "module_children, modules, "
                     "stock_events, supplier_stocks, supplier_prices, "
                     "components, suppliers, users RESTART IDENTITY CASCADE"

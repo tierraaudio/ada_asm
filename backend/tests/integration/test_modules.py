@@ -456,6 +456,49 @@ async def test_price_history_empty_when_no_descendants(
 # ---------- delete cascades children ----------
 
 
+async def test_list_module_stock_events_empty(
+    api_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    module = await _create_module(api_client, auth_headers)
+    response = await api_client.get(
+        f"/api/v1/modules/{module['id']}/stock-events", headers=auth_headers
+    )
+    assert response.status_code == 200
+    assert response.json()["items"] == []
+
+
+async def test_list_module_stock_events_unknown_returns_404(
+    api_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    response = await api_client.get(
+        "/api/v1/modules/00000000-0000-0000-0000-000000000000/stock-events",
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
+async def test_component_purchases_summary_empty_module(
+    api_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    module = await _create_module(api_client, auth_headers)
+    response = await api_client.get(
+        f"/api/v1/modules/{module['id']}/component-purchases-summary",
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+async def test_component_purchases_summary_unknown_returns_404(
+    api_client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    response = await api_client.get(
+        "/api/v1/modules/00000000-0000-0000-0000-000000000000/component-purchases-summary",
+        headers=auth_headers,
+    )
+    assert response.status_code == 404
+
+
 async def test_delete_module_cascades_children(
     api_client: AsyncClient,
     auth_headers: dict[str, str],
