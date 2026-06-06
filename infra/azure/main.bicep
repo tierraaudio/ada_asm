@@ -166,7 +166,8 @@ module containerApps 'modules/container_apps.bicep' = {
     postgresUrlTemplate: data.outputs.connectionUrlTemplate
     redisUrlTemplate: redis.outputs.connectionUrlTemplate
     keyVaultUri: keyvault.outputs.vaultUri
-    backendCustomDomain: apiCustomDomain
+    // backendCustomDomain removed — bind happens post-deploy via
+    // `az containerapp hostname add/bind`. See container_apps.bicep notes.
   }
 }
 

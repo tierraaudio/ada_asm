@@ -42,8 +42,8 @@ param keyVaultUri string
 @description('UAMI principal ID for the deploy identity. Not used directly here — Container Apps use their own system-assigned identities. Kept for cross-module wiring.')
 param deployIdentityPrincipalId string = ''
 
-@description('Custom domain to bind to the backend (e.g. `api.ada.tierra.audio`).')
-param backendCustomDomain string
+// Custom-domain binding is deferred to a post-deploy step (see notes
+// in the `ingress` block below).
 
 // ---- SKU sizing ----
 
@@ -111,14 +111,22 @@ resource backend 'Microsoft.App/containerApps@2024-03-01' = {
             weight: 100
           }
         ]
-        customDomains: [
-          {
-            name: backendCustomDomain
-            bindingType: 'SniEnabled'
-            // certificateId is set out-of-band by the managed-cert
-            // resource once the asuid TXT validates (handled by `dns.bicep`).
-          }
-        ]
+        // CUSTOM DOMAIN BIND DEFERRED: Bicep cannot create the
+        // `Microsoft.App/containerApps/customdomains/SniEnabled` binding
+        // in the same deploy as the Container App itself because:
+        //   1. SniEnabled requires `certificateId` of an already-issued cert.
+        //   2. The managed cert can only be issued AFTER the
+        //      `asuid.<host>` TXT record validates against the Container
+        //      Apps Environment's verificationId.
+        //   3. The Environment's verificationId is only available AFTER
+        //      the Container App is created.
+        //
+        // Post-deploy step (see RUNBOOK_DNS_CUTOVER.md):
+        //   az containerapp hostname add --resource-group $RG \
+        //     --name ca-ada-asm-<env>-backend --hostname <api-fqdn>
+        //   az containerapp hostname bind --resource-group $RG \
+        //     --name ca-ada-asm-<env>-backend --hostname <api-fqdn> \
+        //     --environment $ENV_NAME --validation-method CNAME
       }
       registries: [
         {
