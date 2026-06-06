@@ -24,11 +24,11 @@ param nameSuffix string
 @description('Container Apps Environment ID. Pass `network.outputs.environmentId`.')
 param environmentId string
 
-@description('Backend image reference, e.g. `ghcr.io/tierraaudio/ada-asm-backend:<sha>`. The deploy workflow overrides this on every run.')
-param backendImage string = 'ghcr.io/tierraaudio/ada-asm-backend:bootstrap'
+@description('Backend image reference, e.g. `ghcr.io/tierraaudio/ada-asm-backend:<sha>`. The deploy workflow overrides this on every run. The default is the MCR k8se quickstart so the first Bicep deploy can create the apps before any real image exists in GHCR.')
+param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Worker image — typically the same as backendImage; the worker just runs a different command.')
-param workerImage string = 'ghcr.io/tierraaudio/ada-asm-backend:bootstrap'
+param workerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Postgres SQLAlchemy URL. The caller fills in `{password}` with a Key Vault `secretRef:`.')
 param postgresUrlTemplate string

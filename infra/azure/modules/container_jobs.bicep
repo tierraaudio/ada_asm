@@ -23,8 +23,8 @@ param nameSuffix string
 @description('Container Apps Environment ID. Pass `network.outputs.environmentId`.')
 param environmentId string
 
-@description('Backend image reference shared with the long-running apps. Migrations + cron run against the same image because the entry-point scripts live in the backend container.')
-param backendImage string = 'ghcr.io/tierraaudio/ada-asm-backend:bootstrap'
+@description('Backend image reference shared with the long-running apps. Migrations + cron run against the same image because the entry-point scripts live in the backend container. The default is the MCR k8se quickstart placeholder so the first Bicep deploy can create the jobs before any real image exists in GHCR.')
+param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Key Vault URI to construct `keyVaultUrl:` references.')
 param keyVaultUri string

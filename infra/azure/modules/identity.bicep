@@ -57,11 +57,23 @@ resource githubFederation 'Microsoft.ManagedIdentity/userAssignedIdentities/fede
 // This is implicit in the entry above; we keep one entry for clarity.
 
 // Grant Contributor on the resource group so the deploy can create
-// every resource the Bicep template needs. Contributor explicitly does
-// NOT grant role assignment privileges (User Access Administrator is
-// needed for that) — and we want that boundary so the deploy can't
-// escalate its own permissions.
-resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+// every resource the Bicep template needs.
+//
+// IMPORTANT: this role assignment is CONDITIONAL because the
+// `bootstrap.sh` script (run from the operator's terminal before the
+// first Bicep deploy) ALREADY grants Contributor + Key Vault
+// Administrator + User Access Administrator + DNS Zone Contributor to
+// this same UAMI. Letting Bicep also create it triggers
+// `RoleAssignmentExists` because Azure treats (scope, principalId,
+// roleDefinition) as the uniqueness key regardless of the GUID name.
+//
+// Set `createRoleAssignment=true` ONLY in environments where the
+// bootstrap script was NOT run. Default is false to match the
+// documented bootstrap flow.
+@description('Whether to have Bicep also create the Contributor role assignment. Default false because bootstrap.sh creates it externally.')
+param createRoleAssignment bool = false
+
+resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignment) {
   scope: resourceGroup()
   name: guid(resourceGroup().id, deployIdentity.id, 'Contributor')
   properties: {

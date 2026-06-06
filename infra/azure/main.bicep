@@ -53,8 +53,8 @@ param legacyARecordCleanup bool = false
 @secure()
 param postgresAdminPassword string
 
-@description('Backend container image. The deploy workflow overrides on every run.')
-param backendImage string = 'ghcr.io/tierraaudio/ada-asm-backend:bootstrap'
+@description('Backend container image. The deploy workflow overrides on every run with the real GHCR tag. The default placeholder lets Bicep create Container Apps before any real image is built.')
+param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 // ============================================================================
 // Derived names
