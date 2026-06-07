@@ -1,5 +1,6 @@
 name: deploy-backend
 
+# Re-trigger after KV ghcr-pull-token rotation.
 # Triggers:
 # - Push to `main` touching backend code or this workflow file.
 # - Manual `workflow_dispatch` with an `environment` input (`dev` | `prod`).
