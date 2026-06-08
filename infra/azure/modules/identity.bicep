@@ -73,6 +73,12 @@ resource githubFederation 'Microsoft.ManagedIdentity/userAssignedIdentities/fede
 @description('Whether to have Bicep also create the Contributor role assignment. Default false because bootstrap.sh creates it externally.')
 param createRoleAssignment bool = false
 
+@description('ACR resource ID — scope for the AcrPush role assignment so the deploy UAMI can `docker push` to ACR via OIDC.')
+param acrId string
+
+@description('Built-in AcrPush role definition ID.')
+param acrPushRoleDefinitionId string
+
 resource roleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (createRoleAssignment) {
   scope: resourceGroup()
   name: guid(resourceGroup().id, deployIdentity.id, 'Contributor')
@@ -101,3 +107,24 @@ output identityResourceId string = deployIdentity.id
 
 @description('The exact OIDC subject claim the GitHub workflow runs as. Useful for debugging when adding new branches.')
 output expectedOidcSubject string = 'repo:${githubRepository}:ref:refs/heads/${githubBranch}'
+
+// ============================================================================
+// AcrPush role assignment for the deploy UAMI
+//
+// Scoped to the ACR resource so `az acr login --name <acr>` via OIDC
+// federation can push tags.
+// ============================================================================
+
+resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
+  name: last(split(acrId, '/'))
+}
+
+resource deployAcrPush 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: acr
+  name: guid(acrId, deployIdentity.id, acrPushRoleDefinitionId)
+  properties: {
+    roleDefinitionId: acrPushRoleDefinitionId
+    principalId: deployIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}

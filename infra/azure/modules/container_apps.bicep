@@ -2,8 +2,8 @@
 //
 // Per the spec:
 // - System-assigned managed identity on both apps (used to fetch Key
-//   Vault secrets at revision-start time).
-// - GHCR pull credential (one PAT shared between the two apps).
+//   Vault secrets at revision-start time AND to pull from ACR via the
+//   AcrPull role wired in acr.bicep).
 // - Backend has HTTP ingress + custom domain wiring + concurrency scaler;
 //   worker has no ingress + Redis-list-length scaler.
 // - Both source env vars from Key Vault via `secretRef:`.
@@ -24,11 +24,20 @@ param nameSuffix string
 @description('Container Apps Environment ID. Pass `network.outputs.environmentId`.')
 param environmentId string
 
-@description('Backend image reference, e.g. `ghcr.io/tierraaudio/ada-asm-backend:<sha>`. The deploy workflow overrides this on every run. The default is the MCR k8se quickstart so the first Bicep deploy can create the apps before any real image exists in GHCR.')
+@description('Backend image reference, e.g. `acradaasmdev.azurecr.io/ada-asm-backend:<sha>`. The deploy workflow overrides this on every run. The default is the MCR k8se quickstart so the first Bicep deploy can create the apps before any real image exists in ACR.')
 param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Worker image — typically the same as backendImage; the worker just runs a different command.')
 param workerImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
+@description('ACR login server (e.g. `acradaasmdev.azurecr.io`). Used to wire the `registries[]` block with identity-based pull.')
+param acrLoginServer string
+
+@description('ACR resource ID — scope for the AcrPull role assignments.')
+param acrId string
+
+@description('Built-in AcrPull role definition ID. Granted to backend + worker system MIs on the ACR scope.')
+param acrPullRoleDefinitionId string
 
 @description('Postgres SQLAlchemy URL. The caller fills in `{password}` with a Key Vault `secretRef:`.')
 param postgresUrlTemplate string
@@ -130,9 +139,10 @@ resource backend 'Microsoft.App/containerApps@2024-03-01' = {
       }
       registries: [
         {
-          server: 'ghcr.io'
-          username: 'tierraaudio-bot' // service account username; the PAT is the secret
-          passwordSecretRef: 'ghcr-pull-token'
+          // ACR pull via the Container App's system-assigned managed
+          // identity. The AcrPull role assignment lives in acr.bicep.
+          server: acrLoginServer
+          identity: 'system'
         }
       ]
       secrets: [
@@ -148,7 +158,6 @@ resource backend 'Microsoft.App/containerApps@2024-03-01' = {
         { name: 'tme-app-secret', keyVaultUrl: '${keyVaultUri}secrets/tme-app-secret', identity: 'system' }
         { name: 'farnell-api-key', keyVaultUrl: '${keyVaultUri}secrets/farnell-api-key', identity: 'system' }
         { name: 'rs-api-key', keyVaultUrl: '${keyVaultUri}secrets/rs-api-key', identity: 'system' }
-        { name: 'ghcr-pull-token', keyVaultUrl: '${keyVaultUri}secrets/ghcr-pull-token', identity: 'system' }
       ]
     }
     template: {
@@ -226,9 +235,8 @@ resource worker 'Microsoft.App/containerApps@2024-03-01' = {
       // No ingress — worker is queue-driven only.
       registries: [
         {
-          server: 'ghcr.io'
-          username: 'tierraaudio-bot'
-          passwordSecretRef: 'ghcr-pull-token'
+          server: acrLoginServer
+          identity: 'system'
         }
       ]
       secrets: backend.properties.configuration.secrets // same secret list as backend
@@ -300,3 +308,37 @@ output backendPrincipalId string = backend.identity.principalId
 output workerResourceId string = worker.id
 output workerName string = worker.name
 output workerPrincipalId string = worker.identity.principalId
+
+// ============================================================================
+// AcrPull role assignments
+//
+// Scoped to the ACR resource so backend + worker MIs can pull images.
+// Lives in this module (and not main.bicep) because Bicep requires the
+// role-assignment `name` expression to be calculable at deployment start,
+// which means the principalId MUST come from a resource declared in the
+// same module file — not from a cross-module output.
+// ============================================================================
+
+resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
+  name: last(split(acrId, '/'))
+}
+
+resource backendAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: acr
+  name: guid(acrId, backend.id, acrPullRoleDefinitionId)
+  properties: {
+    roleDefinitionId: acrPullRoleDefinitionId
+    principalId: backend.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource workerAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: acr
+  name: guid(acrId, worker.id, acrPullRoleDefinitionId)
+  properties: {
+    roleDefinitionId: acrPullRoleDefinitionId
+    principalId: worker.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}

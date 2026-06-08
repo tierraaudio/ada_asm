@@ -285,6 +285,18 @@ internet ──────►│
   - [`.github/workflows/deploy-frontend.yml`](../../.github/workflows/deploy-frontend.yml) — runs on push to `main` touching `frontend/**`.
   - [`.github/workflows/deploy-infra.yml`](../../.github/workflows/deploy-infra.yml) — manual `workflow_dispatch` ONLY.
 
+### Container Registry
+
+- Images live in a **per-environment Azure Container Registry** (Basic SKU):
+  - dev → `acradaasmdev.azurecr.io/ada-asm-backend:<sha>`
+  - prod → `acradaasmprod.azurecr.io/ada-asm-backend:<sha>` (created when prod is bootstrapped).
+- Container Apps + Jobs pull via their **system-assigned managed identity**, which holds the `AcrPull` role on the per-env ACR scope. **No PAT, no Key Vault secret, no `registries[].passwordSecretRef`** — `registries[].identity: 'system'` only.
+- The deploy UAMI (`id-deploy-ada-asm-<env>`) holds `AcrPush` on the same ACR scope. The GitHub workflow authenticates via OIDC (`azure/login@v2`) and then `az acr login --name acradaasm<env>` before `docker push`.
+- Role grants are wired in Bicep:
+  - `AcrPull` — created inside `infra/azure/modules/container_apps.bicep` (backend + worker) and `infra/azure/modules/container_jobs.bicep` (migrate + seed-admin + beat-cron). Lives in those modules because Bicep requires the role-assignment `name` expression to be calculable from same-module resources.
+  - `AcrPush` — created inside `infra/azure/modules/identity.bicep` for the deploy UAMI.
+- The previous GHCR pull path (`ghcr.io/tierraaudio/ada-asm-backend` + Key Vault `ghcr-pull-token`) was retired in change `pivot-ghcr-to-acr` after persistent auth quirks during dev bootstrap (org-scoped PAT permissions are non-deterministic; public-visibility flips don't propagate reliably).
+
 ### Env-var differences vs. local
 
 | Local (`.env`) | Cloud (Key Vault → Container Apps) |

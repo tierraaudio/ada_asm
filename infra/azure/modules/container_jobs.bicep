@@ -23,11 +23,20 @@ param nameSuffix string
 @description('Container Apps Environment ID. Pass `network.outputs.environmentId`.')
 param environmentId string
 
-@description('Backend image reference shared with the long-running apps. Migrations + cron run against the same image because the entry-point scripts live in the backend container. The default is the MCR k8se quickstart placeholder so the first Bicep deploy can create the jobs before any real image exists in GHCR.')
+@description('Backend image reference shared with the long-running apps. Migrations + cron run against the same image because the entry-point scripts live in the backend container. The default is the MCR k8se quickstart placeholder so the first Bicep deploy can create the jobs before any real image exists in ACR.')
 param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 @description('Key Vault URI to construct `keyVaultUrl:` references.')
 param keyVaultUri string
+
+@description('ACR login server (e.g. `acradaasmdev.azurecr.io`). Each Job pulls via its own system MI; AcrPull is granted below.')
+param acrLoginServer string
+
+@description('ACR resource ID — scope for the AcrPull role assignments.')
+param acrId string
+
+@description('Built-in AcrPull role definition ID. Granted to each Job system MI on the ACR scope.')
+param acrPullRoleDefinitionId string
 
 @description('Cron expression for the daily sync. Default 03:00 UTC.')
 param dailySyncCron string = '0 3 * * *'
@@ -46,16 +55,16 @@ var sharedSecrets = [
   { name: 'tme-app-secret', keyVaultUrl: '${keyVaultUri}secrets/tme-app-secret', identity: 'system' }
   { name: 'farnell-api-key', keyVaultUrl: '${keyVaultUri}secrets/farnell-api-key', identity: 'system' }
   { name: 'rs-api-key', keyVaultUrl: '${keyVaultUri}secrets/rs-api-key', identity: 'system' }
-  { name: 'ghcr-pull-token', keyVaultUrl: '${keyVaultUri}secrets/ghcr-pull-token', identity: 'system' }
   { name: 'seed-admin-email', keyVaultUrl: '${keyVaultUri}secrets/seed-admin-email', identity: 'system' }
   { name: 'seed-admin-password', keyVaultUrl: '${keyVaultUri}secrets/seed-admin-password', identity: 'system' }
 ]
 
 var sharedRegistries = [
   {
-    server: 'ghcr.io'
-    username: 'tierraaudio-bot'
-    passwordSecretRef: 'ghcr-pull-token'
+    // ACR pull via each Job's system-assigned managed identity.
+    // AcrPull role on the ACR scope is wired in acr.bicep.
+    server: acrLoginServer
+    identity: 'system'
   }
 ]
 
@@ -243,3 +252,41 @@ output beatCronJobPrincipalId string = beatCronJob.identity.principalId
 
 @description('Convenience: command line to start the migrate job from the deploy workflow.')
 output migrateJobStartCommand string = 'az containerapp job start --name ${migrateJob.name} --resource-group <rg>'
+
+// ============================================================================
+// AcrPull role assignments per Job
+// ============================================================================
+
+resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' existing = {
+  name: last(split(acrId, '/'))
+}
+
+resource migrateJobAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: acr
+  name: guid(acrId, migrateJob.id, acrPullRoleDefinitionId)
+  properties: {
+    roleDefinitionId: acrPullRoleDefinitionId
+    principalId: migrateJob.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource seedAdminJobAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: acr
+  name: guid(acrId, seedAdminJob.id, acrPullRoleDefinitionId)
+  properties: {
+    roleDefinitionId: acrPullRoleDefinitionId
+    principalId: seedAdminJob.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource beatCronJobAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: acr
+  name: guid(acrId, beatCronJob.id, acrPullRoleDefinitionId)
+  properties: {
+    roleDefinitionId: acrPullRoleDefinitionId
+    principalId: beatCronJob.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}

@@ -5,6 +5,12 @@
 // `prod` based on the `environment` parameter; SKU sizing and naming
 // are derived from it.
 //
+// Container registry: per-environment ACR (`mod-acr` → `acradaasm<env>`)
+// integrated with Container Apps' system-assigned managed identities via
+// the AcrPull role (granted inside `container_apps.bicep` and
+// `container_jobs.bicep`). The deploy UAMI gets AcrPush via
+// `identity.bicep`. No long-lived registry credentials live in Key Vault.
+//
 // Usage:
 //   az deployment group create \
 //     --resource-group rg-ada-asm-dev \
@@ -53,7 +59,7 @@ param legacyARecordCleanup bool = false
 @secure()
 param postgresAdminPassword string
 
-@description('Backend container image. The deploy workflow overrides on every run with the real GHCR tag. The default placeholder lets Bicep create Container Apps before any real image is built.')
+@description('Backend container image. The deploy workflow overrides on every run with the real ACR tag (e.g. `acradaasmdev.azurecr.io/ada-asm-backend:<sha>`). The default placeholder lets Bicep create Container Apps before any real image is built.')
 param backendImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
 
 // ============================================================================
@@ -147,6 +153,20 @@ module identity 'modules/identity.bicep' = {
     nameSuffix: nameSuffix
     githubRepository: githubRepository
     githubBranch: githubBranch
+    acrId: acr.outputs.acrId
+    acrPushRoleDefinitionId: acr.outputs.acrPushRoleDefinitionId
+  }
+}
+
+// ============================================================================
+// Azure Container Registry (per-environment)
+// ============================================================================
+
+module acr 'modules/acr.bicep' = {
+  name: 'mod-acr'
+  params: {
+    environment: environment
+    location: location
   }
 }
 
@@ -166,6 +186,9 @@ module containerApps 'modules/container_apps.bicep' = {
     postgresUrlTemplate: data.outputs.connectionUrlTemplate
     redisUrlTemplate: redis.outputs.connectionUrlTemplate
     keyVaultUri: keyvault.outputs.vaultUri
+    acrLoginServer: acr.outputs.loginServer
+    acrId: acr.outputs.acrId
+    acrPullRoleDefinitionId: acr.outputs.acrPullRoleDefinitionId
     // backendCustomDomain removed — bind happens post-deploy via
     // `az containerapp hostname add/bind`. See container_apps.bicep notes.
   }
@@ -184,6 +207,9 @@ module containerJobs 'modules/container_jobs.bicep' = {
     environmentId: network.outputs.environmentId
     backendImage: backendImage
     keyVaultUri: keyvault.outputs.vaultUri
+    acrLoginServer: acr.outputs.loginServer
+    acrId: acr.outputs.acrId
+    acrPullRoleDefinitionId: acr.outputs.acrPullRoleDefinitionId
   }
 }
 
@@ -281,3 +307,9 @@ output spaUrl string = 'https://${spaCustomDomain}'
 
 @description('Public API URL.')
 output apiUrl string = 'https://${apiCustomDomain}'
+
+@description('ACR login server. Used by the deploy workflow as `IMAGE_REGISTRY`.')
+output acrLoginServer string = acr.outputs.loginServer
+
+@description('ACR resource name (no .azurecr.io suffix). Used by the deploy workflow for `az acr login`.')
+output acrName string = acr.outputs.acrName

@@ -36,12 +36,11 @@ var secretNames = [
   'app-insights-connection-string'
   'seed-admin-email'
   'seed-admin-password'
-  'ghcr-pull-token'
   // Connection-string secrets referenced by Container Apps via
   // `secretRef`. Their values are populated post-deploy by the operator
-  // (the bootstrap.sh script + `az keyvault secret set` for the GHCR
-  // PAT) — Bicep cannot compute them inline without leaking the Postgres
-  // password and Redis key into the secret URL template at deploy time.
+  // (bootstrap.sh) — Bicep cannot compute them inline without leaking
+  // the Postgres password and Redis key into the secret URL template at
+  // deploy time.
   'database-url'
   'celery-broker-url'
 ]
