@@ -32,7 +32,8 @@ permissions:
   contents: read
 
 env:
-  TARGET_ENV: ${{ github.event.inputs.environment || 'prod' }}
+  # Default to `dev` on push triggers; `workflow_dispatch` can override to `prod`.
+  TARGET_ENV: ${{ github.event.inputs.environment || 'dev' }}
 
 jobs:
   quality-and-deploy:
