@@ -119,11 +119,21 @@ jobs:
           RG="rg-ada-asm-${{ env.TARGET_ENV }}"
           JOB="caj-ada-asm-${{ env.TARGET_ENV }}-migrate"
           IMG="${{ env.IMAGE_REPO }}:${{ github.sha }}"
-          echo "Starting migrate job with $IMG"
-          EXECUTION=$(az containerapp job start \
+          # IMPORTANT: update the Job's image in the resource definition FIRST,
+          # then `start` WITHOUT --image. Passing --image to `job start` wipes
+          # the rest of the container template (command, env), which would make
+          # the container fall back to the Dockerfile CMD (uvicorn) instead of
+          # running `alembic upgrade head`.
+          echo "Updating migrate Job image to $IMG"
+          az containerapp job update \
             --resource-group "$RG" \
             --name "$JOB" \
             --image "$IMG" \
+            --output none
+          echo "Starting migrate execution"
+          EXECUTION=$(az containerapp job start \
+            --resource-group "$RG" \
+            --name "$JOB" \
             --query "id" -o tsv)
           echo "Execution: $EXECUTION"
           # Poll until terminal state. Max 30 minutes.

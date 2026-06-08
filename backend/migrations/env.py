@@ -34,10 +34,12 @@ def _resolve_sync_url() -> str:
         raise RuntimeError("DATABASE_URL is not set; cannot run Alembic.")
     # Rewrite async driver to the sync one Alembic uses.
     if raw_url.startswith("postgresql+asyncpg://"):
-        return raw_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
-    if raw_url.startswith("postgresql://"):
-        return raw_url.replace("postgresql://", "postgresql+psycopg://", 1)
-    return raw_url
+        raw_url = raw_url.replace("postgresql+asyncpg://", "postgresql+psycopg://", 1)
+    elif raw_url.startswith("postgresql://"):
+        raw_url = raw_url.replace("postgresql://", "postgresql+psycopg://", 1)
+    # Rewrite asyncpg-style `ssl=` query param to psycopg-style `sslmode=`.
+    # asyncpg accepts both forms; psycopg only accepts `sslmode=`.
+    return raw_url.replace("?ssl=", "?sslmode=").replace("&ssl=", "&sslmode=")
 
 
 def run_migrations_offline() -> None:

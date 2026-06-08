@@ -21,7 +21,7 @@
 
 - [x] 4.1 [BE] Edit `.github/workflows/deploy-backend.yml`: replace `IMAGE_REGISTRY=ghcr.io/tierraaudio` with `IMAGE_REGISTRY=acradaasm<env>.azurecr.io`; update `IMAGE_REPO` similarly. Remove the `packages: write` permission.
 - [x] 4.2 [BE] Replace the `Log in to GHCR` (docker/login-action) step with the existing `Azure login (OIDC)` step followed by `run: az acr login --name acradaasm<env>`. Order: Azure login MUST come before `docker/build-push-action`.
-- [ ] 4.3 [BE] Push a no-op commit touching backend; verify the workflow round-trips: build → push to ACR → migrate job Succeeds → backend + worker pick up the new image. Total wall time ≤ 12 minutes.
+- [/] 4.3 [BE] Push a no-op commit touching backend; verify the workflow round-trips: build → push to ACR → migrate job Succeeds → backend + worker pick up the new image. Total wall time ≤ 12 minutes. *(Discovered + fixed an additional bug: `az containerapp job start --image` wipes the container template's `command`. Workflow now does `az containerapp job update --image` first, then `start` with no image override.)*
 
 ## 5. Tear-down + cleanup
 
@@ -40,4 +40,4 @@
 - [x] 7.2 [TEST] `az containerapp replica show -n ca-ada-asm-dev-backend -g rg-ada-asm-dev` shows `runState: Running`, `containers[0].ready: true`, no `ImagePullBackOff`. *(Verified: container ready, no pull back-off.)*
 - [x] 7.3 [TEST] `az role assignment list --scope <acrId> --role AcrPull -o table` lists exactly 4 ServicePrincipals (backend + worker + 3 jobs MIs). *(Verified: 5 AcrPull principals — backend + worker + 3 jobs.)*
 - [x] 7.4 [TEST] `az role assignment list --scope <acrId> --role AcrPush -o table` lists exactly 1 ServicePrincipal (deploy UAMI). *(Verified.)*
-- [ ] 7.5 [TEST] Trigger the workflow with a no-op backend commit. Assert the run completes green and the migrate job execution status is `Succeeded` within 12 minutes.
+- [/] 7.5 [TEST] Trigger the workflow with a no-op backend commit. Assert the run completes green and the migrate job execution status is `Succeeded` within 12 minutes.
