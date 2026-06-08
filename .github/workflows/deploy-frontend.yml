@@ -53,9 +53,9 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Vitest (with 80% coverage gate)
+      - name: Vitest (with coverage gate from vitest.config.ts)
         working-directory: frontend
-        run: pnpm test --run --coverage
+        run: pnpm test:coverage
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
