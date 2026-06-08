@@ -189,6 +189,8 @@ module containerApps 'modules/container_apps.bicep' = {
     acrLoginServer: acr.outputs.loginServer
     acrId: acr.outputs.acrId
     acrPullRoleDefinitionId: acr.outputs.acrPullRoleDefinitionId
+    kvId: keyvault.outputs.vaultId
+    kvSecretsUserRoleDefinitionId: keyvault.outputs.secretsUserRoleDefinitionId
     // backendCustomDomain removed — bind happens post-deploy via
     // `az containerapp hostname add/bind`. See container_apps.bicep notes.
   }
@@ -210,6 +212,8 @@ module containerJobs 'modules/container_jobs.bicep' = {
     acrLoginServer: acr.outputs.loginServer
     acrId: acr.outputs.acrId
     acrPullRoleDefinitionId: acr.outputs.acrPullRoleDefinitionId
+    kvId: keyvault.outputs.vaultId
+    kvSecretsUserRoleDefinitionId: keyvault.outputs.secretsUserRoleDefinitionId
   }
 }
 

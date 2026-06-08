@@ -39,6 +39,12 @@ param acrId string
 @description('Built-in AcrPull role definition ID. Granted to backend + worker system MIs on the ACR scope.')
 param acrPullRoleDefinitionId string
 
+@description('Key Vault resource ID — scope for the Key Vault Secrets User role assignments.')
+param kvId string
+
+@description('Built-in Key Vault Secrets User role definition ID. Granted to backend + worker system MIs on the KV scope so they can read secretRef values at start time.')
+param kvSecretsUserRoleDefinitionId string
+
 @description('Postgres SQLAlchemy URL. The caller fills in `{password}` with a Key Vault `secretRef:`.')
 param postgresUrlTemplate string
 
@@ -338,6 +344,33 @@ resource workerAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(acrId, worker.id, acrPullRoleDefinitionId)
   properties: {
     roleDefinitionId: acrPullRoleDefinitionId
+    principalId: worker.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Key Vault Secrets User on the KV scope so backend + worker MIs can
+// resolve `secretRef:` values at revision-start time without falling back
+// to a cached placeholder (which caused the dev-bootstrap CrashLoopBackOff).
+resource kv 'Microsoft.KeyVault/vaults@2024-04-01-preview' existing = {
+  name: last(split(kvId, '/'))
+}
+
+resource backendKvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: kv
+  name: guid(kvId, backend.id, kvSecretsUserRoleDefinitionId)
+  properties: {
+    roleDefinitionId: kvSecretsUserRoleDefinitionId
+    principalId: backend.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource workerKvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: kv
+  name: guid(kvId, worker.id, kvSecretsUserRoleDefinitionId)
+  properties: {
+    roleDefinitionId: kvSecretsUserRoleDefinitionId
     principalId: worker.identity.principalId
     principalType: 'ServicePrincipal'
   }

@@ -38,6 +38,12 @@ param acrId string
 @description('Built-in AcrPull role definition ID. Granted to each Job system MI on the ACR scope.')
 param acrPullRoleDefinitionId string
 
+@description('Key Vault resource ID — scope for the Key Vault Secrets User role assignments.')
+param kvId string
+
+@description('Built-in Key Vault Secrets User role definition ID. Granted to each Job system MI so it can resolve `secretRef:` values at start time.')
+param kvSecretsUserRoleDefinitionId string
+
 @description('Cron expression for the daily sync. Default 03:00 UTC.')
 param dailySyncCron string = '0 3 * * *'
 
@@ -286,6 +292,43 @@ resource beatCronJobAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01'
   name: guid(acrId, beatCronJob.id, acrPullRoleDefinitionId)
   properties: {
     roleDefinitionId: acrPullRoleDefinitionId
+    principalId: beatCronJob.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Key Vault Secrets User on the KV scope so each Job's MI can resolve
+// secretRef values at start. Required for migrate / seed-admin / beat-cron
+// to read DATABASE_URL etc. (See container_apps.bicep for the same pattern.)
+resource kv 'Microsoft.KeyVault/vaults@2024-04-01-preview' existing = {
+  name: last(split(kvId, '/'))
+}
+
+resource migrateJobKvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: kv
+  name: guid(kvId, migrateJob.id, kvSecretsUserRoleDefinitionId)
+  properties: {
+    roleDefinitionId: kvSecretsUserRoleDefinitionId
+    principalId: migrateJob.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource seedAdminJobKvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: kv
+  name: guid(kvId, seedAdminJob.id, kvSecretsUserRoleDefinitionId)
+  properties: {
+    roleDefinitionId: kvSecretsUserRoleDefinitionId
+    principalId: seedAdminJob.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource beatCronJobKvSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: kv
+  name: guid(kvId, beatCronJob.id, kvSecretsUserRoleDefinitionId)
+  properties: {
+    roleDefinitionId: kvSecretsUserRoleDefinitionId
     principalId: beatCronJob.identity.principalId
     principalType: 'ServicePrincipal'
   }
