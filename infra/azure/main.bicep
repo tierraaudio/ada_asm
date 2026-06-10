@@ -117,6 +117,12 @@ module data 'modules/data.bicep' = {
 
 // ============================================================================
 // Redis
+//
+// 'Azure Cache for Redis' is being retired by Microsoft (BadRequest on new
+// creates from 2026-06). 'Azure Managed Redis' (the replacement) starts at
+// ≈90 €/mo for the smallest SKU. We self-host Redis as a Container App
+// inside the same CAE — zero extra service cost, single-replica, internal
+// ingress only. See `modules/redis.bicep` for the trade-offs.
 // ============================================================================
 
 module redis 'modules/redis.bicep' = {
@@ -125,6 +131,7 @@ module redis 'modules/redis.bicep' = {
     environment: environment
     location: location
     nameSuffix: nameSuffix
+    environmentId: network.outputs.environmentId
   }
 }
 
@@ -221,11 +228,17 @@ module containerJobs 'modules/container_jobs.bicep' = {
 // Static Web App for the SPA
 // ============================================================================
 
+// Static Web Apps are only available in a small set of regions
+// (centralus, eastus2, westus2, westeurope, eastasia). When the rest of
+// the stack lands in another EU region (e.g. northeurope for AKS capacity),
+// pin the SWA explicitly to westeurope so the deploy still succeeds.
+var swaLocation = contains(['centralus', 'eastus2', 'westus2', 'westeurope', 'eastasia'], location) ? location : 'westeurope'
+
 module swa 'modules/static_web_app.bicep' = {
   name: 'mod-swa'
   params: {
     environment: environment
-    location: location
+    location: swaLocation
     nameSuffix: nameSuffix
     customDomain: spaCustomDomain
   }

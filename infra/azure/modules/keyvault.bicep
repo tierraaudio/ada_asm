@@ -45,10 +45,15 @@ var secretNames = [
   'celery-broker-url'
 ]
 
+// KV names are global. With purge-protection on, a deleted KV blocks
+// re-creation of the same name for 90 days — fatal when re-deploying
+// after a region switch. Append a deterministic 5-char hash derived from
+// the RG so each (env, region) combo gets its own stable name.
+var kvName = 'kv-${nameSuffix}-${take(uniqueString(resourceGroup().id), 5)}'
+
 resource vault 'Microsoft.KeyVault/vaults@2024-04-01-preview' = {
-  // Key Vault names must be globally unique and <= 24 characters; with
-  // our suffix pattern `kv-ada-asm-prod` we sit at 15 — safe.
-  name: 'kv-${nameSuffix}'
+  // 'kv-ada-asm-prod-XXXXX' = 21 chars, under the 24 limit.
+  name: kvName
   location: location
   properties: {
     tenantId: tenantId
