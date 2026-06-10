@@ -65,4 +65,7 @@ test-results/
 
 # direnv (per-repo env, may contain tokens)
 .envrc
+
+# Claude Code session logs (lives in ~/.claude, NEVER in repo)
 0a2f930e-dc65-4160-935c-ee3b4afa7952.jsonl
+/*.jsonl
