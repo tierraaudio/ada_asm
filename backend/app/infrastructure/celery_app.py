@@ -37,7 +37,7 @@ celery_app.conf.update(
         "health_check_interval": 30,
         "max_retries": 3,
     },
-    broker_connection_timeout=5,
+    broker_connection_timeout=10,
     broker_connection_retry=True,
     broker_connection_max_retries=3,
     broker_pool_limit=10,
