@@ -85,6 +85,13 @@ def _get_client() -> Redis[bytes]:
         _client = redis_async.from_url(
             get_settings().celery_broker_url,
             decode_responses=True,
+            # Production stability: detect dropped connections within 30s
+            # (default would block indefinitely on a dead TCP socket).
+            socket_keepalive=True,
+            socket_connect_timeout=5,
+            socket_timeout=5,
+            health_check_interval=30,
+            retry_on_timeout=True,
         )
     return _client
 
