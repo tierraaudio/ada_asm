@@ -26,8 +26,6 @@ import asyncio
 import time
 from typing import TYPE_CHECKING
 
-import redis.asyncio as redis_async
-
 from app.core.exceptions import SupplierRateLimitedError
 
 if TYPE_CHECKING:
@@ -80,19 +78,9 @@ _client: Redis[bytes] | None = None
 def _get_client() -> Redis[bytes]:
     global _client
     if _client is None:
-        from app.core.config import get_settings
+        from app.infrastructure.redis_client import create_resilient_client
 
-        _client = redis_async.from_url(
-            get_settings().celery_broker_url,
-            decode_responses=True,
-            # Production stability: detect dropped connections within 30s
-            # (default would block indefinitely on a dead TCP socket).
-            socket_keepalive=True,
-            socket_connect_timeout=10,
-            socket_timeout=10,
-            health_check_interval=30,
-            retry_on_timeout=True,
-        )
+        _client = create_resilient_client()
     return _client
 
 

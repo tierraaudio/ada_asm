@@ -279,3 +279,12 @@ class SupplierNotEnabledError(DomainError):
 class SupplierSyncRunNotFoundError(DomainError):
     code = "SUPPLIER_SYNC_RUN_NOT_FOUND"
     http_status = 404
+
+
+class SupplierSyncEnqueueFailedError(DomainError):
+    """The Celery broker (Redis) was unreachable while publishing the sync
+    task. The pre-created `supplier_sync_runs` row is left in `running`
+    state and must be retried by the operator."""
+
+    code = "SUPPLIER_SYNC_ENQUEUE_FAILED"
+    http_status = 503

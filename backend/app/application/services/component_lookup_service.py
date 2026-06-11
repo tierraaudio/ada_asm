@@ -9,12 +9,12 @@ from "all suppliers errored" (502).
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
 from decimal import Decimal
 from typing import TYPE_CHECKING
-
-import redis.asyncio as redis_async
 
 from app.core.config import get_settings
 from app.core.exceptions import (
@@ -38,6 +38,11 @@ _log = logging.getLogger(__name__)
 
 _CACHE_KEY_PREFIX = "supplier_lookup"
 
+# Hard ceiling on each cache round-trip. The cache is an optimisation:
+# if Redis can't answer in this window the lookup proceeds straight to
+# the suppliers rather than stalling the request.
+_CACHE_OP_TIMEOUT_SECONDS = 5.0
+
 
 def _cache_key(mpn: str) -> str:
     return f"{_CACHE_KEY_PREFIX}:{mpn.strip().lower()}"
@@ -49,16 +54,9 @@ _client: Redis[bytes] | None = None
 def _get_client() -> Redis[bytes]:
     global _client
     if _client is None:
-        _client = redis_async.from_url(
-            get_settings().celery_broker_url,
-            decode_responses=True,
-            # Production stability: detect dropped connections within 30s.
-            socket_keepalive=True,
-            socket_connect_timeout=10,
-            socket_timeout=10,
-            health_check_interval=30,
-            retry_on_timeout=True,
-        )
+        from app.infrastructure.redis_client import create_resilient_client
+
+        _client = create_resilient_client()
     return _client
 
 
@@ -166,17 +164,40 @@ async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupRespo
     settings = get_settings()
     cache_key = _cache_key(mpn)
     redis = _get_client()
+    started = time.monotonic()
+    cache_state = "bypass" if force_refresh else "miss"
 
-    # 1. Cache lookup (unless force_refresh).
+    # 1. Cache lookup (unless force_refresh). Best-effort: a Redis outage
+    # must degrade to a live fetch, never fail or stall the request.
     if not force_refresh:
-        cached = await redis.get(cache_key)
+        try:
+            cached = await asyncio.wait_for(
+                redis.get(cache_key), timeout=_CACHE_OP_TIMEOUT_SECONDS
+            )
+        except Exception as exc:
+            cache_state = "error"
+            _log.warning(
+                "supplier_lookup.cache.read_failed mpn=%s err=%s.%s msg=%s",
+                mpn,
+                type(exc).__module__,
+                type(exc).__name__,
+                exc,
+            )
+            cached = None
         if cached:
             try:
-                return LookupResponse.model_validate_json(cached)
+                response = LookupResponse.model_validate_json(cached)
             except (json.JSONDecodeError, ValueError):
                 # Stale/corrupt cache entry — fall through to live fetch
                 # and let the next write overwrite it.
                 _log.info("supplier_lookup.cache.invalid mpn=%s", mpn)
+            else:
+                _log.info(
+                    "supplier_lookup.done mpn=%s cache=hit duration_ms=%d",
+                    mpn,
+                    (time.monotonic() - started) * 1000,
+                )
+                return response
 
     # 2. Iterate suppliers in priority order.
     adapters = lookup_adapters_in_priority_order(settings=settings)
@@ -185,12 +206,17 @@ async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupRespo
     supplier_data: list[SupplierData] = []
     consulted: list[str] = []
     succeeded: list[str] = []
+    adapter_timings: list[str] = []
 
     for adapter in adapters:
         consulted.append(adapter.code)
+        adapter_started = time.monotonic()
         try:
             quote = await adapter.fetch_by_mpn(mpn)
         except SupplierError as exc:
+            adapter_timings.append(
+                f"{adapter.code}:{(time.monotonic() - adapter_started) * 1000:.0f}ms:error"
+            )
             _log.info(
                 "supplier_lookup.adapter_error supplier=%s mpn=%s err=%s",
                 adapter.code,
@@ -200,6 +226,10 @@ async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupRespo
             continue
 
         succeeded.append(adapter.code)
+        adapter_timings.append(
+            f"{adapter.code}:{(time.monotonic() - adapter_started) * 1000:.0f}ms:"
+            f"{'match' if quote is not None else 'no_match'}"
+        )
         if quote is None:
             continue
         successful_quotes.append(quote)
@@ -236,14 +266,30 @@ async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupRespo
         missing_fields=_missing_fields(fields),
     )
 
-    # 5. Cache the successful payload (TTL from settings).
+    # 5. Cache the successful payload (TTL from settings). Best-effort.
     try:
-        await redis.setex(
-            cache_key,
-            settings.supplier_lookup_cache_ttl_seconds,
-            response.model_dump_json(),
+        await asyncio.wait_for(
+            redis.setex(
+                cache_key,
+                settings.supplier_lookup_cache_ttl_seconds,
+                response.model_dump_json(),
+            ),
+            timeout=_CACHE_OP_TIMEOUT_SECONDS,
         )
     except Exception as exc:
-        _log.warning("supplier_lookup.cache.write_failed mpn=%s err=%s", mpn, exc)
+        _log.warning(
+            "supplier_lookup.cache.write_failed mpn=%s err=%s.%s msg=%s",
+            mpn,
+            type(exc).__module__,
+            type(exc).__name__,
+            exc,
+        )
 
+    _log.info(
+        "supplier_lookup.done mpn=%s cache=%s duration_ms=%d adapters=[%s]",
+        mpn,
+        cache_state,
+        (time.monotonic() - started) * 1000,
+        ",".join(adapter_timings),
+    )
     return response

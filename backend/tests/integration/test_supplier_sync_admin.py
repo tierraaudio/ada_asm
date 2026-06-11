@@ -171,3 +171,33 @@ async def test_unauthenticated_request_returns_401(
 ) -> None:
     response = await api_client.get("/api/v1/supplier-sync/runs")
     assert response.status_code == 401
+
+
+async def test_trigger_returns_503_when_enqueue_fails(
+    api_client: AsyncClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If the Celery broker is unreachable the trigger endpoint must fail
+    fast with a typed 503 instead of blocking the event loop on kombu's
+    internal retry loop."""
+
+    monkeypatch.setenv("SUPPLIER_SYNC_ENABLED_SUPPLIERS", "mouser")
+    monkeypatch.setenv("MOUSER_API_KEY", "test-key")
+
+    from app.infrastructure.tasks import supplier_sync as sync_tasks
+
+    def _broken_apply_async(*args: object, **kwargs: object) -> object:
+        raise ConnectionError("broker unreachable")
+
+    monkeypatch.setattr(
+        sync_tasks.sync_one_supplier, "apply_async", _broken_apply_async
+    )
+
+    response = await api_client.post(
+        "/api/v1/supplier-sync/runs?supplier=mouser",
+        headers=auth_headers,
+    )
+    assert response.status_code == 503
+    body = response.json()
+    assert body["code"] == "SUPPLIER_SYNC_ENQUEUE_FAILED"

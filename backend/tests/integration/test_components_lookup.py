@@ -16,6 +16,7 @@ from uuid import uuid4
 import pytest
 import redis.asyncio as redis_async
 from httpx import AsyncClient
+from redis import exceptions as redis_exceptions
 
 from app.application.services import component_lookup_service
 from app.core.config import get_settings
@@ -295,3 +296,41 @@ async def test_cache_hit_skips_adapters_on_second_call(
     )
     assert r3.status_code == 200
     assert mouser.calls == 2
+
+
+class _BrokenRedis:
+    """Stand-in Redis client whose every operation raises ConnectionError —
+    simulates the CAE internal ingress silently dropping the TCP socket."""
+
+    async def get(self, key: str) -> None:
+        raise redis_exceptions.ConnectionError("socket dropped by ingress")
+
+    async def setex(self, key: str, ttl: int, value: str) -> None:
+        raise redis_exceptions.ConnectionError("socket dropped by ingress")
+
+
+async def test_lookup_survives_redis_cache_outage(
+    api_client: AsyncClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cache must be best-effort: if Redis is unreachable the lookup still
+    serves fresh supplier data instead of failing or hanging."""
+
+    mpn = f"TEST-NOCACHE-{uuid4().hex[:8].upper()}"
+    mouser = _FakeAdapter("mouser", quote=_mouser_quote(mpn))
+    _patch_adapters(monkeypatch, [mouser])
+    component_lookup_service._set_client(_BrokenRedis())  # type: ignore[arg-type]
+    try:
+        response = await api_client.get(
+            f"/api/v1/components/lookup?mpn={mpn}",
+            headers=auth_headers,
+        )
+    finally:
+        component_lookup_service._set_client(None)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["found"] is True
+    assert body["sources_succeeded"] == ["mouser"]
+    assert mouser.calls == 1

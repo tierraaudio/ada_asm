@@ -1183,10 +1183,13 @@ paths:
       description: >
         Pre-creates the `supplier_sync_runs` row HTTP-side so the
         operator gets the real `run_id` back synchronously, then
-        enqueues `sync_one_supplier.delay(code, run_id)` on Celery. Poll
+        enqueues `sync_one_supplier` on Celery (publish runs in a worker
+        thread with a 15s budget and bounded broker retries). Poll
         `GET /api/v1/supplier-sync/runs/{run_id}` for completion. Fails
         with 422 `SUPPLIER_NOT_ENABLED` when the supplier is not listed
-        in `SUPPLIER_SYNC_ENABLED_SUPPLIERS` or has no credentials.
+        in `SUPPLIER_SYNC_ENABLED_SUPPLIERS` or has no credentials, and
+        with 503 `SUPPLIER_SYNC_ENQUEUE_FAILED` when the broker is
+        unreachable.
       security:
         - bearerAuth: []
       parameters:
@@ -1211,6 +1214,17 @@ paths:
                 type: object
                 properties:
                   code: { type: string, enum: [SUPPLIER_NOT_ENABLED] }
+        "503":
+          description: >
+            Celery broker (Redis) unreachable while publishing the task.
+            The pre-created run row is finalised as `failed` with
+            `error_summary=ENQUEUE_FAILED`; retry the request later.
+          content:
+            application/problem+json:
+              schema:
+                type: object
+                properties:
+                  code: { type: string, enum: [SUPPLIER_SYNC_ENQUEUE_FAILED] }
 
   /api/v1/supplier-sync/runs/{run_id}/errors:
     get:

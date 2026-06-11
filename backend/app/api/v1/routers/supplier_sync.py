@@ -11,6 +11,10 @@ Endpoints:
 
 from __future__ import annotations
 
+import asyncio
+import logging
+import time
+from datetime import UTC, datetime
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -27,6 +31,7 @@ from app.api.v1.schemas.supplier_sync import (
 from app.core.config import get_settings
 from app.core.exceptions import (
     SupplierNotEnabledError,
+    SupplierSyncEnqueueFailedError,
     SupplierSyncRunNotFoundError,
 )
 from app.domain.entities.user import User
@@ -36,6 +41,13 @@ from app.infrastructure.repositories.supplier_sync_run_repository import (
 from app.infrastructure.suppliers.registry import enabled_adapters
 
 router = APIRouter(prefix="/supplier-sync", tags=["supplier-sync"])
+
+_log = logging.getLogger(__name__)
+
+# Hard ceiling on the broker publish. kombu's connection handling is
+# synchronous and retries internally; without a budget a Redis outage
+# turns this request into a multi-minute hang.
+_ENQUEUE_TIMEOUT_SECONDS = 15.0
 
 
 @router.get(
@@ -136,6 +148,55 @@ async def trigger_supplier_sync(
     await session.flush()
     await session.commit()
 
-    async_result = sync_one_supplier.delay(supplier, str(run_id))
-    response.headers["X-Task-Id"] = async_result.id
-    return TriggerSyncResponse(run_id=run_id, task_id=async_result.id)
+    # Publish OFF the event loop: kombu's broker I/O is synchronous, so a
+    # Redis hiccup inside `.delay()` would otherwise freeze EVERY in-flight
+    # request (login included) until kombu's internal retries give up.
+    def _enqueue() -> str:
+        async_result = sync_one_supplier.apply_async(
+            args=(supplier, str(run_id)),
+            retry=True,
+            retry_policy={
+                "max_retries": 2,
+                "interval_start": 0,
+                "interval_step": 0.5,
+                "interval_max": 1,
+            },
+        )
+        return str(async_result.id)
+
+    enqueue_started = time.monotonic()
+    try:
+        task_id = await asyncio.wait_for(
+            asyncio.to_thread(_enqueue), timeout=_ENQUEUE_TIMEOUT_SECONDS
+        )
+    except Exception as exc:
+        _log.error(
+            "supplier_sync.enqueue.failed supplier=%s run_id=%s "
+            "duration_ms=%d err=%s.%s msg=%s",
+            supplier,
+            run_id,
+            (time.monotonic() - enqueue_started) * 1000,
+            type(exc).__module__,
+            type(exc).__name__,
+            exc,
+        )
+        # Close the orphaned run row so it doesn't sit in `running` forever.
+        run_row = await session.get(SupplierSyncRunModel, run_id)
+        if run_row is not None:
+            run_row.status = "failed"
+            run_row.error_summary = "ENQUEUE_FAILED: broker unreachable"
+            run_row.finished_at = datetime.now(UTC)
+            await session.commit()
+        raise SupplierSyncEnqueueFailedError(
+            f"Could not enqueue sync for {supplier!r}: broker unreachable"
+        ) from exc
+
+    _log.info(
+        "supplier_sync.enqueue.done supplier=%s run_id=%s task_id=%s duration_ms=%d",
+        supplier,
+        run_id,
+        task_id,
+        (time.monotonic() - enqueue_started) * 1000,
+    )
+    response.headers["X-Task-Id"] = task_id
+    return TriggerSyncResponse(run_id=run_id, task_id=task_id)
