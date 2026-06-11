@@ -39,4 +39,13 @@ describe("telemetry", () => {
     expect(result2).toBe(true);
     expect(getAppInsights()).not.toBeNull();
   });
+
+  it("is a no-op (never throws) when the connection string is malformed", () => {
+    // A Key Vault placeholder like "CHANGE_ME" reaching the build must
+    // degrade to no-telemetry, not crash the app before first render.
+    const result = init("CHANGE_ME");
+    expect(result).toBe(false);
+    expect(getAppInsights()).toBeNull();
+  });
 });
+

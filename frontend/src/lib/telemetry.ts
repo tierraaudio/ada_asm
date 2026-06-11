@@ -67,11 +67,21 @@ export function init(connectionString: string | undefined): boolean {
     disableCookiesUsage: false, // user-session correlation needs cookies
   };
 
-  const instance = new ApplicationInsights({ config });
-  instance.loadAppInsights();
-  instance.trackPageView(); // first page view
-  appInsights = instance;
-  return true;
+  // Telemetry must NEVER take the app down: a malformed connection
+  // string (e.g. a Key Vault placeholder leaking into the build) makes
+  // the SDK throw, and init() runs before the first render — an
+  // uncaught error here is a blank page in production.
+  try {
+    const instance = new ApplicationInsights({ config });
+    instance.loadAppInsights();
+    instance.trackPageView(); // first page view
+    appInsights = instance;
+    return true;
+  } catch (error) {
+    console.warn("App Insights init failed; telemetry disabled", error);
+    appInsights = null;
+    return false;
+  }
 }
 
 /**
