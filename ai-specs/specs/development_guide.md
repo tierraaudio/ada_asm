@@ -303,7 +303,8 @@ internet ──────►│
 | --- | --- |
 | `JWT_SECRET=change-me-in-env` | `secretRef:jwt-secret` |
 | `DATABASE_URL=postgresql+asyncpg://ada_asm:ada_asm@postgres:5432/ada_asm` | `secretRef:database-url` (with `?ssl=require` on the Azure FQDN) |
-| `CELERY_BROKER_URL=redis://redis:6379/0` | `secretRef:celery-broker-url` (with `rediss://` for TLS) |
+| `CELERY_BROKER_URL=redis://redis:6379/0` | `secretRef:celery-broker-url` — `azurestoragequeues://{account key}@{account}.queue.core.windows.net`. The broker rides Azure Storage Queues (HTTP) because the CAE internal TCP ingress proved unreliable for `redis://` (June 2026: healthy Redis, TCP connect timeouts from every client). `CELERY_RESULT_BACKEND` must NOT be set in cloud: results are disabled app-side and Celery would crash trying to use the `azurestoragequeues://` scheme as a result backend |
+| *(unset — falls back to `CELERY_BROKER_URL`)* | `REDIS_CACHE_URL=redis://ca-redis-<env>...:6379/0` — app caches (lookup/FX/rate-limit) stay on the self-hosted Redis Container App; all consumers fail open, so an unreachable Redis only costs performance, never availability |
 | Supplier API keys plaintext in `.env` | `secretRef:<supplier>-*-key` |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` (absent → observability is no-op) | `secretRef:app-insights-connection-string` |
 | `ENVIRONMENT_NAME=local` | `ENVIRONMENT_NAME=dev` or `prod` |

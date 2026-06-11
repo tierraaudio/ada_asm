@@ -136,6 +136,23 @@ module redis 'modules/redis.bicep' = {
 }
 
 // ============================================================================
+// Storage (Celery broker queues)
+//
+// The Celery broker rides Azure Storage Queues, NOT the Redis above: the
+// CAE internal TCP ingress proved unreliable for redis:// (June 2026 —
+// healthy Redis, TCP connect timeouts from every client). Redis remains
+// as the best-effort app cache only. See `modules/storage.bicep`.
+// ============================================================================
+
+module storage 'modules/storage.bicep' = {
+  name: 'mod-storage'
+  params: {
+    environment: environment
+    location: location
+  }
+}
+
+// ============================================================================
 // Key Vault
 // ============================================================================
 

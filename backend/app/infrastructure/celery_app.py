@@ -24,6 +24,11 @@ celery_app = Celery(
 
 celery_app.conf.update(
     task_default_queue="default",
+    # Explicitly disable the result backend: Celery silently falls back to
+    # the CELERY_RESULT_BACKEND env var when the app doesn't set one, and
+    # that env carries the broker URL (azurestoragequeues:// in Azure),
+    # which is not a valid result backend and crashes the worker on boot.
+    result_backend=None,
     task_ignore_result=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,

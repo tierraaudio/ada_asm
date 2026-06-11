@@ -79,8 +79,10 @@ var baseEnvVars = [
   { name: 'ENV', value: environment == 'prod' ? 'production' : 'staging' }
   { name: 'LOG_LEVEL', value: 'INFO' }
   { name: 'DATABASE_URL', secretRef: 'database-url' }
+  // NO CELERY_RESULT_BACKEND: results are disabled app-side, and Celery
+  // would treat the env var as a result-backend URL and crash on the
+  // azurestoragequeues:// scheme the broker secret now carries.
   { name: 'CELERY_BROKER_URL', secretRef: 'celery-broker-url' }
-  { name: 'CELERY_RESULT_BACKEND', secretRef: 'celery-broker-url' }
   { name: 'JWT_SECRET', secretRef: 'jwt-secret' }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'app-insights-connection-string' }
   { name: 'MOUSER_API_KEY', secretRef: 'mouser-api-key' }

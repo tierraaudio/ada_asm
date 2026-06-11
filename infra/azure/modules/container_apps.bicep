@@ -82,8 +82,16 @@ var sharedEnvVars = [
   { name: 'ENV', value: environment == 'prod' ? 'production' : 'staging' }
   { name: 'LOG_LEVEL', value: 'INFO' }
   { name: 'DATABASE_URL', secretRef: 'database-url' }
+  // Broker = Azure Storage Queues (azurestoragequeues://KEY@account.queue.core.windows.net).
+  // The CAE internal TCP ingress proved unreliable for redis:// (June 2026:
+  // healthy Redis, TCP connect timeouts from every client, fresh app + fresh
+  // port included). NO CELERY_RESULT_BACKEND here: results are disabled
+  // (task state lives in supplier_sync_runs) and Celery would treat the env
+  // var as a result-backend URL and crash on the azurestoragequeues scheme.
   { name: 'CELERY_BROKER_URL', secretRef: 'celery-broker-url' }
-  { name: 'CELERY_RESULT_BACKEND', secretRef: 'celery-broker-url' } // same broker, db 1 in URL — handled in main.bicep
+  // App caches (lookup/FX/rate-limit) stay on the self-hosted Redis; every
+  // consumer fails open, so an unreachable Redis only costs performance.
+  { name: 'REDIS_CACHE_URL', value: redisUrlTemplate }
   { name: 'JWT_SECRET', secretRef: 'jwt-secret' }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'app-insights-connection-string' }
   { name: 'CORS_ORIGINS', value: 'https://ada.tierra.audio,https://ada-dev.tierra.audio' }
