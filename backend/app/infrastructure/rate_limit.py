@@ -23,8 +23,12 @@ inactive buckets without affecting correctness.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import TYPE_CHECKING
+
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from app.core.exceptions import SupplierRateLimitedError
 
@@ -71,6 +75,8 @@ return wait_ms
 
 _MAX_WAIT_MS = 60_000
 
+_log = logging.getLogger(__name__)
+
 
 _client: Redis[bytes] | None = None
 
@@ -108,15 +114,28 @@ async def acquire(bucket: str, limit_per_minute: int) -> None:
 
     while True:
         now_ms = int(time.time() * 1000)
-        wait_ms = int(
-            await client.eval(  # type: ignore[no-untyped-call]
-                _TOKEN_BUCKET_LUA,
-                1,
-                key,
-                str(limit_per_minute),
-                str(now_ms),
+        try:
+            wait_ms = int(
+                await client.eval(  # type: ignore[no-untyped-call]
+                    _TOKEN_BUCKET_LUA,
+                    1,
+                    key,
+                    str(limit_per_minute),
+                    str(now_ms),
+                )
             )
-        )
+        except (RedisConnectionError, RedisTimeoutError, OSError) as exc:
+            # Fail-open: the limiter protects supplier quotas, it is not a
+            # hard dependency. With Redis unreachable the caller proceeds
+            # unthrottled rather than turning every lookup into a 500.
+            _log.warning(
+                "rate_limit.fail_open bucket=%s err=%s.%s msg=%s",
+                bucket,
+                type(exc).__module__,
+                type(exc).__name__,
+                exc,
+            )
+            return
         if wait_ms == 0:
             return
         total_waited_ms += wait_ms

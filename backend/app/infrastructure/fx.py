@@ -27,6 +27,7 @@ next publish.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date
 from decimal import Decimal
 from typing import TYPE_CHECKING
@@ -35,6 +36,8 @@ from xml.etree import ElementTree as ET
 import httpx
 
 from app.core.exceptions import FxUnavailableError
+
+_log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from redis.asyncio.client import Redis
@@ -57,7 +60,19 @@ def _today_utc() -> date:
 
 
 async def _read_cached(client: Redis[bytes], currency: str, on_date: date) -> Decimal | None:
-    raw = await client.get(_redis_key(currency, on_date))
+    # Best-effort: a Redis outage degrades to a live ECB fetch instead of
+    # failing the conversion (and with it the whole lookup/sync request).
+    try:
+        raw = await client.get(_redis_key(currency, on_date))
+    except Exception as exc:
+        _log.warning(
+            "fx.cache.read_failed currency=%s err=%s.%s msg=%s",
+            currency,
+            type(exc).__module__,
+            type(exc).__name__,
+            exc,
+        )
+        return None
     if raw is None:
         return None
     try:
@@ -72,11 +87,20 @@ async def _write_cached(
     on_date: date,
     rate: Decimal,
 ) -> None:
-    await client.setex(
-        _redis_key(currency, on_date),
-        _CACHE_TTL_SECONDS,
-        str(rate),
-    )
+    try:
+        await client.setex(
+            _redis_key(currency, on_date),
+            _CACHE_TTL_SECONDS,
+            str(rate),
+        )
+    except Exception as exc:
+        _log.warning(
+            "fx.cache.write_failed currency=%s err=%s.%s msg=%s",
+            currency,
+            type(exc).__module__,
+            type(exc).__name__,
+            exc,
+        )
 
 
 def _parse_rates(xml_text: str) -> tuple[date, dict[str, Decimal]]:

@@ -11,6 +11,7 @@ from collections.abc import AsyncIterator
 import fakeredis.aioredis
 import pytest
 import pytest_asyncio
+from redis import exceptions as redis_exceptions
 
 from app.core.exceptions import SupplierRateLimitedError
 from app.infrastructure import rate_limit
@@ -115,3 +116,22 @@ async def test_separate_buckets_are_independent(
         await rate_limit.acquire("test:a", limit_per_minute=5)
     for _ in range(5):
         await rate_limit.acquire("test:b", limit_per_minute=5)
+
+
+class _DeadRedis:
+    """Client whose every command fails with a connectivity error —
+    simulates Redis being unreachable through the CAE internal ingress."""
+
+    async def eval(self, *args: object, **kwargs: object) -> int:
+        raise redis_exceptions.ConnectionError("connection refused")
+
+
+async def test_acquire_fails_open_when_redis_unreachable() -> None:
+    """Rate limiting is a protection, not a dependency: if Redis is down
+    the caller proceeds unthrottled instead of failing the request."""
+
+    rate_limit._set_client(_DeadRedis())  # type: ignore[arg-type]
+    try:
+        await rate_limit.acquire("test:dead", limit_per_minute=30)
+    finally:
+        rate_limit._set_client(None)

@@ -14,6 +14,7 @@ import httpx
 import pytest
 import pytest_asyncio
 import respx
+from redis import exceptions as redis_exceptions
 
 from app.core.exceptions import FxUnavailableError
 from app.infrastructure import fx
@@ -120,3 +121,30 @@ async def test_to_eur_converts_correctly(
         # USD 10.83 / 1.0832 ≈ 9.998... EUR
         eur = await fx.to_eur(Decimal("10.83"), "USD", on_date=target)
     assert eur.quantize(Decimal("0.0001")) == Decimal("9.9982")
+
+
+class _DeadRedis:
+    """Client whose every command fails with a connectivity error —
+    simulates Redis being unreachable through the CAE internal ingress."""
+
+    async def get(self, key: str) -> None:
+        raise redis_exceptions.ConnectionError("connection refused")
+
+    async def setex(self, key: str, ttl: int, value: str) -> None:
+        raise redis_exceptions.ConnectionError("connection refused")
+
+
+async def test_rate_survives_redis_outage_via_live_fetch() -> None:
+    """The Redis cache is an optimisation: with Redis down the rate is
+    still served straight from the (mocked) ECB feed."""
+
+    fx._set_client(_DeadRedis())  # type: ignore[arg-type]
+    try:
+        with respx.mock(assert_all_called=True) as mock:
+            mock.get(fx.ECB_DAILY_URL).mock(
+                return_value=httpx.Response(200, text=_SAMPLE_XML),
+            )
+            usd_rate = await fx.eur_rate_for("USD", on_date=date(2026, 5, 28))
+    finally:
+        fx._set_client(None)
+    assert usd_rate == Decimal("1.0832")
