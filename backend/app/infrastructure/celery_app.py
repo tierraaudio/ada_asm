@@ -14,14 +14,17 @@ from app.core.config import get_settings
 
 _settings = get_settings()
 
+# No result backend: nobody reads Celery results — task outcome lives in
+# the `supplier_sync_runs` table. Dropping it removes a whole Redis
+# dependency from the worker and the API producer.
 celery_app = Celery(
     "ada_asm",
     broker=_settings.celery_broker_url,
-    backend=_settings.celery_result_backend,
 )
 
 celery_app.conf.update(
     task_default_queue="default",
+    task_ignore_result=True,
     task_acks_late=True,
     worker_prefetch_multiplier=1,
     timezone="UTC",
@@ -41,22 +44,6 @@ celery_app.conf.update(
     broker_connection_retry=True,
     broker_connection_max_retries=3,
     broker_pool_limit=10,
-    # Result backend (Redis) — same hardening as the broker. Without
-    # `retry_policy` the backend's reconnect loop defaults to 20 retries
-    # ("Connection to Redis lost: Retry (x/20)"), each blocking sync code.
-    redis_socket_timeout=10,
-    redis_socket_connect_timeout=10,
-    redis_socket_keepalive=True,
-    redis_retry_on_timeout=True,
-    redis_backend_health_check_interval=30,
-    result_backend_transport_options={
-        "retry_policy": {
-            "max_retries": 3,
-            "interval_start": 0,
-            "interval_step": 0.5,
-            "interval_max": 1,
-        },
-    },
     # Modules whose `@celery_app.task` decorations register tasks on the
     # registry. Workers + beat need to import these on boot or the
     # registry is empty and tasks fail with KeyError.

@@ -27,8 +27,30 @@ class Settings(BaseSettings):
     app_version: str = Field(default="0.1.0")
 
     database_url: str = Field(..., description="SQLAlchemy URL, e.g. postgresql+asyncpg://...")
-    celery_broker_url: str = Field(..., description="Redis URL for the Celery broker")
-    celery_result_backend: str = Field(..., description="Redis URL for Celery results")
+    celery_broker_url: str = Field(
+        ...,
+        description=(
+            "Celery broker URL. redis:// locally; azurestoragequeues:// in "
+            "Azure (the CAE internal TCP ingress proved too unreliable to "
+            "carry the broker — see change cloud-deployment-azure)"
+        ),
+    )
+    celery_result_backend: str = Field(
+        default="",
+        description=(
+            "UNUSED — kept for env compatibility. Task state lives in the "
+            "supplier_sync_runs table; Celery results are ignored"
+        ),
+    )
+    redis_cache_url: str = Field(
+        default="",
+        description=(
+            "Redis URL for the app caches (lookup, FX, rate limiting). "
+            "Falls back to celery_broker_url when empty (local dev, where "
+            "the broker IS Redis). All cache consumers fail open, so an "
+            "unreachable Redis degrades performance, never availability"
+        ),
+    )
 
     jwt_secret: str = Field(..., min_length=8, description="Secret used to sign JWTs")
     jwt_access_token_ttl_seconds: int = Field(default=900)

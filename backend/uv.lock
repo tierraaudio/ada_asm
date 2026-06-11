@@ -10,7 +10,9 @@ dependencies = [
     { name = "aiosmtplib" },
     { name = "alembic" },
     { name = "asyncpg" },
+    { name = "azure-identity" },
     { name = "azure-monitor-opentelemetry-exporter" },
+    { name = "azure-storage-queue" },
     { name = "celery" },
     { name = "email-validator" },
     { name = "fastapi" },
@@ -51,7 +53,9 @@ requires-dist = [
     { name = "aiosmtplib", specifier = ">=3.0,<4.0" },
     { name = "alembic", specifier = ">=1.13,<2.0" },
     { name = "asyncpg", specifier = ">=0.30,<1.0" },
+    { name = "azure-identity", specifier = ">=1.12,<2.0" },
     { name = "azure-monitor-opentelemetry-exporter", specifier = ">=1.0.0b30,<2.0" },
+    { name = "azure-storage-queue", specifier = ">=12.0,<13.0" },
     { name = "celery", specifier = ">=5.4,<6.0" },
     { name = "email-validator", specifier = ">=2.2,<3.0" },
     { name = "fakeredis", extras = ["lua"], marker = "extra == 'dev'", specifier = ">=2.24,<3.0" },
@@ -252,6 +256,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7c/7e/bfc03436b88c48f5adc21a3ebbf4392b6b7fbbfe33ef3b1e88d07ba9f380/azure_monitor_opentelemetry_exporter-1.0.0b52.tar.gz", hash = "sha256:7eac679fca32dee9e426df65f2a538161db4514fc322fc66107f7826567d86e1", size = 326179, upload-time = "2026-05-11T22:47:02.687Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a4/e8/d13e6a74c98ecc3011bce9ab09fc2e75aec48ab46288f72be57c2fa21460/azure_monitor_opentelemetry_exporter-1.0.0b52-py2.py3-none-any.whl", hash = "sha256:a38c503e5e2cc0ec8a4bf336b23cce23488719f5361a45cdd01a514080f0e7fc", size = 244751, upload-time = "2026-05-11T22:47:04.304Z" },
+]
+
+[[package]]
+name = "azure-storage-queue"
+version = "12.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-core" },
+    { name = "cryptography" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/84/7d/babb616eb1ed1ac5f13cbb336875fd91c9c6f8b1702bf2ff860b222cb833/azure_storage_queue-12.17.0.tar.gz", hash = "sha256:6eb108a88554be371feb2eba9715fa0e3f7baca7b3f00c19ec417fc7ce5b3834", size = 203777, upload-time = "2026-06-08T18:03:16.393Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8c/e3/6aee19df63974d87e55dc0ddf5bb18eb1022cd290b125a46792594a00673/azure_storage_queue-12.17.0-py3-none-any.whl", hash = "sha256:aaef08ee2613f84a3a85e60a059d29567361e5a2af455298bb0e529f0b47d5a1", size = 189526, upload-time = "2026-06-08T18:03:19.139Z" },
 ]
 
 [[package]]

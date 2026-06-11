@@ -38,8 +38,9 @@ if TYPE_CHECKING:
 def create_resilient_client() -> Redis[bytes]:
     """Build an async Redis client hardened for flaky internal ingress."""
 
+    settings = get_settings()
     return redis_async.from_url(
-        get_settings().celery_broker_url,
+        settings.redis_cache_url or settings.celery_broker_url,
         decode_responses=True,
         socket_keepalive=True,
         socket_connect_timeout=10,
