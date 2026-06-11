@@ -27,6 +27,20 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     broker_connection_retry_on_startup=True,
+    # Production stability: prevent silent TCP drops on the broker
+    # connection (CAE internal traffic). Cap retry/connect timeouts so
+    # the producer (web backend) doesn't block the FastAPI event loop
+    # for minutes when redis times out.
+    broker_transport_options={
+        "socket_keepalive": True,
+        "socket_keepalive_options": {},
+        "health_check_interval": 30,
+        "max_retries": 3,
+    },
+    broker_connection_timeout=5,
+    broker_connection_retry=True,
+    broker_connection_max_retries=3,
+    broker_pool_limit=10,
     # Modules whose `@celery_app.task` decorations register tasks on the
     # registry. Workers + beat need to import these on boot or the
     # registry is empty and tasks fail with KeyError.
