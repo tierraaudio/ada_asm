@@ -32,8 +32,10 @@ permissions:
   contents: read
 
 env:
-  # Default to `dev` on push triggers; `workflow_dispatch` can override to `prod`.
-  TARGET_ENV: ${{ github.event.inputs.environment || 'dev' }}
+  # Default to `prod` on push triggers (single-env cloud setup; dev lives in
+  # docker-compose locally). `workflow_dispatch` can still override to `dev`
+  # if a dev env is ever re-provisioned.
+  TARGET_ENV: ${{ github.event.inputs.environment || 'prod' }}
 
 jobs:
   quality-and-deploy:
