@@ -178,26 +178,32 @@ resource backend 'Microsoft.App/containerApps@2024-03-01' = {
           env: sharedEnvVars
           probes: [
             {
+              // Relaxed liveness: app startup with OTel init + DB pool warmup
+              // can take 30-40s. Lower values caused repeated CrashLoopBackOff
+              // during prod bootstrap.
               type: 'Liveness'
               httpGet: {
                 path: '/api/v1/health'
                 port: 8000
               }
-              initialDelaySeconds: 15
-              periodSeconds: 30
-              timeoutSeconds: 5
-              failureThreshold: 3
+              initialDelaySeconds: 60
+              periodSeconds: 60
+              timeoutSeconds: 15
+              failureThreshold: 5
             }
             {
+              // Relaxed readiness: the /health endpoint itself is fast (<200ms)
+              // but the container event loop is briefly blocked during OTel
+              // batch span exports — give it room.
               type: 'Readiness'
               httpGet: {
                 path: '/api/v1/health'
                 port: 8000
               }
               initialDelaySeconds: 5
-              periodSeconds: 10
-              timeoutSeconds: 3
-              failureThreshold: 3
+              periodSeconds: 30
+              timeoutSeconds: 10
+              failureThreshold: 6
             }
           ]
         }
