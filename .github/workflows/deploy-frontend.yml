@@ -71,7 +71,12 @@ jobs:
         id: env
         run: |
           set -euo pipefail
-          KV="kv-ada-asm-${{ env.TARGET_ENV }}"
+          # KV name pattern: `kv-ada-asm-<env>-XXXXX` where XXXXX is a 5-char
+          # uniqueString(rg.id) suffix in Bicep. Look it up dynamically by tag
+          # so the workflow keeps working when the KV gets recreated (e.g. after
+          # a region switch leaves the original name in soft-delete).
+          KV=$(az keyvault list -g "rg-ada-asm-${{ env.TARGET_ENV }}" --query "[?starts_with(name, 'kv-ada-asm-${{ env.TARGET_ENV }}')].name | [0]" -o tsv)
+          echo "Resolved KV name: $KV"
           AI_CONN=$(az keyvault secret show --vault-name "$KV" --name app-insights-connection-string --query value -o tsv)
           if [ "${{ env.TARGET_ENV }}" = "prod" ]; then
             API_URL="https://api.ada.tierra.audio"
@@ -94,7 +99,7 @@ jobs:
       - name: Resolve SWA deployment token
         id: swa
         run: |
-          KV="kv-ada-asm-${{ env.TARGET_ENV }}"
+          KV=$(az keyvault list -g "rg-ada-asm-${{ env.TARGET_ENV }}" --query "[?starts_with(name, 'kv-ada-asm-${{ env.TARGET_ENV }}')].name | [0]" -o tsv)
           TOKEN=$(az keyvault secret show --vault-name "$KV" --name swa-deployment-token --query value -o tsv)
           echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
