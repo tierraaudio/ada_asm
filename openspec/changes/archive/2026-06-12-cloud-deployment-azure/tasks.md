@@ -75,14 +75,14 @@
 
 ## 8. Prod provisioning + cutover
 
-- [ ] 8.1 `az group create --name rg-ada-asm-prod --location westeurope`.
-- [ ] 8.2 `az deployment group create` with `environment=prod` and `legacy_a_cleanup=false` (DNS A record stays so cutover is reversible).
-- [ ] 8.3 Load prod secrets into `kv-ada-asm-prod` (user, with Claude providing commands).
-- [ ] 8.4 Lower TTL on the existing `ada.tierra.audio` A record to 300s, 24h before cutover.
-- [ ] 8.5 Cutover (user present, ~10 min): re-run the deployment with `legacy_a_cleanup=true`, which DELETES the legacy A record and creates the CNAMEs. Verify cert issuance succeeds (~5-15 min). Verify `https://ada.tierra.audio` and `https://api.ada.tierra.audio/api/v1/health` are 200 from multiple resolvers.
-- [ ] 8.6 Trigger `deploy-backend.yml` and `deploy-frontend.yml` against prod for the first prod deploy.
-- [ ] 8.7 Run seed-admin job in prod with prod admin email/password from Key Vault.
-- [ ] 8.8 Smoke test prod with the same checklist as §7.
+- [x] 8.1 `az group create --name rg-ada-asm-prod --location westeurope`.
+- [x] 8.2 `az deployment group create` with `environment=prod` and `legacy_a_cleanup=false` (DNS A record stays so cutover is reversible).
+- [x] 8.3 Load prod secrets into `kv-ada-asm-prod` (user, with Claude providing commands).
+- [x] 8.4 Lower TTL on the existing `ada.tierra.audio` A record to 300s, 24h before cutover.
+- [x] 8.5 Cutover (user present, ~10 min): re-run the deployment with `legacy_a_cleanup=true`, which DELETES the legacy A record and creates the CNAMEs. Verify cert issuance succeeds (~5-15 min). Verify `https://ada.tierra.audio` and `https://api.ada.tierra.audio/api/v1/health` are 200 from multiple resolvers.
+- [x] 8.6 Trigger `deploy-backend.yml` and `deploy-frontend.yml` against prod for the first prod deploy.
+- [x] 8.7 Run seed-admin job in prod with prod admin email/password from Key Vault.
+- [x] 8.8 Smoke test prod with the same checklist as §7.
 
 ## 9. Documentation + runbooks
 
