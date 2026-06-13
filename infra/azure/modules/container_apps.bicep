@@ -51,6 +51,18 @@ param postgresUrlTemplate string
 @description('Redis URL template. The caller fills in `{key}` with a Key Vault `secretRef:`.')
 param redisUrlTemplate string
 
+@description('Storage account resource ID — scope for the backend Storage Blob Data Contributor role (datasheet archival).')
+param datasheetStorageAccountId string = ''
+
+@description('Blob endpoint URL of the datasheet storage account, e.g. https://<acct>.blob.core.windows.net')
+param datasheetBlobEndpoint string = ''
+
+@description('Private blob container name for archived datasheet PDFs.')
+param datasheetContainer string = 'datasheets'
+
+@description('Built-in Storage Blob Data Contributor role definition ID (ba92f5b4-...). Granted to the backend system MI on the storage account scope.')
+param storageBlobDataContributorRoleDefinitionId string = ''
+
 @description('Vault URI used to construct `keyVaultUrl:` references for the Container App secrets block.')
 param keyVaultUri string
 
@@ -92,6 +104,11 @@ var sharedEnvVars = [
   // App caches (lookup/FX/rate-limit) stay on the self-hosted Redis; every
   // consumer fails open, so an unreachable Redis only costs performance.
   { name: 'REDIS_CACHE_URL', value: redisUrlTemplate }
+  // Datasheet archival (change `ingest-component-from-mpn`). Empty endpoint
+  // → the app falls back to filesystem storage; set in prod so the backend
+  // archives PDFs to the private blob container via its managed identity.
+  { name: 'DATASHEET_STORAGE_ACCOUNT_URL', value: datasheetBlobEndpoint }
+  { name: 'DATASHEET_CONTAINER', value: datasheetContainer }
   { name: 'JWT_SECRET', secretRef: 'jwt-secret' }
   { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', secretRef: 'app-insights-connection-string' }
   { name: 'CORS_ORIGINS', value: 'https://ada.tierra.audio,https://ada-dev.tierra.audio' }
@@ -361,6 +378,23 @@ resource workerAcrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     principalId: worker.identity.principalId
     principalType: 'ServicePrincipal'
   }
+}
+
+// Storage Blob Data Contributor on the datasheet storage account so the
+// backend MI can read/write archived PDFs without an account key. Skipped
+// when no storage account / role id is wired (e.g. minimal envs).
+resource backendStorageBlob 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(datasheetStorageAccountId) && !empty(storageBlobDataContributorRoleDefinitionId)) {
+  scope: datasheetStorage
+  name: guid(datasheetStorageAccountId, backend.id, storageBlobDataContributorRoleDefinitionId)
+  properties: {
+    roleDefinitionId: storageBlobDataContributorRoleDefinitionId
+    principalId: backend.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+resource datasheetStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = if (!empty(datasheetStorageAccountId)) {
+  name: last(split(datasheetStorageAccountId, '/'))
 }
 
 // Key Vault Secrets User on the KV scope so backend + worker MIs can

@@ -215,6 +215,14 @@ module containerApps 'modules/container_apps.bicep' = {
     acrPullRoleDefinitionId: acr.outputs.acrPullRoleDefinitionId
     kvId: keyvault.outputs.vaultId
     kvSecretsUserRoleDefinitionId: keyvault.outputs.secretsUserRoleDefinitionId
+    // Datasheet archival storage (change `ingest-component-from-mpn`).
+    datasheetStorageAccountId: storage.outputs.accountId
+    datasheetBlobEndpoint: storage.outputs.blobEndpoint
+    datasheetContainer: storage.outputs.datasheetContainerName
+    storageBlobDataContributorRoleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+    )
     // backendCustomDomain removed — bind happens post-deploy via
     // `az containerapp hostname add/bind`. See container_apps.bicep notes.
   }
