@@ -33,6 +33,11 @@ class SupplierData(BaseModel):
     supplier_product_url: str | None = None
     stock: int | None = None
     price_breaks: list[SupplierPriceBreakResponse] = Field(default_factory=list)
+    # Raw category signal per supplier — NOT merged by presentation priority.
+    # Family resolution happens in FamilyInferenceService (change ingest).
+    supplier_category_id: str | None = None
+    supplier_category_name: str | None = None
+    tariff_code: str | None = None
 
 
 class LookupFields(BaseModel):

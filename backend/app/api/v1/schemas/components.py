@@ -41,6 +41,17 @@ class ComponentResponse(BaseModel):
     nato_score: NatoScoreLiteral
     country_of_origin: CountryCode | None = None
     proveedor_preferente_id: UUID | None = None
+    # Blended supplier-derived fields (change `ingest-component-from-mpn`).
+    lifecycle_status: str | None = None
+    last_buy_date: date | None = None
+    discontinued: bool | None = None
+    end_of_life: bool | None = None
+    moq: int | None = None
+    order_multiple: int | None = None
+    lead_time_days: int | None = None
+    unit_weight_kg: Decimal | None = None
+    image_url: str | None = None
+    family_needs_review: bool = False
     created_at: datetime
     updated_at: datetime
     # Server-computed read-only fields.

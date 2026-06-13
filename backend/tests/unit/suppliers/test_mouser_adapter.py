@@ -20,6 +20,7 @@ import respx
 from app.core.exceptions import (
     SupplierAuthError,
     SupplierParseError,
+    SupplierRateLimitedError,
     SupplierTransportError,
 )
 from app.infrastructure import fx, rate_limit
@@ -82,6 +83,19 @@ async def test_hit_returns_quote_with_price_breaks(
     assert quote.manufacturer == "onsemi"
     assert quote.datasheet_url and quote.datasheet_url.startswith("https://")
     assert quote.family_hint == "Clock & Timer ICs"
+    # Localized leaf category name kept (Mouser exposes no stable id).
+    assert quote.supplier_category_name == "Clock & Timer ICs"
+    assert quote.supplier_category_id is None
+    assert quote.lifecycle_status == "Active"
+    assert quote.image_url == "https://www.mouser.com/images/ne555p_t.jpg"
+    assert quote.moq == 1
+    assert quote.order_multiple == 1
+    codes = {c.code_type: c.code_value for c in quote.compliance}
+    assert codes.get("ECCN") == "EAR99"
+    assert codes.get("USHTS") == "8542390001"
+    assert codes.get("RoHS") == "RoHS Compliant"  # from ROHSStatus
+    assert codes.get("País de origen") == "MX"  # from TradeCompliance
+    assert quote.raw_payload is not None
     assert quote.stock == 1240
     assert len(quote.price_breaks) == 4
     first = quote.price_breaks[0]
@@ -91,6 +105,20 @@ async def test_hit_returns_quote_with_price_breaks(
     # 5.00 USD / 1.10 USD-per-EUR ≈ 4.5454... EUR
     assert first.price_eur is not None
     assert first.price_eur.quantize(Decimal("0.0001")) == Decimal("4.5455")
+
+
+async def test_over_limit_errors_entry_maps_to_rate_limited(
+    shared_redis: fakeredis.aioredis.FakeRedis,
+    adapter: MouserAdapter,
+) -> None:
+    # Mouser reports over-limit as HTTP 200 with a TooManyRequests Errors[]
+    # entry, NOT a 429. The adapter must promote it to the typed error.
+    with respx.mock() as mock:
+        mock.post("https://api.mouser.com/api/v2/search/partnumber").mock(
+            return_value=httpx.Response(200, text=_load("errors_ratelimit.json")),
+        )
+        with pytest.raises(SupplierRateLimitedError):
+            await adapter.fetch_by_mpn("NE555P")
 
 
 async def test_miss_returns_none(

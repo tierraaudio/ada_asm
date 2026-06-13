@@ -103,6 +103,9 @@ def _quote_to_supplier_data(quote: SupplierQuote) -> SupplierData:
             )
             for pb in quote.price_breaks
         ],
+        supplier_category_id=quote.supplier_category_id,
+        supplier_category_name=quote.supplier_category_name,
+        tariff_code=quote.tariff_code,
     )
 
 
@@ -126,16 +129,20 @@ def _merge_fields(quotes: list[SupplierQuote]) -> LookupFields:
         take("name", quote.name)
         take("description", quote.description)
         take("manufacturer", quote.manufacturer)
-        take("family_hint", quote.family_hint)
         take("datasheet_url", quote.datasheet_url)
         take("package", quote.package)
         take("current_price_per_100_eur", _price_per_100(quote))
 
+    # `family_hint` is intentionally NOT merged here: the presentation
+    # priority order (Mouser first) inverts the category signal-strength
+    # order (DigiKey/TME stable ids first). The family is resolved by
+    # FamilyInferenceService from the per-supplier signals carried in
+    # `supplier_data[]`. See change `ingest-component-from-mpn`.
     return LookupFields(
         name=merged.get("name"),
         description=merged.get("description"),
         manufacturer=merged.get("manufacturer"),
-        family_hint=merged.get("family_hint"),
+        family_hint=None,
         datasheet_url=merged.get("datasheet_url"),
         package=merged.get("package"),
         current_price_per_100_eur=merged.get("current_price_per_100_eur"),
@@ -148,6 +155,52 @@ def _missing_fields(fields: LookupFields) -> list[str]:
         for name, value in fields.model_dump().items()
         if value is None
     ]
+
+
+async def gather_quotes(mpn: str) -> tuple[list[SupplierQuote], list[str], list[str]]:
+    """Walk enabled suppliers LIVE (no cache) for ingestion.
+
+    Returns `(quotes, consulted, succeeded)`. Raises the same three-outcome
+    disambiguation as `lookup_by_mpn`: `SupplierLookupUnavailableError` when
+    no supplier is enabled or all errored, `ComponentMpnNotFoundError` when
+    suppliers responded but none recognised the MPN.
+    """
+
+    settings = get_settings()
+    adapters = lookup_adapters_in_priority_order(settings=settings)
+    quotes: list[SupplierQuote] = []
+    consulted: list[str] = []
+    succeeded: list[str] = []
+
+    for adapter in adapters:
+        consulted.append(adapter.code)
+        try:
+            quote = await adapter.fetch_by_mpn(mpn)
+        except SupplierError as exc:
+            _log.info(
+                "ingest.adapter_error supplier=%s mpn=%s err=%s",
+                adapter.code,
+                mpn,
+                exc,
+            )
+            continue
+        succeeded.append(adapter.code)
+        if quote is not None:
+            quotes.append(quote)
+
+    if not consulted:
+        raise SupplierLookupUnavailableError(
+            "No suppliers enabled; configure SUPPLIER_SYNC_ENABLED_SUPPLIERS",
+        )
+    if not succeeded:
+        raise SupplierLookupUnavailableError(
+            f"All consulted suppliers errored: {', '.join(consulted)}",
+        )
+    if not quotes:
+        raise ComponentMpnNotFoundError(
+            f"No supplier returned data for MPN {mpn!r}",
+        )
+    return quotes, consulted, succeeded
 
 
 async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupResponse:

@@ -40,6 +40,8 @@ from app.core.exceptions import (
 )
 from app.domain.entities.supplier_quote import (
     SupplierCode,
+    SupplierComplianceCode,
+    SupplierParameter,
     SupplierPriceBreak,
     SupplierQuote,
 )
@@ -89,6 +91,9 @@ class FarnellAdapter:
             "resultsSettings.offset": "0",
             "resultsSettings.numberOfResults": "5",
             "resultsSettings.responseGroup": "large",
+            # versionNumber unlocks the richer field set (datasheets, images,
+            # orderMultiples, productURL) the base 1.0-era response omits.
+            "versionInfo.versionNumber": "1.4",
             "callInfo.omitXmlSchema": "false",
             "callInfo.responseDataFormat": "json",
             "callInfo.apiKey": self._api_key,
@@ -169,6 +174,60 @@ def _construct_product_url(sku: str | None, store_id: str) -> str | None:
     return f"https://{store_id}/_/dp/{sku}"
 
 
+# Attribute labels that are compliance/export codes, not parametric specs.
+# Farnell mixes both inside `attributes[]`; we route them to different tables.
+_COMPLIANCE_LABELS = frozenset(
+    {
+        "tariffCode",
+        "usEccn",
+        "euEccn",
+        "rohsCompliant",
+        "rohsPhthalatesCompliant",
+        "SVHC",
+        "reachSvhc",
+        "MSL",
+        "hazardous",
+        "productTraceability",
+        "countryOfOrigin",
+    }
+)
+
+
+def _attribute_value(product: dict[str, Any], label: str) -> str | None:
+    for attr in product.get("attributes") or []:
+        if attr.get("attributeLabel") == label:
+            value = attr.get("attributeValue")
+            return str(value) if value not in (None, "") else None
+    return None
+
+
+def _split_attributes(
+    product: dict[str, Any],
+) -> tuple[tuple[SupplierParameter, ...], tuple[SupplierComplianceCode, ...]]:
+    """Partition Farnell `attributes[]` into parametric specs vs compliance."""
+
+    params: list[SupplierParameter] = []
+    compliance: list[SupplierComplianceCode] = []
+    for attr in product.get("attributes") or []:
+        label = attr.get("attributeLabel")
+        value = attr.get("attributeValue")
+        if not label or value in (None, ""):
+            continue
+        if label in _COMPLIANCE_LABELS:
+            compliance.append(
+                SupplierComplianceCode(code_type=str(label), code_value=str(value))
+            )
+        else:
+            params.append(
+                SupplierParameter(
+                    label=str(label),
+                    value=str(value),
+                    unit=attr.get("attributeUnit") or None,
+                )
+            )
+    return tuple(params), tuple(compliance)
+
+
 async def _build_quote(
     products: list[dict[str, Any]],
     *,
@@ -218,21 +277,48 @@ async def _build_quote(
     )
     sku = str(product.get("sku")) if product.get("sku") is not None else None
 
+    display_name = product.get("displayName")
+    tariff_code = _attribute_value(product, "tariffCode")
+    parameters, compliance = _split_attributes(product)
+    # rohsStatusCode is top-level, not in attributes[].
+    rohs = product.get("rohsStatusCode")
+    if rohs:
+        compliance = (
+            *compliance,
+            SupplierComplianceCode(code_type="rohsStatusCode", code_value=str(rohs)),
+        )
+
+    moq_raw = product.get("translatedMinimumOrderQuality")
+    try:
+        moq = int(str(moq_raw)) if moq_raw not in (None, "") else None
+    except (TypeError, ValueError):
+        moq = None
+
+    datasheets = product.get("datasheets") or []
+    datasheet_url = datasheets[0].get("url") if datasheets else None
+
     return SupplierQuote(
         supplier="farnell",
         mpn=resolved_mpn,
         manufacturer=product.get("brandName") or product.get("vendorName"),
-        name=product.get("displayName"),
-        description=product.get("displayName"),
-        family_hint=None,
-        # The Basic/Large response group does not include datasheet URLs.
-        # Upgrading to `inventory` or `attributes` response groups exposes
-        # them but doubles the payload size — defer until needed.
-        datasheet_url=None,
+        name=display_name,
+        description=display_name,
+        # Farnell exposes no category id; the family signal is the HS
+        # tariff_code plus keyword matching on the display name.
+        family_hint=display_name,
+        supplier_category_name=display_name,
+        tariff_code=tariff_code,
+        datasheet_url=datasheet_url,
+        image_url=product.get("mainImageURL") or (product.get("image") or {}).get("vrntPath"),
         package=None,
         stock=stock,
+        moq=moq,
+        country_of_origin=product.get("countryOfOrigin"),
+        parameters=parameters,
+        compliance=compliance,
         price_breaks=tuple(breaks),
         supplier_sku=sku,
         supplier_product_url=_construct_product_url(sku, store_id),
+        raw_payload=product,
         last_seen_at=datetime.now(UTC),
     )

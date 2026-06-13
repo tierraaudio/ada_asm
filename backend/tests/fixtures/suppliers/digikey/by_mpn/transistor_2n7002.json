@@ -1,25 +1,39 @@
 {
   "Products": [
     {
-      "ManufacturerProductNumber": "NE555P",
+      "ManufacturerProductNumber": "2N7002",
       "Manufacturer": {
-        "Id": 296,
-        "Name": "Texas Instruments"
+        "Id": 0,
+        "Name": "onsemi"
       },
       "Description": {
         "ProductDescription": "IC OSC SINGLE TIMER 100KHZ 8-DIP",
         "DetailedDescription": "555 Type, Timer/Oscillator (Single) IC 100kHz 8-PDIP"
       },
       "Category": {
-        "CategoryId": 32,
+        "CategoryId": 19,
         "ParentId": 0,
-        "Name": "Integrated Circuits (ICs)",
+        "Name": "Discrete Semiconductor Products",
         "ChildCategories": [
           {
-            "CategoryId": 990,
-            "ParentId": 32,
-            "Name": "Clock/Timing - Programmable Timers and Oscillators",
-            "ChildCategories": []
+            "CategoryId": 2045,
+            "ParentId": 19,
+            "Name": "Transistors",
+            "ChildCategories": [
+              {
+                "CategoryId": 2088,
+                "ParentId": 2045,
+                "Name": "FETs - Single",
+                "ChildCategories": [
+                  {
+                    "CategoryId": 278,
+                    "ParentId": 2088,
+                    "Name": "Single FETs, MOSFETs",
+                    "ChildCategories": []
+                  }
+                ]
+              }
+            ]
           }
         ]
       },

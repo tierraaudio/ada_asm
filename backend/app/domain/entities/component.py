@@ -38,6 +38,24 @@ class Component:
     nato_score: NatoScoreValue = "C"
     country_of_origin: str | None = None
     proveedor_preferente_id: UUID | None = None
+    # Blended supplier-derived scalars (change `ingest-component-from-mpn`).
+    lifecycle_status: str | None = None
+    last_buy_date: date | None = None
+    discontinued: bool | None = None
+    end_of_life: bool | None = None
+    moq: int | None = None
+    order_multiple: int | None = None
+    lead_time_days: int | None = None
+    unit_weight_kg: Decimal | None = None
+    image_url: str | None = None
+    # Family-inference provenance (change `ingest-component-from-mpn`).
+    family_inferred_supplier: str | None = None
+    family_inferred_match_type: str | None = None
+    raw_category_id: str | None = None
+    raw_category_name: str | None = None
+    raw_tariff_code: str | None = None
+    family_confidence: int | None = None
+    family_needs_review: bool = False
     created_at: datetime | None = None
     updated_at: datetime | None = None
     # Transient — populated by the list query via JOIN with supplier_prices

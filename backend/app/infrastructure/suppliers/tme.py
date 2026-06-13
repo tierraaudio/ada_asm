@@ -281,9 +281,17 @@ async def _build_quote(
     )
 
     manufacturer = (product.get("manufacturer") or {}).get("name")
-    category = (product.get("category") or {}).get("name")
+    category_node = product.get("category") or {}
+    category_name = category_node.get("name")
+    category_id = category_node.get("id")
     product_url = product.get("product_information_page") or product.get("url")
     datasheet = product.get("document_url") or product.get("datasheet_url")
+
+    def _as_int(value: Any) -> int | None:
+        try:
+            return int(value) if value is not None else None
+        except (TypeError, ValueError):
+            return None
 
     return SupplierQuote(
         supplier="tme",
@@ -291,12 +299,19 @@ async def _build_quote(
         manufacturer=manufacturer,
         name=product.get("description"),
         description=product.get("description"),
-        family_hint=category,
+        family_hint=category_name,
+        supplier_category_id=str(category_id) if category_id is not None else None,
+        supplier_category_name=category_name,
+        image_url=(product.get("assets") or {}).get("primary_photo")
+        or product.get("photo"),
         datasheet_url=datasheet,
         package=None,
         stock=stock,
+        moq=_as_int(product.get("minimal_amount")),
+        order_multiple=_as_int(product.get("multiples")),
         price_breaks=tuple(breaks),
         supplier_sku=product.get("symbol"),
         supplier_product_url=product_url,
+        raw_payload=product,
         last_seen_at=datetime.now(UTC),
     )

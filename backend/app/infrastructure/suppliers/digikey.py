@@ -48,6 +48,8 @@ from app.core.exceptions import (
 )
 from app.domain.entities.supplier_quote import (
     SupplierCode,
+    SupplierComplianceCode,
+    SupplierParameter,
     SupplierPriceBreak,
     SupplierQuote,
 )
@@ -202,6 +204,80 @@ def _extract_description(product: dict[str, Any]) -> tuple[str | None, str | Non
     return short, detailed
 
 
+def _descend_to_leaf_category(
+    category: dict[str, Any],
+) -> tuple[str | None, str | None, str | None]:
+    """Walk `ChildCategories[0]` to the leaf of DigiKey's category tree.
+
+    Returns `(leaf_id, leaf_name, root_id)`. The root collides across our
+    families (root 19 = both Diodes and Transistors) so the LEAF id is the
+    reliable family signal; the root id is kept as a fallback. CategoryIds
+    are locale-invariant (only the names localize).
+    """
+
+    if not category:
+        return None, None, None
+    root_id = category.get("CategoryId")
+    node = category
+    while True:
+        children = node.get("ChildCategories") or []
+        if not children:
+            break
+        node = children[0]
+    leaf_id = node.get("CategoryId")
+    leaf_name = node.get("Name")
+    return (
+        str(leaf_id) if leaf_id is not None else None,
+        leaf_name,
+        str(root_id) if root_id is not None else None,
+    )
+
+
+def _extract_parameters(product: dict[str, Any]) -> tuple[SupplierParameter, ...]:
+    """DigiKey `Parameters[]` → value objects, keyed by stable ParameterId."""
+
+    out: list[SupplierParameter] = []
+    for p in product.get("Parameters") or []:
+        label = p.get("ParameterText")
+        value = p.get("ValueText")
+        if not label or value in (None, ""):
+            continue
+        pid = p.get("ParameterId")
+        out.append(
+            SupplierParameter(
+                label=str(label),
+                value=str(value),
+                key=str(pid) if pid is not None else None,
+            )
+        )
+    return tuple(out)
+
+
+def _extract_compliance(product: dict[str, Any]) -> tuple[SupplierComplianceCode, ...]:
+    """DigiKey `Classifications` → flat (code_type, code_value) pairs."""
+
+    classifications = product.get("Classifications") or {}
+    out: list[SupplierComplianceCode] = []
+    for code_type, value in classifications.items():
+        if value in (None, ""):
+            continue
+        out.append(
+            SupplierComplianceCode(code_type=str(code_type), code_value=str(value))
+        )
+    return tuple(out)
+
+
+def _lead_weeks_to_days(raw: Any) -> int | None:
+    """DigiKey `ManufacturerLeadWeeks` is a string like '6' → days."""
+
+    if raw in (None, ""):
+        return None
+    try:
+        return int(str(raw).strip().split()[0]) * 7
+    except (ValueError, IndexError):
+        return None
+
+
 def _pick_variation(variations: list[dict[str, Any]]) -> dict[str, Any]:
     """Pick the variation that has the most complete price ladder.
 
@@ -264,9 +340,23 @@ async def _build_quote(
     )
     name, description = _extract_description(product)
     manufacturer = (product.get("Manufacturer") or {}).get("Name")
-    category = (product.get("Category") or {}).get("Name")
+    leaf_id, leaf_name, _root_id = _descend_to_leaf_category(
+        product.get("Category") or {}
+    )
     package = (variation.get("PackageType") or {}).get("Name")
     sku = variation.get("DigiKeyProductNumber")
+
+    lifecycle = (product.get("ProductStatus") or {}).get("Status")
+    moq_raw = variation.get("MinimumOrderQuantity")
+    try:
+        moq = int(moq_raw) if moq_raw is not None else None
+    except (TypeError, ValueError):
+        moq = None
+    std_pkg_raw = variation.get("StandardPackage")
+    try:
+        order_multiple = int(std_pkg_raw) if std_pkg_raw else None
+    except (TypeError, ValueError):
+        order_multiple = None
 
     return SupplierQuote(
         supplier="digikey",
@@ -274,12 +364,22 @@ async def _build_quote(
         manufacturer=manufacturer,
         name=name,
         description=description,
-        family_hint=category,
+        family_hint=leaf_name,
+        supplier_category_id=leaf_id,
+        supplier_category_name=leaf_name,
         datasheet_url=product.get("DatasheetUrl"),
+        image_url=product.get("PhotoUrl"),
         package=package,
         stock=stock,
+        lifecycle_status=lifecycle,
+        moq=moq,
+        order_multiple=order_multiple,
+        lead_time_days=_lead_weeks_to_days(product.get("ManufacturerLeadWeeks")),
+        parameters=_extract_parameters(product),
+        compliance=_extract_compliance(product),
         price_breaks=tuple(breaks),
         supplier_sku=sku,
         supplier_product_url=product.get("ProductUrl"),
+        raw_payload=product,
         last_seen_at=datetime.now(UTC),
     )

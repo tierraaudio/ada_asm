@@ -1,25 +1,39 @@
 {
   "Products": [
     {
-      "ManufacturerProductNumber": "NE555P",
+      "ManufacturerProductNumber": "1N4148W",
       "Manufacturer": {
-        "Id": 296,
-        "Name": "Texas Instruments"
+        "Id": 0,
+        "Name": "Diodes Incorporated"
       },
       "Description": {
         "ProductDescription": "IC OSC SINGLE TIMER 100KHZ 8-DIP",
         "DetailedDescription": "555 Type, Timer/Oscillator (Single) IC 100kHz 8-PDIP"
       },
       "Category": {
-        "CategoryId": 32,
+        "CategoryId": 19,
         "ParentId": 0,
-        "Name": "Integrated Circuits (ICs)",
+        "Name": "Discrete Semiconductor Products",
         "ChildCategories": [
           {
-            "CategoryId": 990,
-            "ParentId": 32,
-            "Name": "Clock/Timing - Programmable Timers and Oscillators",
-            "ChildCategories": []
+            "CategoryId": 2042,
+            "ParentId": 19,
+            "Name": "Diodes",
+            "ChildCategories": [
+              {
+                "CategoryId": 2085,
+                "ParentId": 2042,
+                "Name": "Diodes - Rectifiers - Single",
+                "ChildCategories": [
+                  {
+                    "CategoryId": 280,
+                    "ParentId": 2085,
+                    "Name": "Single Diodes",
+                    "ChildCategories": []
+                  }
+                ]
+              }
+            ]
           }
         ]
       },

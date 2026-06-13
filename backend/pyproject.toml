@@ -101,7 +101,7 @@ warn_unreachable = true
 exclude = ["migrations/versions/"]
 
 [[tool.mypy.overrides]]
-module = ["passlib.*", "jose.*", "celery.*"]
+module = ["passlib.*", "jose.*", "celery.*", "azure.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

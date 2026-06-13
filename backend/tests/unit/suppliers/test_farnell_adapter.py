@@ -79,6 +79,20 @@ async def test_hit_returns_quote_with_eur_prices(
     assert quote.mpn == "NE555P"
     assert quote.supplier_sku == "3006909"
     assert quote.manufacturer == "TEXAS INSTRUMENTS"
+    # Category signal: no id, but tariff_code + displayName captured
+    # (was family_hint=None before the ingest change).
+    assert quote.tariff_code == "85423990"
+    assert quote.supplier_category_name == quote.name
+    # Datasheet now extracted from datasheets[] (was hard-coded None).
+    assert quote.datasheet_url == "http://www.farnell.com/datasheets/ne555p.pdf"
+    assert quote.image_url == "https://es.farnell.com/productimages/ne555p.jpg"
+    codes = {c.code_type: c.code_value for c in quote.compliance}
+    assert codes.get("usEccn") == "EAR99"
+    assert codes.get("tariffCode") == "85423990"
+    # Parametric attribute (not a compliance label) → parameters.
+    plabels = {p.label for p in quote.parameters}
+    assert "Voltaje de alimentación" in plabels
+    assert quote.raw_payload is not None
     assert quote.stock == 14_954
     # ES store → EUR direct, identity conversion in `price_eur`.
     assert quote.supplier_product_url == "https://es.farnell.com/_/dp/3006909"

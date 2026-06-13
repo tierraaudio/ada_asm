@@ -24,6 +24,11 @@ from app.api.v1.schemas.components import (
     ScoringAlternativeResponse,
     ScoringClassificationResponse,
 )
+from app.api.v1.schemas.ingest import (
+    IngestComponentRequest,
+    IngestComponentResponse,
+    IngestionReportResponse,
+)
 from app.api.v1.schemas.modules import ModuleSummaryResponse
 from app.api.v1.schemas.stock_events import (
     PaginatedStockEvents,
@@ -32,6 +37,9 @@ from app.api.v1.schemas.stock_events import (
 from app.api.v1.schemas.supplier_data import (
     SupplierPriceResponse,
     SupplierStockResponse,
+)
+from app.application.services.component_ingestion_service import (
+    ComponentIngestionService,
 )
 from app.application.services.components_service import (
     _MISSING,
@@ -50,6 +58,8 @@ from app.application.services.nato_scoring_service import (
 from app.domain.entities.component import NatoScoreValue, TierValue
 from app.domain.entities.user import User
 from app.domain.repositories.component_repository import ComponentFilters
+from app.infrastructure.datasheet_storage import get_datasheet_storage
+from app.infrastructure.db.models.component_blended import ComponentDocumentModel
 from app.infrastructure.db.models.supplier import SupplierModel
 from app.infrastructure.db.models.user import UserModel
 from app.infrastructure.repositories.component_repository import (
@@ -275,6 +285,64 @@ async def create_component(
         )
     )
     return ComponentResponse.model_validate(created)
+
+
+@router.post(
+    "/ingest",
+    response_model=IngestComponentResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Ingest a component from a manufacturer MPN",
+)
+async def ingest_component(
+    payload: IngestComponentRequest,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> IngestComponentResponse:
+    service = ComponentIngestionService(session, storage=get_datasheet_storage())
+    component, report = await service.ingest(
+        payload.mpn,
+        ubicacion=payload.ubicacion,
+        stock_inicial=payload.stock_inicial,
+        holded_id=payload.holded_id,
+        force=payload.force,
+    )
+    return IngestComponentResponse(
+        component=ComponentResponse.model_validate(component),
+        report=IngestionReportResponse.model_validate(report, from_attributes=True),
+    )
+
+
+@router.get(
+    "/{component_id}/datasheet",
+    summary="Stream the archived datasheet PDF for a component",
+)
+async def get_component_datasheet(
+    component_id: UUID,
+    _user: Annotated[User, Depends(require_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> Response:
+    stmt = (
+        select(ComponentDocumentModel)
+        .where(
+            ComponentDocumentModel.component_id == component_id,
+            ComponentDocumentModel.doc_type == "datasheet",
+            ComponentDocumentModel.blob_path.isnot(None),
+        )
+        .order_by(ComponentDocumentModel.created_at.desc())
+        .limit(1)
+    )
+    doc = (await session.execute(stmt)).scalar_one_or_none()
+    if doc is None or doc.blob_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No archived datasheet for this component",
+        )
+    content = await get_datasheet_storage().read(doc.blob_path)
+    return Response(
+        content=content,
+        media_type=doc.content_type or "application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{component_id}.pdf"'},
+    )
 
 
 @router.get("/{component_id}", response_model=ComponentDetailResponse)

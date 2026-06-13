@@ -95,6 +95,13 @@ async def test_hit_returns_quote_with_manufacturer_symbol_as_mpn(
     assert quote.supplier_sku == "NE555P"  # in this fixture symbol == MPN
     assert quote.manufacturer == "TEXAS INSTRUMENTS"
     assert quote.family_hint == "Watchdog and reset circuits"
+    # Stable category id captured for family inference (change ingest).
+    assert quote.supplier_category_id == "112875"
+    assert quote.supplier_category_name == "Watchdog and reset circuits"
+    assert quote.moq == 1  # minimal_amount
+    assert quote.order_multiple == 1  # multiples
+    assert quote.raw_payload is not None
+    assert quote.raw_payload.get("symbol") == "NE555P"
     assert quote.description == "IC: peripheral circuit; astable,monostable,RC timer; 500kHz"
     assert quote.stock == 17_997
     assert len(quote.price_breaks) == 4

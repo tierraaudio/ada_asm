@@ -30,11 +30,13 @@ import httpx
 from app.core.exceptions import (
     SupplierAuthError,
     SupplierParseError,
+    SupplierRateLimitedError,
     SupplierTimeoutError,
     SupplierTransportError,
 )
 from app.domain.entities.supplier_quote import (
     SupplierCode,
+    SupplierComplianceCode,
     SupplierPriceBreak,
     SupplierQuote,
 )
@@ -96,11 +98,15 @@ class MouserAdapter:
         except json.JSONDecodeError as exc:
             raise SupplierParseError(f"Mouser non-JSON response: {exc}") from exc
 
-        # Mouser reports a bad key as HTTP 200 with an Errors entry; promote
-        # to a typed auth error so the caller's behaviour matches a real 401.
+        # Mouser reports auth + quota failures as HTTP 200 with an Errors
+        # entry (NOT 401/429); promote each to its typed error so callers
+        # behave as if the real status code had been returned.
         for err in body.get("Errors") or []:
-            if err.get("ResourceKey") == "InvalidApiKey":
+            key = err.get("ResourceKey") or err.get("Code")
+            if key == "InvalidApiKey":
                 raise SupplierAuthError("Mouser rejected API key")
+            if key == "TooManyRequests":
+                raise SupplierRateLimitedError("Mouser rate limit exceeded")
 
         results = body.get("SearchResults") or {}
         parts = results.get("Parts") or []
@@ -150,6 +156,12 @@ async def _build_quote(part: dict[str, Any], *, mpn: str) -> SupplierQuote:
     # round-trip the canonical MPN; fall back to the lookup MPN otherwise.
     resolved_mpn = (part.get("ManufacturerPartNumber") or mpn).strip() or mpn
 
+    def _as_int(value: Any) -> int | None:
+        try:
+            return int(str(value).strip()) if value not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
     return SupplierQuote(
         supplier="mouser",
         mpn=resolved_mpn,
@@ -157,11 +169,56 @@ async def _build_quote(part: dict[str, Any], *, mpn: str) -> SupplierQuote:
         name=part.get("Description"),
         description=part.get("Description"),
         family_hint=part.get("Category"),
+        supplier_category_name=part.get("Category"),  # no stable id on Mouser
         datasheet_url=part.get("DataSheetUrl"),
+        image_url=part.get("ImagePath"),
         package=None,  # Mouser exposes packaging under ProductAttributes; out of scope
         stock=stock,
+        lifecycle_status=part.get("LifecycleStatus"),
+        moq=_as_int(part.get("Min")),
+        order_multiple=_as_int(part.get("Mult")),
+        unit_weight_kg=_parse_unit_weight(part.get("UnitWeightKg")),
+        compliance=_extract_compliance(part),
         price_breaks=tuple(breaks),
         supplier_sku=part.get("MouserPartNumber"),
         supplier_product_url=part.get("ProductDetailUrl"),
+        raw_payload=part,
         last_seen_at=datetime.now(UTC),
     )
+
+
+def _parse_unit_weight(node: Any) -> Decimal | None:
+    """Mouser `UnitWeightKg` is `{"UnitWeight": <kg>}`."""
+
+    if not isinstance(node, dict):
+        return None
+    raw = node.get("UnitWeight")
+    if raw in (None, ""):
+        return None
+    try:
+        return Decimal(str(raw))
+    except (TypeError, ValueError, InvalidOperation):
+        return None
+
+
+def _extract_compliance(part: dict[str, Any]) -> tuple[SupplierComplianceCode, ...]:
+    """Flatten Mouser's ROHSStatus + ProductCompliance + TradeCompliance.
+
+    `ProductCompliance` carries export/customs codes (ECCN, USHTS, TARIC...);
+    `TradeCompliance` carries country-of-origin. `ROHSStatus` is a scalar.
+    """
+
+    out: list[SupplierComplianceCode] = []
+    rohs = part.get("ROHSStatus")
+    if rohs:
+        out.append(SupplierComplianceCode(code_type="RoHS", code_value=str(rohs)))
+    for entry in (part.get("ProductCompliance") or []) + (
+        part.get("TradeCompliance") or []
+    ):
+        name = entry.get("ComplianceName")
+        value = entry.get("ComplianceValue")
+        if name and value not in (None, ""):
+            out.append(
+                SupplierComplianceCode(code_type=str(name), code_value=str(value))
+            )
+    return tuple(out)

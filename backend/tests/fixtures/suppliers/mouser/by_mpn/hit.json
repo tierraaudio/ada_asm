@@ -14,14 +14,52 @@
         "ManufacturerPartNumber": "NBC12429FAR2G",
         "MouserPartNumber": "863-NBC12429FAR2G",
         "PriceBreaks": [
-          { "Quantity": 1, "Price": "$5.00", "Currency": "USD" },
-          { "Quantity": 10, "Price": "$4.50", "Currency": "USD" },
-          { "Quantity": 100, "Price": "$3.80", "Currency": "USD" },
-          { "Quantity": 1000, "Price": "$3.10", "Currency": "USD" }
+          {
+            "Quantity": 1,
+            "Price": "$5.00",
+            "Currency": "USD"
+          },
+          {
+            "Quantity": 10,
+            "Price": "$4.50",
+            "Currency": "USD"
+          },
+          {
+            "Quantity": 100,
+            "Price": "$3.80",
+            "Currency": "USD"
+          },
+          {
+            "Quantity": 1000,
+            "Price": "$3.10",
+            "Currency": "USD"
+          }
         ],
         "ProductDetailUrl": "https://www.mouser.com/ProductDetail/onsemi/NBC12429FAR2G",
         "LifecycleStatus": "Active",
-        "ROHSStatus": "RoHS Compliant"
+        "ROHSStatus": "RoHS Compliant",
+        "ProductCompliance": [
+          {
+            "ComplianceName": "ECCN",
+            "ComplianceValue": "EAR99"
+          },
+          {
+            "ComplianceName": "USHTS",
+            "ComplianceValue": "8542390001"
+          }
+        ],
+        "TradeCompliance": [
+          {
+            "ComplianceName": "País de origen",
+            "ComplianceValue": "MX"
+          }
+        ],
+        "Min": "1",
+        "Mult": "1",
+        "ImagePath": "https://www.mouser.com/images/ne555p_t.jpg",
+        "UnitWeightKg": {
+          "UnitWeight": 0.0002
+        }
       }
     ]
   }

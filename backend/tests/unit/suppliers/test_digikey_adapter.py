@@ -83,7 +83,12 @@ async def test_hit_returns_quote_with_eur_breaks_and_package(
     assert quote.mpn == "NE555P"
     assert quote.supplier_sku == "296-NE555P-ND"
     assert quote.manufacturer == "Texas Instruments"
-    assert quote.family_hint == "Integrated Circuits (ICs)"
+    # Category now descends to the LEAF, not the root.
+    assert quote.supplier_category_id == "990"
+    assert quote.supplier_category_name == (
+        "Clock/Timing - Programmable Timers and Oscillators"
+    )
+    assert quote.family_hint == quote.supplier_category_name
     assert quote.package == "Tube"
     assert quote.stock == 26_735
     assert quote.datasheet_url == "https://www.ti.com/lit/ds/symlink/na555.pdf"
@@ -95,6 +100,69 @@ async def test_hit_returns_quote_with_eur_breaks_and_package(
     assert first.price_original == Decimal("0.43")
     assert first.currency_original == "EUR"
     assert first.price_eur == Decimal("0.43")
+
+
+async def test_category_descends_to_leaf_distinguishing_diode_from_transistor(
+    shared_redis: fakeredis.aioredis.FakeRedis,
+    adapter: DigiKeyAdapter,
+) -> None:
+    # Both share root CategoryId 19; only the LEAF distinguishes them.
+    with respx.mock() as mock:
+        mock.post(_TOKEN_URL).mock(
+            return_value=httpx.Response(200, text=_load("auth_token.json")),
+        )
+        mock.post(_SEARCH_URL).mock(
+            return_value=httpx.Response(200, text=_load("diode_1n4148w.json")),
+        )
+        diode = await adapter.fetch_by_mpn("1N4148W")
+
+    # Token is cached on the adapter after the first call — only the search
+    # route is hit on the second fetch.
+    with respx.mock() as mock:
+        mock.post(_SEARCH_URL).mock(
+            return_value=httpx.Response(200, text=_load("transistor_2n7002.json")),
+        )
+        transistor = await adapter.fetch_by_mpn("2N7002")
+
+    assert diode is not None and transistor is not None
+    assert diode.supplier_category_id == "280"
+    assert diode.supplier_category_name == "Single Diodes"
+    assert transistor.supplier_category_id == "278"
+    assert transistor.supplier_category_name == "Single FETs, MOSFETs"
+
+
+async def test_hit_extracts_blended_parametrics_compliance_lifecycle(
+    shared_redis: fakeredis.aioredis.FakeRedis,
+    adapter: DigiKeyAdapter,
+) -> None:
+    with respx.mock() as mock:
+        mock.post(_TOKEN_URL).mock(
+            return_value=httpx.Response(200, text=_load("auth_token.json")),
+        )
+        mock.post(_SEARCH_URL).mock(
+            return_value=httpx.Response(200, text=_load("hit.json")),
+        )
+        quote = await adapter.fetch_by_mpn("NE555P")
+
+    assert quote is not None
+    assert quote.image_url == "https://mm.digikey.com/Volume0/opasdata/ne555p.jpg"
+    assert quote.lifecycle_status == "Active"
+    assert quote.lead_time_days == 42  # 6 weeks normalized to days
+    assert quote.moq == 1
+    # Parametrics extracted with stable ParameterId keys.
+    labels = {p.label for p in quote.parameters}
+    assert "Voltage - Supply" in labels
+    voltage = next(p for p in quote.parameters if p.label == "Voltage - Supply")
+    assert voltage.key == "2074"
+    assert voltage.value == "4.5V ~ 16V"
+    # Compliance codes flattened to (type, value).
+    codes = {c.code_type: c.code_value for c in quote.compliance}
+    assert codes.get("RohsStatus") == "ROHS3 Compliant"
+    assert codes.get("ExportControlClassNumber") == "EAR99"
+    assert codes.get("HtsusCode") == "8542.39.0001"
+    # Raw payload preserved.
+    assert quote.raw_payload is not None
+    assert quote.raw_payload.get("ManufacturerProductNumber") == "NE555P"
 
 
 async def test_miss_returns_none(

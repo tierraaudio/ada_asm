@@ -19,22 +19,95 @@
           "status": 1,
           "shipsFromMultipleWarehouses": false,
           "breakdown": [
-            { "inv": 14954, "region": "UK", "lead": 92, "warehouse": "UK1" },
-            { "inv": 0, "region": "UK", "lead": 92, "warehouse": "GB1" }
+            {
+              "inv": 14954,
+              "region": "UK",
+              "lead": 92,
+              "warehouse": "UK1"
+            },
+            {
+              "inv": 0,
+              "region": "UK",
+              "lead": 92,
+              "warehouse": "GB1"
+            }
           ]
         },
         "prices": [
-          { "to": 9, "from": 1, "cost": 0.494 },
-          { "to": 99, "from": 10, "cost": 0.354 },
-          { "to": 499, "from": 100, "cost": 0.275 },
-          { "to": 999, "from": 500, "cost": 0.255 },
-          { "to": 2499, "from": 1000, "cost": 0.25 },
-          { "to": 4999, "from": 2500, "cost": 0.245 },
-          { "to": 999999999, "from": 5000, "cost": 0.24 }
+          {
+            "to": 9,
+            "from": 1,
+            "cost": 0.494
+          },
+          {
+            "to": 99,
+            "from": 10,
+            "cost": 0.354
+          },
+          {
+            "to": 499,
+            "from": 100,
+            "cost": 0.275
+          },
+          {
+            "to": 999,
+            "from": 500,
+            "cost": 0.255
+          },
+          {
+            "to": 2499,
+            "from": 1000,
+            "cost": 0.25
+          },
+          {
+            "to": 4999,
+            "from": 2500,
+            "cost": 0.245
+          },
+          {
+            "to": 999999999,
+            "from": 5000,
+            "cost": 0.24
+          }
         ],
         "productStatus": "ok",
         "rohsStatusCode": "Y",
-        "image": { "baseName": "/42268235.jpg", "vrntPath": "farnell/" }
+        "image": {
+          "baseName": "/42268235.jpg",
+          "vrntPath": "farnell/"
+        },
+        "datasheets": [
+          {
+            "url": "http://www.farnell.com/datasheets/ne555p.pdf",
+            "type": "Technical Data Sheet",
+            "description": "Datasheet"
+          }
+        ],
+        "attributes": [
+          {
+            "attributeLabel": "tariffCode",
+            "attributeValue": "85423990"
+          },
+          {
+            "attributeLabel": "usEccn",
+            "attributeValue": "EAR99"
+          },
+          {
+            "attributeLabel": "countryOfOrigin",
+            "attributeValue": "MX"
+          },
+          {
+            "attributeLabel": "SVHC",
+            "attributeValue": "No SVHC (27-Jun-2018)"
+          },
+          {
+            "attributeLabel": "Voltaje de alimentación",
+            "attributeValue": "4.5",
+            "attributeUnit": "V"
+          }
+        ],
+        "countryOfOrigin": "MX",
+        "mainImageURL": "https://es.farnell.com/productimages/ne555p.jpg"
       }
     ]
   }

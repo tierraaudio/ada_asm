@@ -169,6 +169,47 @@ async def test_happy_path_merges_progressively_and_returns_supplier_data(
     assert "description" not in body["missing_fields"]
 
 
+async def test_family_not_merged_and_category_signals_in_supplier_data(
+    api_client: AsyncClient,
+    auth_headers: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Family is no longer decided by the presentation merge; per-supplier
+    # category signals are carried in supplier_data for FamilyInferenceService.
+    mpn = f"TEST-FAM-{uuid4().hex[:8].upper()}"
+    await _flush_lookup_cache(mpn)
+    from dataclasses import replace
+
+    mouser_q = replace(
+        _mouser_quote(mpn),
+        family_hint="Diodo de conmutación",
+        supplier_category_name="Diodo de conmutación",
+    )
+    digikey_q = replace(
+        _digikey_quote(mpn),
+        family_hint="Single FETs, MOSFETs",
+        supplier_category_id="278",
+        supplier_category_name="Single FETs, MOSFETs",
+    )
+    _patch_adapters(
+        monkeypatch,
+        [_FakeAdapter("mouser", quote=mouser_q), _FakeAdapter("digikey", quote=digikey_q)],
+    )
+
+    response = await api_client.get(
+        f"/api/v1/components/lookup?mpn={mpn}", headers=auth_headers
+    )
+    assert response.status_code == 200
+    body = response.json()
+
+    # family_hint is NOT decided by Mouser's priority — it is not merged.
+    assert body["fields"]["family_hint"] is None
+    # The raw category signals are present per supplier.
+    by_supplier = {sd["supplier"]: sd for sd in body["supplier_data"]}
+    assert by_supplier["digikey"]["supplier_category_id"] == "278"
+    assert by_supplier["digikey"]["supplier_category_name"] == "Single FETs, MOSFETs"
+
+
 async def test_404_when_all_suppliers_succeeded_but_no_match(
     api_client: AsyncClient,
     auth_headers: dict[str, str],

@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
+    SmallInteger,
     String,
+    Text,
     text,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -75,4 +80,29 @@ class ComponentModel(Base, TimestampMixin):
     last_supplier_sync_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
+    )
+
+    # --- Blended supplier-derived scalars (change `ingest-component-from-mpn`) ---
+    lifecycle_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_buy_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    discontinued: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    end_of_life: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    moq: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    order_multiple: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lead_time_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    unit_weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(12, 6), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # --- Family-inference provenance (change `ingest-component-from-mpn`) ---
+    family_inferred_supplier: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    family_inferred_match_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    raw_category_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    raw_category_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    raw_tariff_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    family_confidence: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    family_needs_review: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("false"),
     )

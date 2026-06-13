@@ -51,6 +51,18 @@ class Settings(BaseSettings):
             "unreachable Redis degrades performance, never availability"
         ),
     )
+    datasheet_storage_account_url: str = Field(
+        default="",
+        description=(
+            "Azure Blob account URL (e.g. https://<acct>.blob.core.windows.net) "
+            "for archived datasheets. Empty → filesystem driver (local/dev)."
+        ),
+    )
+    datasheet_container: str = Field(default="datasheets")
+    datasheet_local_root: str = Field(
+        default="/tmp/ada_asm_datasheets",
+        description="Filesystem root used when no Azure storage account is set.",
+    )
 
     jwt_secret: str = Field(..., min_length=8, description="Secret used to sign JWTs")
     jwt_access_token_ttl_seconds: int = Field(default=900)

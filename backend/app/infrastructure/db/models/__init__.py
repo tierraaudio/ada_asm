@@ -7,6 +7,16 @@ autogeneration can see the full schema in one place.
 from __future__ import annotations
 
 from app.infrastructure.db.models.component import ComponentModel
+from app.infrastructure.db.models.component_blended import (
+    ComponentComplianceModel,
+    ComponentCrossRefModel,
+    ComponentDocumentModel,
+    ComponentParameterModel,
+    ComponentSupplierPayloadModel,
+)
+from app.infrastructure.db.models.component_family_rule import (
+    ComponentFamilyRuleModel,
+)
 from app.infrastructure.db.models.customer import CustomerModel
 from app.infrastructure.db.models.module import ModuleModel
 from app.infrastructure.db.models.module_child import ModuleChildModel
@@ -27,8 +37,14 @@ from app.infrastructure.db.models.supplier_sync_run import SupplierSyncRunModel
 from app.infrastructure.db.models.user import UserModel
 
 __all__ = [
+    "ComponentComplianceModel",
+    "ComponentCrossRefModel",
+    "ComponentDocumentModel",
+    "ComponentFamilyRuleModel",
     "ComponentModel",
     "ComponentNatoScoringModel",
+    "ComponentParameterModel",
+    "ComponentSupplierPayloadModel",
     "CustomerModel",
     "ModuleChildModel",
     "ModuleModel",
