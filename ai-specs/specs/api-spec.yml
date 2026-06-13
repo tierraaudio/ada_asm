@@ -210,6 +210,76 @@ paths:
         "422":
           $ref: "#/components/responses/Validation"
 
+  /api/v1/components/ingest:
+    post:
+      tags: [components]
+      summary: Ingest a component from a manufacturer MPN
+      description: >
+        Walks the enabled suppliers for the MPN, blends the results, infers
+        the internal family (signal-strength resolution, separate from the
+        presentation merge), archives the datasheet PDF (best-effort), and
+        creates the component with every field the suppliers could fill plus
+        optional manual fields. The internal SKU is auto-generated from the
+        inferred family. Returns the created component plus a structured
+        IngestionReport for a results view. The component is then picked up
+        by the daily supplier sync, which accumulates price/stock history.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/IngestComponentRequest" }
+      responses:
+        "201":
+          description: Component ingested.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IngestComponentResponse" }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "No supplier recognised the MPN (code: COMPONENT_MPN_NOT_FOUND)"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "409":
+          description: "MPN already registered (code: MPN_ALREADY_REGISTERED)"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+        "502":
+          description: "All consulted suppliers errored (code: SUPPLIER_LOOKUP_UNAVAILABLE)"
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /api/v1/components/{component_id}/datasheet:
+    get:
+      tags: [components]
+      summary: Stream the archived datasheet PDF for a component
+      description: >
+        Streams the private archived datasheet PDF (or redirects to a
+        short-lived read-only SAS). Protected; the blob container has no
+        anonymous public access.
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: component_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The datasheet PDF.
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: No archived datasheet for this component.
+
   /api/v1/components/{component_id}:
     parameters:
       - in: path
@@ -1375,6 +1445,19 @@ components:
           pattern: "^[A-Z]{2}$"
           description: ISO 3166-1 alpha-2.
         proveedor_preferente_id: { type: string, format: uuid, nullable: true }
+        # Blended supplier-derived fields (change `ingest-component-from-mpn`).
+        lifecycle_status: { type: string, nullable: true }
+        last_buy_date: { type: string, format: date, nullable: true }
+        discontinued: { type: boolean, nullable: true }
+        end_of_life: { type: boolean, nullable: true }
+        moq: { type: integer, nullable: true }
+        order_multiple: { type: integer, nullable: true }
+        lead_time_days: { type: integer, nullable: true }
+        unit_weight_kg: { type: string, nullable: true }
+        image_url: { type: string, nullable: true }
+        family_needs_review:
+          type: boolean
+          description: True when the family could not be inferred and awaits manual review.
         current_price_per_100_eur:
           type: string
           nullable: true
@@ -1408,6 +1491,63 @@ components:
               allOf:
                 - $ref: "#/components/schemas/NatoScoringResponse"
               nullable: true
+
+    IngestComponentRequest:
+      type: object
+      required: [mpn]
+      properties:
+        mpn: { type: string, minLength: 1, maxLength: 100, description: Manufacturer part number. }
+        ubicacion: { type: string, nullable: true, maxLength: 100 }
+        stock_inicial: { type: integer, nullable: true, minimum: 0 }
+        holded_id: { type: string, nullable: true, maxLength: 80 }
+        force: { type: boolean, default: false, description: Re-ingest even if the MPN already exists. }
+
+    IngestComponentResponse:
+      type: object
+      required: [component, report]
+      properties:
+        component: { $ref: "#/components/schemas/Component" }
+        report: { $ref: "#/components/schemas/IngestionReport" }
+
+    IngestionReport:
+      type: object
+      description: Structured summary of an ingestion, for a results view.
+      required: [status, mpn, sku, family, datasheet, counts]
+      properties:
+        status: { type: string, enum: [ok, ok_with_warnings] }
+        mpn: { type: string }
+        sku: { type: string }
+        sources_consulted: { type: array, items: { type: string } }
+        sources_succeeded: { type: array, items: { type: string } }
+        sources_contributed:
+          type: array
+          items: { type: string }
+          description: Suppliers whose data actually landed on the component.
+        family:
+          type: object
+          properties:
+            inferred: { type: string, nullable: true }
+            needs_review: { type: boolean }
+            decided_by: { type: string, nullable: true }
+            match_type: { type: string, nullable: true, enum: [category_id, tariff_prefix, name_keyword] }
+            raw_category: { type: string, nullable: true }
+            confidence: { type: integer, nullable: true }
+        datasheet:
+          type: object
+          properties:
+            outcome: { type: string, enum: [archived, link_only, none] }
+            source: { type: string, nullable: true }
+            url: { type: string, nullable: true }
+            blob_path: { type: string, nullable: true }
+            size_bytes: { type: integer, nullable: true }
+        fields_populated: { type: array, items: { type: string } }
+        fields_missing: { type: array, items: { type: string } }
+        counts:
+          type: object
+          additionalProperties: { type: integer }
+          description: Stored-row counts (price_breaks, parameters, compliance_codes, cross_refs, documents, supplier_stock_rows).
+        manual_overrides_applied: { type: array, items: { type: string } }
+        warnings: { type: array, items: { type: string } }
 
     ComponentCreate:
       type: object

@@ -159,8 +159,6 @@ The recursive walks are bounded to depth 8 to prevent runaway in case of misconf
 
 ### 4. Component
 
-### 4. Component
-
 A leaf in the asset tree representing a single electronic part. Carries identifying metadata (mpn/sku/name/description/datasheet), warehouse location + storage type, manufacturer, preferred supplier (FK), current on-hand stock, and the two **cached** classification fields the workshop operates on: `tier` (criticality 1–4) and `nato_score` (geopolitical origin scoring A+/A/B/C/D/F). The classification cache is kept in sync with whichever `component_nato_scorings` row is currently `status='active'` — never edited directly via the component PATCH path.
 
 - **Status**: ✅ Implemented (introduced by `component-management`; iterated across migrations `20260523_1800`, `20260524_1200`, `20260525_0900`).
@@ -186,8 +184,27 @@ A leaf in the asset tree representing a single electronic part. Carries identify
   - `country_of_origin` `varchar(2)`, nullable — ISO 3166-1 alpha-2
   - `proveedor_preferente_id` UUIDv4, nullable, FK → `suppliers.id` ON DELETE SET NULL
   - `last_supplier_sync_at` `timestamptz`, nullable — last time the supplier sync (change `supplier-sync`, migration `20260528_1330`) wrote a `supplier_prices` or `supplier_stocks` row for this component. NULL on components that have never been synced.
+  - **Blended supplier-derived columns** (change `ingest-component-from-mpn`, migration `20260613_1000`): `lifecycle_status` `varchar(32)`, `last_buy_date` `date`, `discontinued` `boolean`, `end_of_life` `boolean`, `moq` `integer`, `order_multiple` `integer`, `lead_time_days` `integer`, `unit_weight_kg` `numeric(12,6)`, `image_url` `text` — all nullable, populated at ingest from the supplier APIs and refreshable by sync.
+  - **Family-inference provenance** (same migration): `family_inferred_supplier` `varchar(32)`, `family_inferred_match_type` `varchar(32)`, `raw_category_id` `varchar(64)`, `raw_category_name` `text`, `raw_tariff_code` `varchar(32)`, `family_confidence` `smallint` (all nullable), `family_needs_review` `boolean` not null default `false`. These record which supplier signal decided the family so a mis-mapping is auditable and components can be re-classified in bulk without re-calling the APIs.
   - `created_at` / `updated_at` `timestamptz`, server-defaulted to `now()`
 - **Indexes**: unique functional `uq_components_mpn_lower`, plus per-column `lower(...)` indexes on `sku`, `name`, `family` for case-insensitive search; `ix_components_proveedor_preferente_id`.
+
+### 4a. Blended ingestion tables (change `ingest-component-from-mpn`)
+
+Per-supplier data captured when a component is ingested from its MPN (migration `20260613_1001`). All cascade-delete with their parent component.
+
+- **`component_parameters`** — parametric specs as N key/value rows: `component_id` FK, `supplier`, `param_key` (stable supplier parameter id when present), `param_label`, `param_value`, `param_unit`.
+- **`component_compliance`** — export/customs + compliance codes: `component_id` FK, `supplier`, `code_type` (ECCN/HTS/RoHS/REACH/MSL/country…), `code_value`.
+- **`component_documents`** — datasheets and other documents (multiple per component): `component_id` FK, `supplier`, `doc_type`, `url`, `file_name`, `size_bytes`, `language`, `blob_path` (Azure Blob path of the archived PDF, `datasheets/<sha256>.pdf`), `sha256`, `content_type`, `fetched_at`.
+- **`component_cross_refs`** — alternates/substitutes/aliases: `component_id` FK, `supplier`, `ref_type`, `ref_value`.
+- **`component_supplier_payloads`** — raw JSONB snapshot of each supplier's product object (`component_id`, `supplier`, `raw_payload jsonb`, `fetched_at`), unique on `(component_id, supplier)`, so doc-only fields are re-parseable without an API call.
+
+### 4b. ComponentFamilyRule (change `ingest-component-from-mpn`)
+
+Editable seed table (migration `20260613_1001`, seeded `20260613_1002`) mapping a single supplier category signal to one internal family. `FamilyInferenceService` evaluates these by signal strength (stable `category_id` 100 > HS `tariff_prefix` 70 > localized `name_keyword` 40).
+
+- **Table**: `component_family_rules`.
+- **Columns**: `id` PK, `supplier` (CHECK in the five codes), `match_type` (CHECK in `category_id`|`tariff_prefix`|`name_keyword`), `match_value`, `family` (CHECK in the nine families), `confidence` `smallint`, `priority` `smallint`, `enabled` `boolean`, `notes` `text`. Unique on `(supplier, match_type, match_value)`. Grows from logged misses without a code deploy.
 
 ### 5. Supplier
 

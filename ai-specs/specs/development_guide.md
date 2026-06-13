@@ -90,6 +90,36 @@ docker compose run --rm backend python -m app.scripts.seed_projects
 
 Inserts 3 Holded-style customers (`HLD-CUST-001/002/003`) and 5 projects covering every status from the Spanish enum — `Presupuestado` (empty BOM), 2 × `En proceso` (mixed module + component BOMs), `Completado` (with `fecha_entrega_real` set), `Archivado`. Every project carries an `icon` (emoji), `color` (hex), `tags`, and `version`. Also writes ~6 interest links (`{name, url}`) across the projects so the "Enlaces de interés" surface has rows, and ~6 consumption `stock_events` so "Histórico de eventos" is populated.
 
+### Ingest a real component from its MPN (change `ingest-component-from-mpn`)
+
+Instead of typing every field by hand, ingest a component straight from its manufacturer MPN. Given an MPN, the pipeline walks the four supplier APIs, blends the data, infers the internal family, downloads + archives the datasheet PDF, and creates the component fully populated — then the daily sync accumulates its price/stock history.
+
+Two entrypoints share one application service:
+
+```bash
+# CLI (local)
+docker compose run --rm backend python -m app.scripts.ingest_component NE555P \
+  --ubicacion G-T-23 --stock-inicial 100 --holded-id HLD-NE555
+
+# CLI (prod — one-off Container App Job on the backend image)
+az containerapp job start -n caj-ada-asm-prod-migrate -g rg-ada-asm-prod \
+  --command python -m app.scripts.ingest_component NE555P   # or a dedicated ingest job
+
+# API
+POST /api/v1/components/ingest   {"mpn":"NE555P","ubicacion":"G-T-23"}
+```
+
+The response (and the CLI output) carries an **IngestionReport**: which suppliers contributed, the inferred family (or `needs_review`), the datasheet outcome (`archived`/`link_only`/`none`), per-table counts, and warnings.
+
+**Family rules.** Inference maps each supplier's category signal to one of the nine internal families via the `component_family_rules` seed table (stable DigiKey/TME `category_id`, Farnell HS `tariff_prefix`, Mouser localized `name_keyword`). Unmapped categories leave the family empty + `needs_review` and are logged (`family_inference.unmapped …`) — grow the table with an `INSERT` (no code deploy):
+
+```sql
+INSERT INTO component_family_rules (supplier, match_type, match_value, family, confidence)
+VALUES ('digikey', 'category_id', '<leaf id>', 'Sensores', 100);
+```
+
+**Datasheet storage env (cloud only).** `DATASHEET_STORAGE_ACCOUNT_URL` (e.g. `https://<acct>.blob.core.windows.net`) + `DATASHEET_CONTAINER=datasheets` select the Azure Blob driver; the backend reads/writes via its managed identity (Storage Blob Data Contributor). Unset → filesystem driver at `DATASHEET_LOCAL_ROOT` (local dev). Datasheet archival is best-effort and never blocks component creation.
+
 Pass `--reset` to wipe (in order) `stock_events WHERE project_id IS NOT NULL`, `project_children`, `projects`, and `customers` before re-seeding (modules + components survive). The `project_interest_links` rows are cascaded by the FK on `project_children → projects`, so they're wiped automatically. Exits with 3 if components or modules aren't seeded yet; exits with 2 if `projects` is non-empty without `--reset`.
 
 #### Project status enum
