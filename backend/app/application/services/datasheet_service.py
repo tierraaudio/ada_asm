@@ -10,6 +10,7 @@ the live-probed per-host gotchas.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -22,6 +23,10 @@ _log = logging.getLogger(__name__)
 
 _PDF_MAGIC = b"%PDF"
 _HTTP_TIMEOUT_SECONDS = 20.0
+# Global budget for the whole acquisition chain so a sequence of slow/hanging
+# candidate hosts can never make ingestion hang (observed: some MPNs walked
+# several slow URLs for >100s). On expiry we fall back to link-only.
+_ACQUIRE_BUDGET_SECONDS = 40.0
 _MAX_PDF_BYTES = 64 * 1024 * 1024  # 64 MB safety cap
 
 # Per-host User-Agent strategy (live-probed). Some manufacturer hosts only
@@ -140,22 +145,32 @@ async def acquire(
     if not candidates:
         return DatasheetResult(outcome="none")
 
-    for source, url in candidates:
-        downloaded = await _try_download(url)
-        if downloaded is None:
-            continue
-        content, content_type = downloaded
-        blob_path = await storage.store(content, content_type=content_type)
-        return DatasheetResult(
-            outcome="archived",
-            source=source,
-            url=_normalize_url(url),
-            blob_path=blob_path,
-            sha256=sha256_hex(content),
-            content_type=content_type,
-            size_bytes=len(content),
-        )
+    async def _walk() -> DatasheetResult | None:
+        for source, url in candidates:
+            downloaded = await _try_download(url)
+            if downloaded is None:
+                continue
+            content, content_type = downloaded
+            blob_path = await storage.store(content, content_type=content_type)
+            return DatasheetResult(
+                outcome="archived",
+                source=source,
+                url=_normalize_url(url),
+                blob_path=blob_path,
+                sha256=sha256_hex(content),
+                content_type=content_type,
+                size_bytes=len(content),
+            )
+        return None
 
-    # No PDF downloaded — keep the best-known URL as a link.
+    try:
+        result = await asyncio.wait_for(_walk(), timeout=_ACQUIRE_BUDGET_SECONDS)
+    except TimeoutError:
+        _log.warning("datasheet.acquire.budget_exceeded mpn=%s", mpn)
+        result = None
+    if result is not None:
+        return result
+
+    # No PDF downloaded (or budget exceeded) — keep the best-known URL as a link.
     source, url = candidates[0]
     return DatasheetResult(outcome="link_only", source=source, url=_normalize_url(url))
