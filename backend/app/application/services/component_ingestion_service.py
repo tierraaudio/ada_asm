@@ -129,7 +129,11 @@ class ComponentIngestionService:
         existing = await self._components.get_by_mpn(mpn)
         if existing is not None and not force:
             raise ComponentMpnAlreadyRegisteredError(
-                f"MPN '{mpn}' is already registered"
+                f"MPN '{mpn}' is already registered",
+                extra={
+                    "existing_id": str(existing.id),
+                    "existing_sku": existing.sku,
+                },
             )
 
         # 2. Gather supplier quotes (raises 404 / 502 per disambiguation).

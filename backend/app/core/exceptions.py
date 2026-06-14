@@ -16,8 +16,13 @@ class DomainError(Exception):
     code: str = "DOMAIN_ERROR"
     http_status: int = 400
 
-    def __init__(self, message: str | None = None) -> None:
+    def __init__(
+        self, message: str | None = None, *, extra: dict[str, object] | None = None
+    ) -> None:
         super().__init__(message or self.__class__.__name__)
+        # Optional RFC 7807 extension members merged into the problem body
+        # (e.g. the existing component's id/sku on a 409 so the UI can link).
+        self.extra: dict[str, object] = extra or {}
 
 
 # ---------- Authentication ----------

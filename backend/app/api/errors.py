@@ -45,6 +45,7 @@ async def domain_error_handler(request: Request, exc: DomainError) -> JSONRespon
         code=exc.code,
         title=_title_for(exc.code),
         detail=str(exc) if str(exc) != exc.__class__.__name__ else None,
+        extra=exc.extra or None,
     )
 
 

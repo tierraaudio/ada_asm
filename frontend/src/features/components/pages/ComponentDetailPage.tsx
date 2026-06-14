@@ -1,6 +1,6 @@
-import { Edit3, History, Trash2 } from "lucide-react";
+import { Edit3, History, Trash2, X } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { DashboardLayout } from "@/app/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ type ModalKey = "historial" | "scoring" | "clasificar" | null;
 export function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const detailQuery = useComponentDetail(id);
   const deleteMutation = useDeleteComponent();
   const { reset: resetNavStack } = useDetailNavStack();
@@ -49,6 +50,11 @@ export function ComponentDetailPage() {
   const parentsQuery = useComponentParents(id);
   const projectsUsingQuery = useComponentProjectsUsing(id);
   const [openModal, setOpenModal] = useState<ModalKey>(null);
+  // Set when the user landed here from an ingest attempt whose MPN already
+  // existed — we redirect to the existing component and explain why.
+  const ingestExistingMpn =
+    (location.state as { ingestExistingMpn?: string } | null)?.ingestExistingMpn ?? null;
+  const [showExistingBanner, setShowExistingBanner] = useState(Boolean(ingestExistingMpn));
   useDetailNavPush();
 
   if (!id || detailQuery.isLoading) {
@@ -109,6 +115,23 @@ export function ComponentDetailPage() {
             </>
           }
         />
+
+        {showExistingBanner && ingestExistingMpn && (
+          <div className="flex items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+            <span>
+              Este componente ya estaba ingestado (buscaste el MPN{" "}
+              <span className="font-semibold">{ingestExistingMpn}</span>).
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowExistingBanner(false)}
+              aria-label="Cerrar aviso"
+              className="text-sky-600 transition-colors hover:text-sky-800"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        )}
 
         <ComponentHeaderCard
           component={component}

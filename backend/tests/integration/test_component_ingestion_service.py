@@ -179,9 +179,15 @@ async def test_ingest_duplicate_mpn_rejected_unless_forced(
             # Datasheet not important here — let the whole chain miss.
             mock.get(_DS_URL).mock(return_value=httpx.Response(404))
             mock.route(host="www.ti.com").mock(return_value=httpx.Response(404))
-            await service.ingest(mpn)
-            with pytest.raises(ComponentMpnAlreadyRegisteredError):
+            created, _ = await service.ingest(mpn)
+            with pytest.raises(ComponentMpnAlreadyRegisteredError) as exc_info:
                 await service.ingest(mpn)
+            # The 409 carries the existing component so the UI can redirect
+            # to it instead of dead-ending on an error.
+            assert exc_info.value.extra == {
+                "existing_id": str(created.id),
+                "existing_sku": created.sku,
+            }
     finally:
         await session.close()
 

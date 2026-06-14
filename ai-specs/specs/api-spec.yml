@@ -244,10 +244,25 @@ paths:
             application/problem+json:
               schema: { $ref: "#/components/schemas/Problem" }
         "409":
-          description: "MPN already registered (code: MPN_ALREADY_REGISTERED)"
+          description: >
+            MPN already registered (code: MPN_ALREADY_REGISTERED). The problem
+            body carries the existing component's id and SKU as RFC 7807
+            extension members so the UI can redirect to it instead of
+            dead-ending on an error.
           content:
             application/problem+json:
-              schema: { $ref: "#/components/schemas/Problem" }
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Problem"
+                  - type: object
+                    properties:
+                      existing_id:
+                        type: string
+                        format: uuid
+                        description: Id of the component that already holds this MPN.
+                      existing_sku:
+                        type: string
+                        description: SKU of the component that already holds this MPN.
         "502":
           description: "All consulted suppliers errored (code: SUPPLIER_LOOKUP_UNAVAILABLE)"
           content:

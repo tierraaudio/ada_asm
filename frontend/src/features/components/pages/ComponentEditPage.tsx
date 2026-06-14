@@ -135,6 +135,15 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
         if (status === 404) {
           setIngestError("Ningún proveedor reconoce ese MPN. Revisa la referencia.");
         } else if (status === 409) {
+          // Already ingested — redirect to the existing component instead of
+          // dead-ending on an error. The backend attaches its id to the 409.
+          const data = err.response?.data as { existing_id?: string } | undefined;
+          if (data?.existing_id) {
+            navigate(`/components/${data.existing_id}`, {
+              state: { ingestExistingMpn: mpn },
+            });
+            return;
+          }
           setIngestError("Ya existe un componente con ese MPN.");
         } else if (status === 502) {
           setIngestError("Los proveedores no responden ahora mismo. Inténtalo en un momento.");
