@@ -151,7 +151,20 @@ async def acquire(
             if downloaded is None:
                 continue
             content, content_type = downloaded
-            blob_path = await storage.store(content, content_type=content_type)
+            # Storing is best-effort: a storage backend failure (e.g. missing
+            # role/SDK) must NOT fail ingestion — fall back to link-only.
+            try:
+                blob_path = await storage.store(content, content_type=content_type)
+            except Exception as exc:
+                _log.warning(
+                    "datasheet.store_failed mpn=%s source=%s err=%s.%s msg=%s",
+                    mpn,
+                    source,
+                    type(exc).__module__,
+                    type(exc).__name__,
+                    exc,
+                )
+                return None
             return DatasheetResult(
                 outcome="archived",
                 source=source,
@@ -167,6 +180,15 @@ async def acquire(
         result = await asyncio.wait_for(_walk(), timeout=_ACQUIRE_BUDGET_SECONDS)
     except TimeoutError:
         _log.warning("datasheet.acquire.budget_exceeded mpn=%s", mpn)
+        result = None
+    except Exception as exc:  # never let datasheet archival fail ingestion
+        _log.warning(
+            "datasheet.acquire_failed mpn=%s err=%s.%s msg=%s",
+            mpn,
+            type(exc).__module__,
+            type(exc).__name__,
+            exc,
+        )
         result = None
     if result is not None:
         return result

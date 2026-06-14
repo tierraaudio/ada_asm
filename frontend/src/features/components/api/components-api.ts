@@ -91,9 +91,12 @@ export const componentsApi = {
   ingest: async (
     payload: IngestComponentPayload,
   ): Promise<IngestComponentResponse> => {
+    // Ingestion walks the 4 supplier APIs + downloads the datasheet, so it
+    // routinely takes ~1 min — well over the client's default 15s timeout.
     const response = await api.post<IngestComponentResponse>(
       `${BASE}/ingest`,
       payload,
+      { timeout: 120_000 },
     );
     return response.data;
   },

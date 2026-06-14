@@ -125,3 +125,34 @@ async def test_acquire_none_when_no_candidates(tmp_path: Path) -> None:
         [_q("mouser")], mpn="LM358N", storage=storage
     )
     assert result.outcome == "none"
+
+
+class _BrokenStorage:
+    """A storage backend whose store() always raises (e.g. missing SDK/role)."""
+
+    async def exists(self, sha256: str) -> bool:
+        return False
+
+    async def store(self, content: bytes, *, content_type: str = "application/pdf") -> str:
+        raise ModuleNotFoundError("No module named 'azure.storage.blob'")
+
+    async def read(self, blob_path: str) -> bytes:
+        raise NotImplementedError
+
+
+async def test_acquire_storage_failure_degrades_to_link_only() -> None:
+    # A storage backend failure must NEVER fail ingestion — the datasheet
+    # step is best-effort and falls back to link-only.
+    url = "http://www.farnell.com/datasheets/x.pdf"
+    quotes = [_q("farnell", datasheet_url=url)]
+    with respx.mock() as mock:
+        mock.get(url).mock(
+            return_value=httpx.Response(
+                200, content=_PDF, headers={"content-type": "application/pdf"}
+            )
+        )
+        result = await datasheet_service.acquire(
+            quotes, mpn="LM358N", storage=_BrokenStorage()
+        )
+    assert result.outcome == "link_only"
+    assert result.url == url

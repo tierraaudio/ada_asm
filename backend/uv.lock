@@ -12,6 +12,7 @@ dependencies = [
     { name = "asyncpg" },
     { name = "azure-identity" },
     { name = "azure-monitor-opentelemetry-exporter" },
+    { name = "azure-storage-blob" },
     { name = "azure-storage-queue" },
     { name = "celery" },
     { name = "email-validator" },
@@ -55,6 +56,7 @@ requires-dist = [
     { name = "asyncpg", specifier = ">=0.30,<1.0" },
     { name = "azure-identity", specifier = ">=1.12,<2.0" },
     { name = "azure-monitor-opentelemetry-exporter", specifier = ">=1.0.0b30,<2.0" },
+    { name = "azure-storage-blob", specifier = ">=12.0,<13.0" },
     { name = "azure-storage-queue", specifier = ">=12.0,<13.0" },
     { name = "celery", specifier = ">=5.4,<6.0" },
     { name = "email-validator", specifier = ">=2.2,<3.0" },
@@ -256,6 +258,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7c/7e/bfc03436b88c48f5adc21a3ebbf4392b6b7fbbfe33ef3b1e88d07ba9f380/azure_monitor_opentelemetry_exporter-1.0.0b52.tar.gz", hash = "sha256:7eac679fca32dee9e426df65f2a538161db4514fc322fc66107f7826567d86e1", size = 326179, upload-time = "2026-05-11T22:47:02.687Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a4/e8/d13e6a74c98ecc3011bce9ab09fc2e75aec48ab46288f72be57c2fa21460/azure_monitor_opentelemetry_exporter-1.0.0b52-py2.py3-none-any.whl", hash = "sha256:a38c503e5e2cc0ec8a4bf336b23cce23488719f5361a45cdd01a514080f0e7fc", size = 244751, upload-time = "2026-05-11T22:47:04.304Z" },
+]
+
+[[package]]
+name = "azure-storage-blob"
+version = "12.30.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "azure-core" },
+    { name = "cryptography" },
+    { name = "isodate" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/48/84a820d898267f662b5c06f7cd76fdb8a9e272b44aa9376cef3ec0f6a294/azure_storage_blob-12.30.0.tar.gz", hash = "sha256:2cd74d4d5731e5eb6b8d5c5056ee115a5e88f8fdf22517b739836fda685018be", size = 618229, upload-time = "2026-06-08T11:45:35.575Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5e/0b/e106f0fd7fa785867d9ffcc47dc9e6237c0e58f51058473b777487a98edc/azure_storage_blob-12.30.0-py3-none-any.whl", hash = "sha256:d415ac50b67a8da6b3ae7e9f1014b1b55cd7aafa0b8d4ca9b380568dc7360423", size = 435610, upload-time = "2026-06-08T11:45:37.213Z" },
 ]
 
 [[package]]
