@@ -26,7 +26,7 @@ What this does NOT do:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -110,7 +110,12 @@ def init(app: FastAPI | None = None, *, settings: Settings | None = None) -> boo
     # engine instance at init time; the instrumentor patches the create
     # path so all engines built after init are covered.
     SQLAlchemyInstrumentor().instrument()
-    CeleryInstrumentor().instrument()
+    # CeleryInstrumentor ships no inline type info in some resolved
+    # environments; route the call through an Any-typed handle so mypy is
+    # consistent whether or not its stubs resolve (avoids a no-untyped-call
+    # error in one env and an unused-ignore in the other).
+    celery_instrumentor: Any = CeleryInstrumentor()
+    celery_instrumentor.instrument()
 
     _initialised = True
     _log.info(
