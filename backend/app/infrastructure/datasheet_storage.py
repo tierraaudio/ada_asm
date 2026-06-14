@@ -86,7 +86,9 @@ class AzureBlobDatasheetStorage:
     def __init__(self, account_url: str, container: str) -> None:
         self._account_url = account_url
         self._container = container
-        self._client = None  # lazy: avoid importing azure SDK in local/tests
+        # Lazy: avoid importing the azure SDK in local/tests. Typed Any
+        # because the azure-storage-blob aio client has no usable stubs.
+        self._client: Any = None
 
     def _container_client(self) -> Any:
         if self._client is None:
