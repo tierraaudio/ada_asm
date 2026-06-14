@@ -57,6 +57,18 @@ export interface Component {
   nato_score: NatoScoreValue;
   country_of_origin: string | null;
   proveedor_preferente_id: string | null;
+  /** Blended supplier-derived fields (change `ingest-component-from-mpn`). */
+  lifecycle_status: string | null;
+  last_buy_date: string | null;
+  discontinued: boolean | null;
+  end_of_life: boolean | null;
+  moq: number | null;
+  order_multiple: number | null;
+  lead_time_days: number | null;
+  unit_weight_kg: string | null;
+  image_url: string | null;
+  /** True when the family could not be inferred and awaits manual review. */
+  family_needs_review: boolean;
   /** Latest 100u price from the preferred supplier (read-only, server-computed). */
   current_price_per_100_eur: string | null;
   /** Latest snapshot per supplier — fed into <StockStatusBadge>. Empty array
@@ -64,6 +76,42 @@ export interface Component {
   supplier_stock_summary: SupplierStockSummaryEntry[];
   created_at: string;
   updated_at: string;
+}
+
+/** Structured summary returned by `POST /components/ingest` (change
+ *  `ingest-component-from-mpn`) so the UI can show what was auto-populated. */
+export interface IngestionReport {
+  status: "ok" | "ok_with_warnings";
+  mpn: string;
+  sku: string;
+  sources_consulted: string[];
+  sources_succeeded: string[];
+  sources_contributed: string[];
+  family: {
+    inferred: string | null;
+    needs_review: boolean;
+    decided_by: string | null;
+    match_type: string | null;
+    raw_category: string | null;
+    confidence: number | null;
+  };
+  datasheet: {
+    outcome: "archived" | "link_only" | "none";
+    source: string | null;
+    url: string | null;
+    blob_path: string | null;
+    size_bytes: number | null;
+  };
+  fields_populated: string[];
+  fields_missing: string[];
+  counts: Record<string, number>;
+  manual_overrides_applied: string[];
+  warnings: string[];
+}
+
+export interface IngestComponentResponse {
+  component: Component;
+  report: IngestionReport;
 }
 
 export interface ScoringClassification {

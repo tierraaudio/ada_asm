@@ -5,6 +5,7 @@ import type {
   Component,
   ComponentDetail,
   ComponentFilters,
+  IngestComponentResponse,
   NatoScoreValue,
   NatoScoring,
   Paginated,
@@ -14,6 +15,14 @@ import type {
   SupplierStockSnapshot,
   TierValue,
 } from "../types";
+
+export interface IngestComponentPayload {
+  mpn: string;
+  ubicacion?: string;
+  stock_inicial?: number;
+  holded_id?: string;
+  force?: boolean;
+}
 
 export interface ComponentCreatePayload {
   mpn: string;
@@ -76,6 +85,16 @@ export const componentsApi = {
 
   create: async (payload: ComponentCreatePayload): Promise<Component> => {
     const response = await api.post<Component>(BASE, payload);
+    return response.data;
+  },
+
+  ingest: async (
+    payload: IngestComponentPayload,
+  ): Promise<IngestComponentResponse> => {
+    const response = await api.post<IngestComponentResponse>(
+      `${BASE}/ingest`,
+      payload,
+    );
     return response.data;
   },
 

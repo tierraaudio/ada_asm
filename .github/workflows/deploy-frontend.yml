@@ -20,8 +20,9 @@ on:
         description: "Target environment"
         required: true
         type: choice
-        options: [dev, prod]
-        default: dev
+        # `dev` env was decommissioned (rg-ada-asm-dev deleted 2026-06-12).
+        options: [prod]
+        default: prod
 
 concurrency:
   group: deploy-frontend-${{ github.event.inputs.environment || 'prod' }}

@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { isAxiosError } from "axios";
-import { Calendar, MapPin, Package, Save } from "lucide-react";
-import { useEffect } from "react";
+import { Calendar, Loader2, MapPin, Package, Save, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { z } from "zod";
@@ -23,7 +23,11 @@ import { PreciosDeHoyTable } from "../components/PreciosDeHoyTable";
 import { StockDisponibleChart } from "../components/StockDisponibleChart";
 import { FAMILY_VALUES, TIPO_ALMACENAMIENTO_VALUES } from "../types";
 import { useComponentDetail } from "../hooks/use-component-detail";
-import { useCreateComponent, useUpdateComponent } from "../hooks/use-component-mutations";
+import {
+  useCreateComponent,
+  useIngestComponent,
+  useUpdateComponent,
+} from "../hooks/use-component-mutations";
 import { useStockEvents, useSupplierPrices, useSupplierStocks } from "../hooks/use-supplier-data";
 import { useSuppliers } from "../hooks/use-suppliers";
 import { useDetailNavPush } from "@/features/shared/nav/DetailNavControls";
@@ -106,6 +110,37 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
 
   const create = useCreateComponent();
   const update = useUpdateComponent();
+  const ingest = useIngestComponent();
+
+  // "Ingestar desde MPN": auto-populate a brand-new component from its
+  // manufacturer MPN by walking the supplier APIs (create mode only).
+  const [ingestMpn, setIngestMpn] = useState("");
+  const [ingestError, setIngestError] = useState<string | null>(null);
+
+  const handleIngest = async () => {
+    const mpn = ingestMpn.trim();
+    if (!mpn) return;
+    setIngestError(null);
+    try {
+      const { component } = await ingest.mutateAsync({ mpn });
+      navigate(`/components/${component.id}`);
+    } catch (err) {
+      if (isAxiosError(err)) {
+        const status = err.response?.status;
+        if (status === 404) {
+          setIngestError("Ningún proveedor reconoce ese MPN. Revisa la referencia.");
+        } else if (status === 409) {
+          setIngestError("Ya existe un componente con ese MPN.");
+        } else if (status === 502) {
+          setIngestError("Los proveedores no responden ahora mismo. Inténtalo en un momento.");
+        } else {
+          setIngestError("No se pudo ingestar el componente. Inténtalo de nuevo.");
+        }
+      } else {
+        setIngestError("No se pudo ingestar el componente. Inténtalo de nuevo.");
+      }
+    }
+  };
 
   const {
     register,
@@ -254,6 +289,70 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
           >
             {submitError}
           </div>
+        )}
+
+        {!isEdit && (
+          <section className="rounded-lg border border-brand/30 bg-brand/5 p-6 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-brand" />
+              <h2 className="text-sm font-semibold text-text-primary">
+                Ingestar desde MPN
+              </h2>
+            </div>
+            <p className="mt-1 text-sm text-text-secondary">
+              Escribe el código de fabricante (MPN) y lo poblamos automáticamente
+              desde los proveedores: nombre, familia, datasheet, precios y stock.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <input
+                type="text"
+                value={ingestMpn}
+                onChange={(e) => setIngestMpn(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleIngest();
+                  }
+                }}
+                disabled={ingest.isPending}
+                className={cn(inputCls, "sm:max-w-xs")}
+                placeholder="NE555P"
+                aria-label="MPN a ingestar"
+              />
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleIngest()}
+                disabled={ingest.isPending || !ingestMpn.trim()}
+              >
+                {ingest.isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    Buscando en proveedores…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="size-4" />
+                    Ingestar
+                  </>
+                )}
+              </Button>
+            </div>
+            {ingest.isPending && (
+              <p className="mt-2 text-xs text-text-secondary">
+                Esto puede tardar unos segundos mientras consultamos los 4 proveedores
+                y descargamos el datasheet.
+              </p>
+            )}
+            {ingestError && (
+              <p role="alert" className="mt-2 text-sm text-red-700">
+                {ingestError}
+              </p>
+            )}
+            <p className="mt-3 text-xs text-text-secondary">
+              ¿Prefieres introducirlo a mano? Usa el formulario de abajo.
+            </p>
+          </section>
         )}
 
         <section className="rounded-lg border border-border bg-white p-6 shadow-sm">

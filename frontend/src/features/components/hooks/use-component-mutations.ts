@@ -4,6 +4,7 @@ import {
   componentsApi,
   type ComponentCreatePayload,
   type ComponentUpdatePayload,
+  type IngestComponentPayload,
 } from "../api/components-api";
 
 export function useDeleteComponent() {
@@ -22,6 +23,21 @@ export function useCreateComponent() {
     mutationFn: (payload: ComponentCreatePayload) => componentsApi.create(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["components", "list"] });
+    },
+  });
+}
+
+/** Ingest a component from its manufacturer MPN (change
+ *  `ingest-component-from-mpn`). Returns the created component + a report. */
+export function useIngestComponent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: IngestComponentPayload) => componentsApi.ingest(payload),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["components", "list"] });
+      qc.invalidateQueries({
+        queryKey: ["components", "detail", data.component.id],
+      });
     },
   });
 }

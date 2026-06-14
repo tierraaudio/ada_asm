@@ -1,4 +1,4 @@
-import { Calendar, ExternalLink, MapPin, Package, Paperclip } from "lucide-react";
+import { AlertTriangle, Calendar, ExternalLink, MapPin, Package, Paperclip } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils/cn";
@@ -59,15 +59,27 @@ export function ComponentHeaderCard({
   const preferred = suppliers.find((s) => s.id === component.proveedor_preferente_id);
   return (
     <section className="rounded-lg border border-border bg-white p-6 shadow-sm">
-      <div className="mb-6">
-        <p className="text-xs uppercase tracking-wide text-text-secondary">
-          {component.sku ? `${component.sku} • ` : ""}
-          <span className="font-mono">{component.mpn}</span>
-        </p>
-        <h1 className="mt-1 text-2xl font-semibold text-text-primary">{component.name}</h1>
-        {component.description && (
-          <p className="mt-1 text-sm text-text-secondary">{component.description}</p>
+      <div className="mb-6 flex items-start gap-4">
+        {component.image_url && (
+          <img
+            src={component.image_url}
+            alt={component.name}
+            className="size-16 shrink-0 rounded-md border border-border object-contain p-1"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
         )}
+        <div>
+          <p className="text-xs uppercase tracking-wide text-text-secondary">
+            {component.sku ? `${component.sku} • ` : ""}
+            <span className="font-mono">{component.mpn}</span>
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold text-text-primary">{component.name}</h1>
+          {component.description && (
+            <p className="mt-1 text-sm text-text-secondary">{component.description}</p>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_auto]">
@@ -99,7 +111,23 @@ export function ComponentHeaderCard({
             label="Tipo almacenamiento"
             value={component.tipo_almacenamiento ?? "—"}
           />
-          <Field icon={<Package className="size-3.5" />} label="Familia" value={component.family} />
+          <Field
+            icon={<Package className="size-3.5" />}
+            label="Familia"
+            value={
+              component.family_needs_review || !component.family ? (
+                <span
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700"
+                  title="No se pudo inferir la familia automáticamente — revísala y asígnala a mano."
+                >
+                  <AlertTriangle className="size-3" />
+                  Revisar familia
+                </span>
+              ) : (
+                component.family
+              )
+            }
+          />
           <Field
             label="Proveedor preferente"
             value={
@@ -126,7 +154,18 @@ export function ComponentHeaderCard({
             }
           />
           <Field label="Holded ID" value={component.holded_id ?? "—"} />
-          <div aria-hidden />
+          <Field
+            label="Ciclo de vida"
+            value={
+              component.lifecycle_status ? (
+                <span className="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                  {component.lifecycle_status}
+                </span>
+              ) : (
+                "—"
+              )
+            }
+          />
 
           <Field
             icon={<Paperclip className="size-3.5" />}
