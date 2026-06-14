@@ -56,9 +56,7 @@ class SqlAlchemySupplierSyncRunRepository:
         limit: int = 50,
         supplier: str | None = None,
     ) -> list[SupplierSyncRun]:
-        stmt = select(SupplierSyncRunModel).order_by(
-            SupplierSyncRunModel.started_at.desc()
-        )
+        stmt = select(SupplierSyncRunModel).order_by(SupplierSyncRunModel.started_at.desc())
         if supplier is not None:
             stmt = stmt.where(SupplierSyncRunModel.supplier == supplier)
         stmt = stmt.limit(min(max(limit, 1), 200))

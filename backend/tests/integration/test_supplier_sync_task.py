@@ -141,37 +141,45 @@ async def test_run_for_supplier_persists_history_and_finalises_success(
 
         # Supplier row auto-created.
         suppliers = (
-            await session.execute(
-                select(SupplierModel).where(SupplierModel.name.ilike("Mouser"))
-            )
-        ).scalars().all()
+            (await session.execute(select(SupplierModel).where(SupplierModel.name.ilike("Mouser"))))
+            .scalars()
+            .all()
+        )
         assert len(suppliers) == 1
         supplier_id = suppliers[0].id
 
         # 4 price tiers written for today.
         today = date.today()
         prices = (
-            await session.execute(
-                select(SupplierPriceModel)
-                .where(SupplierPriceModel.component_id == component_id)
-                .where(SupplierPriceModel.supplier_id == supplier_id)
-                .where(SupplierPriceModel.valid_from == today)
-                .order_by(SupplierPriceModel.qty_tier.asc())
+            (
+                await session.execute(
+                    select(SupplierPriceModel)
+                    .where(SupplierPriceModel.component_id == component_id)
+                    .where(SupplierPriceModel.supplier_id == supplier_id)
+                    .where(SupplierPriceModel.valid_from == today)
+                    .order_by(SupplierPriceModel.qty_tier.asc())
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert [p.qty_tier for p in prices] == [1, 10, 100, 1000]
         assert prices[0].price == Decimal("0.4200")
         assert prices[2].price == Decimal("0.2800")
 
         # Stock snapshot inserted for today.
         stock_rows = (
-            await session.execute(
-                select(SupplierStockModel)
-                .where(SupplierStockModel.component_id == component_id)
-                .where(SupplierStockModel.supplier_id == supplier_id)
-                .where(SupplierStockModel.snapshot_at == today)
+            (
+                await session.execute(
+                    select(SupplierStockModel)
+                    .where(SupplierStockModel.component_id == component_id)
+                    .where(SupplierStockModel.supplier_id == supplier_id)
+                    .where(SupplierStockModel.snapshot_at == today)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(stock_rows) == 1
         assert stock_rows[0].quantity == 4321
 
@@ -192,9 +200,7 @@ async def test_run_for_supplier_records_typed_error_and_finalises_partial(
         },
     )
 
-    run_id = await _run_for_supplier(
-        adapter, component_ids=[happy_id, bad_id]
-    )
+    run_id = await _run_for_supplier(adapter, component_ids=[happy_id, bad_id])
 
     factory = get_session_factory()
     async with factory() as session:
@@ -206,12 +212,14 @@ async def test_run_for_supplier_records_typed_error_and_finalises_partial(
         assert run.errors_count == 1
 
         errors = (
-            await session.execute(
-                select(SupplierSyncErrorModel).where(
-                    SupplierSyncErrorModel.run_id == run_id
+            (
+                await session.execute(
+                    select(SupplierSyncErrorModel).where(SupplierSyncErrorModel.run_id == run_id)
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(errors) == 1
         assert errors[0].component_id == bad_id
         assert errors[0].error_code == "HTTP_5XX"
@@ -242,12 +250,16 @@ async def test_run_for_supplier_handles_none_quote_without_writing(
         assert run.status == "success"
 
         prices = (
-            await session.execute(
-                select(SupplierPriceModel).where(
-                    SupplierPriceModel.component_id == component_id
+            (
+                await session.execute(
+                    select(SupplierPriceModel).where(
+                        SupplierPriceModel.component_id == component_id
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(prices) == 0
 
 
@@ -290,23 +302,31 @@ async def test_same_day_re_run_overwrites_prices_via_upsert(
     async with factory() as session:
         today = date.today()
         prices = (
-            await session.execute(
-                select(SupplierPriceModel)
-                .where(SupplierPriceModel.component_id == component_id)
-                .where(SupplierPriceModel.valid_from == today)
-                .where(SupplierPriceModel.qty_tier == 100)
+            (
+                await session.execute(
+                    select(SupplierPriceModel)
+                    .where(SupplierPriceModel.component_id == component_id)
+                    .where(SupplierPriceModel.valid_from == today)
+                    .where(SupplierPriceModel.qty_tier == 100)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(prices) == 1
         # Second run's price wins.
         assert prices[0].price == Decimal("99.9900")
 
         stock_rows = (
-            await session.execute(
-                select(SupplierStockModel)
-                .where(SupplierStockModel.component_id == component_id)
-                .where(SupplierStockModel.snapshot_at == today)
+            (
+                await session.execute(
+                    select(SupplierStockModel)
+                    .where(SupplierStockModel.component_id == component_id)
+                    .where(SupplierStockModel.snapshot_at == today)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         assert len(stock_rows) == 1
         assert stock_rows[0].quantity == 12345

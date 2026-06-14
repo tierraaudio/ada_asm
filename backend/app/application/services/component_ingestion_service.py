@@ -230,9 +230,7 @@ class ComponentIngestionService:
 
     async def _generate_sku(self, family: str | None) -> str:
         prefix = sku_prefix_for_family(family)
-        stmt = select(func.count()).where(
-            ComponentModel.sku.like(f"{prefix}-%")
-        )
+        stmt = select(func.count()).where(ComponentModel.sku.like(f"{prefix}-%"))
         used = (await self._session.execute(stmt)).scalar_one()
         return f"{prefix}-{used + 1:03d}"
 

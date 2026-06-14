@@ -62,9 +62,7 @@ def _currency_for_store(store_id: str) -> str:
     """
 
     store = (store_id or "").lower()
-    if ".farnell.com" in store and (
-        store.startswith("uk.") or store.startswith("ie.")
-    ):
+    if ".farnell.com" in store and (store.startswith("uk.") or store.startswith("ie.")):
         return "GBP"
     if "newark.com" in store:
         return "USD"
@@ -214,9 +212,7 @@ def _split_attributes(
         if not label or value in (None, ""):
             continue
         if label in _COMPLIANCE_LABELS:
-            compliance.append(
-                SupplierComplianceCode(code_type=str(label), code_value=str(value))
-            )
+            compliance.append(SupplierComplianceCode(code_type=str(label), code_value=str(value)))
         else:
             params.append(
                 SupplierParameter(
@@ -271,10 +267,7 @@ async def _build_quote(
     except (TypeError, ValueError):
         stock = None
 
-    resolved_mpn = (
-        str(product.get("translatedManufacturerPartNumber") or "").strip()
-        or lookup_mpn
-    )
+    resolved_mpn = str(product.get("translatedManufacturerPartNumber") or "").strip() or lookup_mpn
     sku = str(product.get("sku")) if product.get("sku") is not None else None
 
     display_name = product.get("displayName")

@@ -212,13 +212,9 @@ def _extract_compliance(part: dict[str, Any]) -> tuple[SupplierComplianceCode, .
     rohs = part.get("ROHSStatus")
     if rohs:
         out.append(SupplierComplianceCode(code_type="RoHS", code_value=str(rohs)))
-    for entry in (part.get("ProductCompliance") or []) + (
-        part.get("TradeCompliance") or []
-    ):
+    for entry in (part.get("ProductCompliance") or []) + (part.get("TradeCompliance") or []):
         name = entry.get("ComplianceName")
         value = entry.get("ComplianceValue")
         if name and value not in (None, ""):
-            out.append(
-                SupplierComplianceCode(code_type=str(name), code_value=str(value))
-            )
+            out.append(SupplierComplianceCode(code_type=str(name), code_value=str(value)))
     return tuple(out)

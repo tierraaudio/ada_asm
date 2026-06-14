@@ -25,9 +25,7 @@ _RULES = [
     ComponentFamilyRule("farnell", "tariff_prefix", "8536", "Conectores", confidence=70),
     ComponentFamilyRule("farnell", "name_keyword", "sensor", "Sensores", confidence=40),
     ComponentFamilyRule("mouser", "name_keyword", "diodo", "Diodos", confidence=40),
-    ComponentFamilyRule(
-        "mouser", "name_keyword", "condensador", "Condensadores", confidence=40
-    ),
+    ComponentFamilyRule("mouser", "name_keyword", "condensador", "Condensadores", confidence=40),
 ]
 
 
@@ -61,9 +59,7 @@ def test_signal_strength_digikey_beats_mouser_keyword() -> None:
 
 
 def test_falls_back_to_mouser_keyword_when_higher_signals_silent() -> None:
-    result = resolve_family(
-        [_q("mouser", supplier_category_name="Condensadores MLCC")], _RULES
-    )
+    result = resolve_family([_q("mouser", supplier_category_name="Condensadores MLCC")], _RULES)
     assert result.family == "Condensadores"
     assert result.match_type == "name_keyword"
 
@@ -87,9 +83,7 @@ def test_bme280_conflict_digikey_module_wins_over_tme_sensor() -> None:
 
 
 def test_no_match_flags_for_review() -> None:
-    result = resolve_family(
-        [_q("digikey", supplier_category_id="999999")], _RULES
-    )
+    result = resolve_family([_q("digikey", supplier_category_id="999999")], _RULES)
     assert result.family is None
     assert result.needs_review is True
     assert result.inferred_supplier is None

@@ -43,9 +43,7 @@ def _quote(mpn: str) -> SupplierQuote:
         supplier_category_name="Single Diodes",
         datasheet_url=_DS_URL,
         price_breaks=(
-            SupplierPriceBreak(
-                quantity=1, price_original=Decimal("0.4"), currency_original="EUR"
-            ),
+            SupplierPriceBreak(quantity=1, price_original=Decimal("0.4"), currency_original="EUR"),
         ),
         stock=5,
     )

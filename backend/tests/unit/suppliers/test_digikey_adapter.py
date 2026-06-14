@@ -25,13 +25,7 @@ from app.infrastructure.suppliers.digikey import DigiKeyAdapter
 
 pytestmark = pytest.mark.asyncio
 
-_FIXTURES = (
-    Path(__file__).resolve().parents[2]
-    / "fixtures"
-    / "suppliers"
-    / "digikey"
-    / "by_mpn"
-)
+_FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "suppliers" / "digikey" / "by_mpn"
 
 _TOKEN_URL = "https://api.digikey.com/v1/oauth2/token"
 _SEARCH_URL = "https://api.digikey.com/products/v4/search/keyword"
@@ -85,9 +79,7 @@ async def test_hit_returns_quote_with_eur_breaks_and_package(
     assert quote.manufacturer == "Texas Instruments"
     # Category now descends to the LEAF, not the root.
     assert quote.supplier_category_id == "990"
-    assert quote.supplier_category_name == (
-        "Clock/Timing - Programmable Timers and Oscillators"
-    )
+    assert quote.supplier_category_name == ("Clock/Timing - Programmable Timers and Oscillators")
     assert quote.family_hint == quote.supplier_category_name
     assert quote.package == "Tube"
     assert quote.stock == 26_735

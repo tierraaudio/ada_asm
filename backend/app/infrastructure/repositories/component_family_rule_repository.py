@@ -37,8 +37,6 @@ class SqlAlchemyComponentFamilyRuleRepository:
         self._session = session
 
     async def list_enabled(self) -> list[ComponentFamilyRule]:
-        stmt = select(ComponentFamilyRuleModel).where(
-            ComponentFamilyRuleModel.enabled.is_(True)
-        )
+        stmt = select(ComponentFamilyRuleModel).where(ComponentFamilyRuleModel.enabled.is_(True))
         result = await self._session.execute(stmt)
         return [_to_entity(row) for row in result.scalars().all()]

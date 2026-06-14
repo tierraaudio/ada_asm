@@ -268,17 +268,14 @@ async def _build_quote(
         stock = None
 
     manufacturer_symbols = product.get("manufacturer_symbols") or []
-    resolved_mpn = (
-        next(
-            (
-                str(sym).strip()
-                for sym in manufacturer_symbols
-                if str(sym).strip().upper() == lookup_mpn.strip().upper()
-            ),
-            None,
-        )
-        or (str(manufacturer_symbols[0]).strip() if manufacturer_symbols else lookup_mpn)
-    )
+    resolved_mpn = next(
+        (
+            str(sym).strip()
+            for sym in manufacturer_symbols
+            if str(sym).strip().upper() == lookup_mpn.strip().upper()
+        ),
+        None,
+    ) or (str(manufacturer_symbols[0]).strip() if manufacturer_symbols else lookup_mpn)
 
     manufacturer = (product.get("manufacturer") or {}).get("name")
     category_node = product.get("category") or {}
@@ -302,8 +299,7 @@ async def _build_quote(
         family_hint=category_name,
         supplier_category_id=str(category_id) if category_id is not None else None,
         supplier_category_name=category_name,
-        image_url=(product.get("assets") or {}).get("primary_photo")
-        or product.get("photo"),
+        image_url=(product.get("assets") or {}).get("primary_photo") or product.get("photo"),
         datasheet_url=datasheet,
         package=None,
         stock=stock,

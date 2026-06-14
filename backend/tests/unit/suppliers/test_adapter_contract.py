@@ -101,16 +101,12 @@ def test_fetch_by_mpn_is_async_with_correct_signature(
     instance = cls(**ctor_kwargs)
 
     fn = instance.fetch_by_mpn
-    assert inspect.iscoroutinefunction(fn), (
-        f"{cls.__name__}.fetch_by_mpn must be `async def`"
-    )
+    assert inspect.iscoroutinefunction(fn), f"{cls.__name__}.fetch_by_mpn must be `async def`"
 
     sig = inspect.signature(fn)
     # Exactly one explicit parameter: `mpn`.
     params = [p for p in sig.parameters.values() if p.name != "self"]
-    assert len(params) == 1, (
-        f"{cls.__name__}.fetch_by_mpn takes {len(params)} params, expected 1"
-    )
+    assert len(params) == 1, f"{cls.__name__}.fetch_by_mpn takes {len(params)} params, expected 1"
     assert params[0].name == "mpn"
 
     # Return annotation should reference SupplierQuote — accept the union

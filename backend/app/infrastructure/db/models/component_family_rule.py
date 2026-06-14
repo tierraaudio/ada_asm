@@ -37,13 +37,7 @@ class ComponentFamilyRuleModel(Base, TimestampMixin):
     match_type: Mapped[str] = mapped_column(String(32), nullable=False)
     match_value: Mapped[str] = mapped_column(String(255), nullable=False)
     family: Mapped[str] = mapped_column(String(64), nullable=False)
-    confidence: Mapped[int] = mapped_column(
-        SmallInteger, nullable=False, server_default=text("0")
-    )
-    priority: Mapped[int] = mapped_column(
-        SmallInteger, nullable=False, server_default=text("0")
-    )
-    enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default=text("true")
-    )
+    confidence: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, server_default=text("0"))
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

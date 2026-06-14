@@ -44,12 +44,8 @@ async def test_list_requires_auth(api_client: AsyncClient) -> None:
 async def test_create_then_list_sorted_by_name(
     api_client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
-    await _create_customer(
-        api_client, auth_headers, holded_id="HOLD-Z", name="Zen Robotics"
-    )
-    await _create_customer(
-        api_client, auth_headers, holded_id="HOLD-A", name="Acme Robotics"
-    )
+    await _create_customer(api_client, auth_headers, holded_id="HOLD-Z", name="Zen Robotics")
+    await _create_customer(api_client, auth_headers, holded_id="HOLD-A", name="Acme Robotics")
     response = await api_client.get("/api/v1/customers", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
@@ -108,9 +104,7 @@ async def test_create_validation_error_missing_fields(
 
 async def test_get_existing(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     created = await _create_customer(api_client, auth_headers)
-    response = await api_client.get(
-        f"/api/v1/customers/{created['id']}", headers=auth_headers
-    )
+    response = await api_client.get(f"/api/v1/customers/{created['id']}", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["id"] == created["id"]
 
@@ -200,17 +194,11 @@ async def test_patch_404_when_unknown(
 # ---------- delete ----------
 
 
-async def test_delete_then_get_404(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_delete_then_get_404(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     created = await _create_customer(api_client, auth_headers)
-    response = await api_client.delete(
-        f"/api/v1/customers/{created['id']}", headers=auth_headers
-    )
+    response = await api_client.delete(f"/api/v1/customers/{created['id']}", headers=auth_headers)
     assert response.status_code == 204
-    response = await api_client.get(
-        f"/api/v1/customers/{created['id']}", headers=auth_headers
-    )
+    response = await api_client.get(f"/api/v1/customers/{created['id']}", headers=auth_headers)
     assert response.status_code == 404
 
 
@@ -244,15 +232,11 @@ async def test_delete_customer_nullifies_project_customer_id(
     project_id = project.json()["id"]
 
     # Delete the customer.
-    delete = await api_client.delete(
-        f"/api/v1/customers/{customer['id']}", headers=auth_headers
-    )
+    delete = await api_client.delete(f"/api/v1/customers/{customer['id']}", headers=auth_headers)
     assert delete.status_code == 204
 
     # Project still exists; customer_id was set to null by the FK action.
-    detail = await api_client.get(
-        f"/api/v1/projects/{project_id}", headers=auth_headers
-    )
+    detail = await api_client.get(f"/api/v1/projects/{project_id}", headers=auth_headers)
     assert detail.status_code == 200
     assert detail.json()["customer_id"] is None
     assert detail.json()["customer"] is None

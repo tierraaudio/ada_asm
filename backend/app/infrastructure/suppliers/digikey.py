@@ -261,9 +261,7 @@ def _extract_compliance(product: dict[str, Any]) -> tuple[SupplierComplianceCode
     for code_type, value in classifications.items():
         if value in (None, ""):
             continue
-        out.append(
-            SupplierComplianceCode(code_type=str(code_type), code_value=str(value))
-        )
+        out.append(SupplierComplianceCode(code_type=str(code_type), code_value=str(value)))
     return tuple(out)
 
 
@@ -334,15 +332,10 @@ async def _build_quote(
     except (TypeError, ValueError):
         stock = None
 
-    resolved_mpn = (
-        str(product.get("ManufacturerProductNumber") or "").strip()
-        or lookup_mpn
-    )
+    resolved_mpn = str(product.get("ManufacturerProductNumber") or "").strip() or lookup_mpn
     name, description = _extract_description(product)
     manufacturer = (product.get("Manufacturer") or {}).get("Name")
-    leaf_id, leaf_name, _root_id = _descend_to_leaf_category(
-        product.get("Category") or {}
-    )
+    leaf_id, leaf_name, _root_id = _descend_to_leaf_category(product.get("Category") or {})
     package = (variation.get("PackageType") or {}).get("Name")
     sku = variation.get("DigiKeyProductNumber")
 

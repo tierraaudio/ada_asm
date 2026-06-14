@@ -102,9 +102,7 @@ def _pick_unit_price_for_tier(
     return max(applicable, key=lambda pair: pair[0])[1]
 
 
-async def _ensure_supplier_row(
-    session: AsyncSession, code: SupplierCode
-) -> UUID:
+async def _ensure_supplier_row(session: AsyncSession, code: SupplierCode) -> UUID:
     """Look up or insert the `suppliers` row for an adapter `code` and
     return its UUID. Names are case-insensitive (the table has a
     functional unique index on `lower(name)`)."""
@@ -138,9 +136,7 @@ async def _upsert_prices_and_stock(
     written (i.e. the quote contributed real data)."""
 
     eur_breaks: list[tuple[int, Decimal]] = [
-        (pb.quantity, pb.price_eur)
-        for pb in quote.price_breaks
-        if pb.price_eur is not None
+        (pb.quantity, pb.price_eur) for pb in quote.price_breaks if pb.price_eur is not None
     ]
 
     wrote_anything = False
@@ -204,9 +200,7 @@ async def _record_error(
     )
 
 
-async def _create_run_row(
-    session: AsyncSession, supplier: SupplierCode
-) -> UUID:
+async def _create_run_row(session: AsyncSession, supplier: SupplierCode) -> UUID:
     run_id = uuid4()
     session.add(
         SupplierSyncRunModel(
@@ -289,9 +283,7 @@ async def _run_for_supplier(
                 ComponentModel.created_at.asc()
             )
             result = await session.execute(stmt)
-            targets: list[tuple[UUID, str]] = [
-                (row.id, row.mpn) for row in result.all()
-            ]
+            targets: list[tuple[UUID, str]] = [(row.id, row.mpn) for row in result.all()]
         else:
             stmt = select(ComponentModel.id, ComponentModel.mpn).where(
                 ComponentModel.id.in_(component_ids)
@@ -408,9 +400,7 @@ def sync_one_supplier(
     return str(run_id)
 
 
-async def _run_for_supplier_isolated(
-    adapter: SupplierAdapter, run_uuid: UUID | None
-) -> UUID:
+async def _run_for_supplier_isolated(adapter: SupplierAdapter, run_uuid: UUID | None) -> UUID:
     """Run one supplier sync with a fresh DB engine bound to THIS loop.
 
     Celery prefork reuses worker processes across tasks, each on a new

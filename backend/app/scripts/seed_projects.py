@@ -210,9 +210,7 @@ async def _ensure_prereqs(
 ) -> tuple[dict[str, UUID], dict[str, UUID]]:
     """Pull component MPN→id and module SKU→id maps. Exits 3 if either is empty."""
     async with session_factory() as session:
-        comp_rows = (
-            await session.execute(select(ComponentModel.id, ComponentModel.mpn))
-        ).all()
+        comp_rows = (await session.execute(select(ComponentModel.id, ComponentModel.mpn))).all()
         mod_rows = (await session.execute(select(ModuleModel.id, ModuleModel.sku))).all()
 
     if not comp_rows or not mod_rows:
@@ -232,9 +230,7 @@ async def _ensure_prereqs(
 async def _reset(session_factory: async_sessionmaker[AsyncSession]) -> None:
     """Wipe project + customer data, leaving modules + components untouched."""
     async with session_factory() as session:
-        await session.execute(
-            text("DELETE FROM stock_events WHERE project_id IS NOT NULL")
-        )
+        await session.execute(text("DELETE FROM stock_events WHERE project_id IS NOT NULL"))
         await session.execute(text("DELETE FROM project_children"))
         await session.execute(text("DELETE FROM projects"))
         await session.execute(text("DELETE FROM customers"))
@@ -319,9 +315,7 @@ async def seed(reset: bool = False) -> None:
                         continue
                     await svc.add_child(
                         created.id,
-                        AddProjectChildInput(
-                            child_module_id=child_module_id, quantity=qty
-                        ),
+                        AddProjectChildInput(child_module_id=child_module_id, quantity=qty),
                     )
                 else:
                     child_component_id = by_mpn.get(slug)
@@ -333,9 +327,7 @@ async def seed(reset: bool = False) -> None:
                         continue
                     await svc.add_child(
                         created.id,
-                        AddProjectChildInput(
-                            child_component_id=child_component_id, quantity=qty
-                        ),
+                        AddProjectChildInput(child_component_id=child_component_id, quantity=qty),
                     )
 
     # ----- consumption stock_events tied to a couple of Active projects -----
@@ -371,9 +363,7 @@ async def seed(reset: bool = False) -> None:
                     total_cost=None,
                     currency="EUR",
                     project_id=project_id,
-                    project_name_snapshot=next(
-                        p.name for p in _PROJECTS if p.code == code
-                    ),
+                    project_name_snapshot=next(p.name for p in _PROJECTS if p.code == code),
                     customer_id_holded=None,
                     customer_name_snapshot=None,
                 )

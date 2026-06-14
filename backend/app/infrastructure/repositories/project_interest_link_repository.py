@@ -47,9 +47,7 @@ class SqlAlchemyProjectInterestLinkRepository:
     async def get(self, link_id: UUID) -> ProjectInterestLink | None:
         row = (
             await self._session.execute(
-                select(ProjectInterestLinkModel).where(
-                    ProjectInterestLinkModel.id == link_id
-                )
+                select(ProjectInterestLinkModel).where(ProjectInterestLinkModel.id == link_id)
             )
         ).scalar_one_or_none()
         return _to_entity(row) if row else None
@@ -71,9 +69,7 @@ class SqlAlchemyProjectInterestLinkRepository:
     async def update(self, link: ProjectInterestLink) -> ProjectInterestLink:
         row = (
             await self._session.execute(
-                select(ProjectInterestLinkModel).where(
-                    ProjectInterestLinkModel.id == link.id
-                )
+                select(ProjectInterestLinkModel).where(ProjectInterestLinkModel.id == link.id)
             )
         ).scalar_one_or_none()
         if row is None:
@@ -88,9 +84,7 @@ class SqlAlchemyProjectInterestLinkRepository:
 
     async def delete(self, link_id: UUID) -> bool:
         result = await self._session.execute(
-            delete(ProjectInterestLinkModel).where(
-                ProjectInterestLinkModel.id == link_id
-            )
+            delete(ProjectInterestLinkModel).where(ProjectInterestLinkModel.id == link_id)
         )
         await self._session.commit()
         return (getattr(result, "rowcount", 0) or 0) > 0

@@ -279,9 +279,7 @@ class ProjectService:
             assert payload.child_component_id is not None
             row = (
                 await self._session.execute(
-                    select(ComponentModel.id).where(
-                        ComponentModel.id == payload.child_component_id
-                    )
+                    select(ComponentModel.id).where(ComponentModel.id == payload.child_component_id)
                 )
             ).scalar_one_or_none()
             if row is None:
@@ -463,9 +461,7 @@ class ProjectService:
             return 0
 
         # Hydrate module stocks for any direct module edges.
-        module_edge_ids = [
-            e.child_module_id for e in direct if e.child_module_id is not None
-        ]
+        module_edge_ids = [e.child_module_id for e in direct if e.child_module_id is not None]
         module_stocks: dict[UUID, int] = {}
         if module_edge_ids:
             rows = (

@@ -24,9 +24,7 @@ async def test_list_enabled_returns_seeded_rules() -> None:
         (
             r
             for r in rules
-            if r.supplier == "digikey"
-            and r.match_type == "category_id"
-            and r.match_value == "280"
+            if r.supplier == "digikey" and r.match_type == "category_id" and r.match_value == "280"
         ),
         None,
     )

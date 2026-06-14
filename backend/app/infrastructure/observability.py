@@ -59,9 +59,7 @@ def init(app: FastAPI | None = None, *, settings: Settings | None = None) -> boo
     settings = settings or get_settings()
     conn_str = settings.applicationinsights_connection_string
     if not conn_str:
-        _log.debug(
-            "observability.init: APPLICATIONINSIGHTS_CONNECTION_STRING absent; skipping"
-        )
+        _log.debug("observability.init: APPLICATIONINSIGHTS_CONNECTION_STRING absent; skipping")
         return False
 
     # Heavy imports go inside `init()` so the no-op path does not pay

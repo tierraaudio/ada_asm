@@ -83,10 +83,7 @@ def _match_quote(
     # 1. category_id (exact).
     if quote.supplier_category_id:
         for rule in rules:
-            if (
-                rule.match_type == "category_id"
-                and rule.match_value == quote.supplier_category_id
-            ):
+            if rule.match_type == "category_id" and rule.match_value == quote.supplier_category_id:
                 return rule, quote.supplier_category_id, quote.supplier_category_name, None
 
     # 2. tariff_prefix (longest matching prefix).
@@ -94,8 +91,7 @@ def _match_quote(
         prefix_rules = [
             r
             for r in rules
-            if r.match_type == "tariff_prefix"
-            and quote.tariff_code.startswith(r.match_value)
+            if r.match_type == "tariff_prefix" and quote.tariff_code.startswith(r.match_value)
         ]
         if prefix_rules:
             rule = max(prefix_rules, key=lambda r: len(r.match_value))
@@ -150,8 +146,7 @@ def resolve_family(
     # No confident match — log every signal so the table can grow.
     for quote in quotes:
         _log.info(
-            "family_inference.unmapped supplier=%s category_id=%s "
-            "category_name=%s tariff=%s",
+            "family_inference.unmapped supplier=%s category_id=%s category_name=%s tariff=%s",
             quote.supplier,
             quote.supplier_category_id,
             quote.supplier_category_name,

@@ -69,9 +69,7 @@ def test_supplier_quote_carries_blended_payload() -> None:
         parameters=(SupplierParameter(label="Voltage", value="16V"),),
         compliance=(SupplierComplianceCode(code_type="RoHS", code_value="Compliant"),),
         price_breaks=(
-            SupplierPriceBreak(
-                quantity=1, price_original=Decimal("0.5"), currency_original="EUR"
-            ),
+            SupplierPriceBreak(quantity=1, price_original=Decimal("0.5"), currency_original="EUR"),
         ),
         raw_payload={"ManufacturerProductNumber": "NE555P"},
     )

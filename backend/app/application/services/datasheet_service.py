@@ -62,7 +62,9 @@ def _manufacturer_pattern_url(manufacturer: str | None, mpn: str) -> str | None:
     if "texas" in m or m == "ti":
         return f"https://www.ti.com/lit/ds/symlink/{part}.pdf"
     if "espressif" in m:
-        return f"https://www.espressif.com/sites/default/files/documentation/{part}_datasheet_en.pdf"
+        return (
+            f"https://www.espressif.com/sites/default/files/documentation/{part}_datasheet_en.pdf"
+        )
     if "onsemi" in m or "on semi" in m:
         return f"https://www.onsemi.com/download/data-sheet/pdf/{part}-d.pdf"
     return None
@@ -123,9 +125,7 @@ async def _try_download(url: str) -> tuple[bytes, str] | None:
         content_type = (resp.headers.get("content-type") or "").split(";")[0].strip()
         content = resp.content
         if content_type != "application/pdf" or not content.startswith(_PDF_MAGIC):
-            _log.info(
-                "datasheet.not_pdf url=%s content_type=%s", target, content_type
-            )
+            _log.info("datasheet.not_pdf url=%s content_type=%s", target, content_type)
             return None
         if len(content) > _MAX_PDF_BYTES:
             return None

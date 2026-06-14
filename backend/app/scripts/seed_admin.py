@@ -34,9 +34,7 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_credentials(
-    cli_email: str | None, cli_password: str | None
-) -> tuple[str, str]:
+def _resolve_credentials(cli_email: str | None, cli_password: str | None) -> tuple[str, str]:
     """CLI args win over env. Env-only path supports the cloud Job."""
     import os
 

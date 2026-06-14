@@ -127,9 +127,7 @@ def _project_summary(
     return ProjectSummaryResponse.model_validate(base)
 
 
-async def _hydrate_child(
-    session: AsyncSession, child: ProjectChild
-) -> ProjectChildResponse:
+async def _hydrate_child(session: AsyncSession, child: ProjectChild) -> ProjectChildResponse:
     """Build a ProjectChildResponse with the right summary embedded.
 
     - Module child: hydrated via `_module_summary` (reused from modules router)
@@ -169,9 +167,7 @@ async def _hydrate_child(
                 stock=comp.stock,
                 current_price_per_100_eur=comp.current_price_per_100_eur,
                 supplier_stock_summary=[
-                    SupplierStockSummaryEntry(
-                        supplier_id=sid, supplier_name=sname, quantity=qty
-                    )
+                    SupplierStockSummaryEntry(supplier_id=sid, supplier_name=sname, quantity=qty)
                     for sid, sname, qty in summary_by_component.get(comp.id, [])
                 ],
             )
@@ -202,8 +198,7 @@ async def _bundle_to_response(
     )
     base["children"] = hydrated_children
     base["interest_links"] = [
-        ProjectInterestLinkResponse.model_validate(li).model_dump()
-        for li in bundle.interest_links
+        ProjectInterestLinkResponse.model_validate(li).model_dump() for li in bundle.interest_links
     ]
     return ProjectResponse.model_validate(base)
 
@@ -230,9 +225,7 @@ def _patch_to_update(payload: ProjectUpdateRequest) -> tuple[ProjectUpdate, bool
         fecha_entrega_estimada=(
             payload.fecha_entrega_estimada if "fecha_entrega_estimada" in fs else None
         ),
-        fecha_entrega_real=(
-            payload.fecha_entrega_real if "fecha_entrega_real" in fs else None
-        ),
+        fecha_entrega_real=(payload.fecha_entrega_real if "fecha_entrega_real" in fs else None),
         notas=payload.notas if "notas" in fs else None,
     )
     return update, "fecha_entrega_real" in fs
@@ -431,9 +424,7 @@ async def project_price_history(
     return ProjectPriceHistoryResponse(
         project_id=project_id,
         period=period,
-        series=[
-            ProjectPriceHistoryPointResponse(date=p.date, price=p.price) for p in series
-        ],
+        series=[ProjectPriceHistoryPointResponse(date=p.date, price=p.price) for p in series],
     )
 
 
@@ -453,9 +444,7 @@ async def list_project_stock_events(
     await _service(session).get(project_id)
 
     repo = SqlAlchemyStockEventRepository(session)
-    page_data = await repo.list_for_project(
-        project_id=project_id, page=page, page_size=page_size
-    )
+    page_data = await repo.list_for_project(project_id=project_id, page=page, page_size=page_size)
 
     supplier_ids = {e.supplier_id for e in page_data.items if e.supplier_id is not None}
     suppliers_by_id: dict[UUID, str] = {}

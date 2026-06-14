@@ -130,9 +130,7 @@ async def _hydrate_child(session: AsyncSession, child: ModuleChild) -> ModuleChi
                 stock=comp.stock,
                 current_price_per_100_eur=comp.current_price_per_100_eur,
                 supplier_stock_summary=[
-                    SupplierStockSummaryEntry(
-                        supplier_id=sid, supplier_name=sname, quantity=qty
-                    )
+                    SupplierStockSummaryEntry(supplier_id=sid, supplier_name=sname, quantity=qty)
                     for sid, sname, qty in summary_by_component.get(comp.id, [])
                 ],
             )

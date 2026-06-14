@@ -94,8 +94,6 @@ def test_component_rollup_defaults_expires_at_to_none() -> None:
 def test_component_rollup_with_explicit_expires_at() -> None:
     cid = uuid4()
     expiry = date(2026, 12, 31)
-    r = _ComponentRollup(
-        id=cid, stock=10, nato_score="D", tier=3, expires_at=expiry
-    )
+    r = _ComponentRollup(id=cid, stock=10, nato_score="D", tier=3, expires_at=expiry)
     assert r.expires_at == expiry
     assert r.tier == 3

@@ -19,9 +19,7 @@ from uuid import UUID, uuid4
 
 from app.domain.entities.component import NatoScoreValue, TierValue
 
-ProjectStatus = Literal[
-    "Presupuestado", "Esperando", "En proceso", "Completado", "Archivado"
-]
+ProjectStatus = Literal["Presupuestado", "Esperando", "En proceso", "Completado", "Archivado"]
 
 
 @dataclass

@@ -190,9 +190,7 @@ async def test_trigger_returns_503_when_enqueue_fails(
     def _broken_apply_async(*args: object, **kwargs: object) -> object:
         raise ConnectionError("broker unreachable")
 
-    monkeypatch.setattr(
-        sync_tasks.sync_one_supplier, "apply_async", _broken_apply_async
-    )
+    monkeypatch.setattr(sync_tasks.sync_one_supplier, "apply_async", _broken_apply_async)
 
     response = await api_client.post(
         "/api/v1/supplier-sync/runs?supplier=mouser",

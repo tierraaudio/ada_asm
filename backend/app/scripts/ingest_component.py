@@ -26,9 +26,7 @@ from app.infrastructure.db.session import get_session_factory
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Ingest a component from its manufacturer MPN."
-    )
+    parser = argparse.ArgumentParser(description="Ingest a component from its manufacturer MPN.")
     parser.add_argument("mpn", help="Manufacturer part number, e.g. NE555P")
     parser.add_argument("--ubicacion", default=None)
     parser.add_argument("--stock-inicial", type=int, default=None)

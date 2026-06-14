@@ -75,9 +75,7 @@ async def test_create_requires_auth(api_client: AsyncClient) -> None:
     assert response.status_code == 401
 
 
-async def test_create_then_list(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_create_then_list(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     await _create_project(api_client, auth_headers, code="PRJ-A", name="Alpha")
     await _create_project(api_client, auth_headers, code="PRJ-B", name="Beta")
     response = await api_client.get("/api/v1/projects", headers=auth_headers)
@@ -168,17 +166,13 @@ async def test_list_search_q_by_code_or_name(
 ) -> None:
     await _create_project(api_client, auth_headers, code="PRJ-SAT", name="Satellite Bus")
     await _create_project(api_client, auth_headers, code="PRJ-RVR", name="Rover")
-    response = await api_client.get(
-        "/api/v1/projects?q=satellite", headers=auth_headers
-    )
+    response = await api_client.get("/api/v1/projects?q=satellite", headers=auth_headers)
     body = response.json()
     assert body["total"] == 1
     assert body["items"][0]["code"] == "PRJ-SAT"
 
 
-async def test_list_filter_by_status(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_list_filter_by_status(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     await _create_project(api_client, auth_headers, code="PRJ-PEND", name="Pending")
     await _create_project(
         api_client,
@@ -187,9 +181,7 @@ async def test_list_filter_by_status(
         name="In progress",
         status="En proceso",
     )
-    response = await api_client.get(
-        "/api/v1/projects?status=En%20proceso", headers=auth_headers
-    )
+    response = await api_client.get("/api/v1/projects?status=En%20proceso", headers=auth_headers)
     body = response.json()
     assert body["total"] == 1
     assert body["items"][0]["code"] == "PRJ-PROC"
@@ -206,9 +198,7 @@ async def test_list_filter_by_customer_id(
         name="With customer",
         customer_id=customer["id"],
     )
-    await _create_project(
-        api_client, auth_headers, code="PRJ-NOCUS", name="No customer"
-    )
+    await _create_project(api_client, auth_headers, code="PRJ-NOCUS", name="No customer")
     response = await api_client.get(
         f"/api/v1/projects?customer_id={customer['id']}", headers=auth_headers
     )
@@ -217,16 +207,10 @@ async def test_list_filter_by_customer_id(
     assert body["items"][0]["code"] == "PRJ-CUS"
 
 
-async def test_list_pagination(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_list_pagination(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     for i in range(3):
-        await _create_project(
-            api_client, auth_headers, code=f"PRJ-PAG-{i}", name=f"Project {i}"
-        )
-    response = await api_client.get(
-        "/api/v1/projects?page=1&page_size=2", headers=auth_headers
-    )
+        await _create_project(api_client, auth_headers, code=f"PRJ-PAG-{i}", name=f"Project {i}")
+    response = await api_client.get("/api/v1/projects?page=1&page_size=2", headers=auth_headers)
     body = response.json()
     assert body["total"] == 3
     assert body["page"] == 1
@@ -250,9 +234,7 @@ async def test_get_detail_empty_children(
     api_client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
     created = await _create_project(api_client, auth_headers)
-    response = await api_client.get(
-        f"/api/v1/projects/{created['id']}", headers=auth_headers
-    )
+    response = await api_client.get(f"/api/v1/projects/{created['id']}", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
     assert body["children"] == []
@@ -260,9 +242,7 @@ async def test_get_detail_empty_children(
     assert body["buildable_stock"] == 0
 
 
-async def test_patch_updates_fields(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_patch_updates_fields(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     created = await _create_project(api_client, auth_headers)
     response = await api_client.patch(
         f"/api/v1/projects/{created['id']}",
@@ -334,9 +314,7 @@ async def test_patch_all_optional_fields(
     assert body["version"] == "v2"
 
 
-async def test_patch_404_unknown(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_patch_404_unknown(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     response = await api_client.patch(
         "/api/v1/projects/00000000-0000-0000-0000-000000000000",
         headers=auth_headers,
@@ -349,17 +327,13 @@ async def test_delete_archives_project(
     api_client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
     created = await _create_project(api_client, auth_headers)
-    response = await api_client.delete(
-        f"/api/v1/projects/{created['id']}", headers=auth_headers
-    )
+    response = await api_client.delete(f"/api/v1/projects/{created['id']}", headers=auth_headers)
     assert response.status_code == 204
     # Soft-deleted projects are excluded from the default list...
     listed = await api_client.get("/api/v1/projects", headers=auth_headers)
     assert listed.json()["total"] == 0
     # ...but reappear when include_archived=true.
-    listed = await api_client.get(
-        "/api/v1/projects?include_archived=true", headers=auth_headers
-    )
+    listed = await api_client.get("/api/v1/projects?include_archived=true", headers=auth_headers)
     body = listed.json()
     assert body["total"] == 1
     assert body["items"][0]["status"] == "Archivado"
@@ -378,9 +352,7 @@ async def test_delete_unknown_returns_404(
 # ---------- children: add / update / remove ----------
 
 
-async def test_add_child_module(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_add_child_module(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     project = await _create_project(api_client, auth_headers)
     module = await _create_module(api_client, auth_headers)
     response = await api_client.post(
@@ -606,9 +578,7 @@ async def test_get_detail_aggregates_via_module_child(
     against a module edge's `module.stock`.
     """
     module = await _create_module(api_client, auth_headers, sku="MOD-BUILD", stock=4)
-    component = next(
-        c for c in seeded_components_catalogue if c.mpn == "STM32F407VGT6"
-    )
+    component = next(c for c in seeded_components_catalogue if c.mpn == "STM32F407VGT6")
     # Module contains the component.
     await api_client.post(
         f"/api/v1/modules/{module['id']}/children",
@@ -622,9 +592,7 @@ async def test_get_detail_aggregates_via_module_child(
         headers=auth_headers,
         json={"child_module_id": module["id"], "quantity": 2},
     )
-    response = await api_client.get(
-        f"/api/v1/projects/{project['id']}", headers=auth_headers
-    )
+    response = await api_client.get(f"/api/v1/projects/{project['id']}", headers=auth_headers)
     body = response.json()
     assert body["aggregated_tier"] == component.tier
     assert body["aggregated_nato_score"] == component.nato_score
@@ -651,9 +619,7 @@ async def test_get_detail_hydrates_aggregates(
         json={"child_component_id": str(stm.id), "quantity": 1},
     )
 
-    response = await api_client.get(
-        f"/api/v1/projects/{project['id']}", headers=auth_headers
-    )
+    response = await api_client.get(f"/api/v1/projects/{project['id']}", headers=auth_headers)
     body = response.json()
     assert body["aggregated_nato_score"] == "D"
     assert body["aggregated_tier"] == 1
@@ -702,9 +668,7 @@ async def test_price_history_unknown_project_returns_404(
 # ---------- stock events ----------
 
 
-async def test_stock_events_empty(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_stock_events_empty(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     project = await _create_project(api_client, auth_headers)
     response = await api_client.get(
         f"/api/v1/projects/{project['id']}/stock-events", headers=auth_headers
@@ -809,9 +773,7 @@ async def test_create_and_list_interest_link(
     assert link["name"] == "Spec sheet"
 
     # Visible on the project detail.
-    detail = await api_client.get(
-        f"/api/v1/projects/{project['id']}", headers=auth_headers
-    )
+    detail = await api_client.get(f"/api/v1/projects/{project['id']}", headers=auth_headers)
     assert detail.status_code == 200
     links = detail.json()["interest_links"]
     assert len(links) == 1
@@ -863,9 +825,7 @@ async def test_patch_interest_link_unknown_returns_404(
     assert response.status_code == 404
 
 
-async def test_delete_interest_link(
-    api_client: AsyncClient, auth_headers: dict[str, str]
-) -> None:
+async def test_delete_interest_link(api_client: AsyncClient, auth_headers: dict[str, str]) -> None:
     project = await _create_project(api_client, auth_headers)
     create = await api_client.post(
         f"/api/v1/projects/{project['id']}/interest-links",

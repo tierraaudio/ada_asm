@@ -50,9 +50,7 @@ def _quote(mpn: str) -> SupplierQuote:
         parameters=(SupplierParameter(label="Voltage", value="16V"),),
         compliance=(SupplierComplianceCode(code_type="ECCN", code_value="EAR99"),),
         price_breaks=(
-            SupplierPriceBreak(
-                quantity=1, price_original=Decimal("0.4"), currency_original="EUR"
-            ),
+            SupplierPriceBreak(quantity=1, price_original=Decimal("0.4"), currency_original="EUR"),
         ),
         country_of_origin="MX",
         raw_payload={"x": 1},
@@ -131,7 +129,5 @@ async def test_datasheet_404_when_none_archived(
     api_client: AsyncClient,
     auth_headers: dict[str, str],
 ) -> None:
-    resp = await api_client.get(
-        f"/api/v1/components/{uuid4()}/datasheet", headers=auth_headers
-    )
+    resp = await api_client.get(f"/api/v1/components/{uuid4()}/datasheet", headers=auth_headers)
     assert resp.status_code == 404

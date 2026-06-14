@@ -118,9 +118,7 @@ async def _flush_lookup_cache(mpn: str) -> None:
         await client.aclose()
 
 
-def _patch_adapters(
-    monkeypatch: pytest.MonkeyPatch, adapters: list[Any]
-) -> None:
+def _patch_adapters(monkeypatch: pytest.MonkeyPatch, adapters: list[Any]) -> None:
     """Patch the registry function the service calls so it returns our
     fake adapter list in the desired order."""
 
@@ -196,9 +194,7 @@ async def test_family_not_merged_and_category_signals_in_supplier_data(
         [_FakeAdapter("mouser", quote=mouser_q), _FakeAdapter("digikey", quote=digikey_q)],
     )
 
-    response = await api_client.get(
-        f"/api/v1/components/lookup?mpn={mpn}", headers=auth_headers
-    )
+    response = await api_client.get(f"/api/v1/components/lookup?mpn={mpn}", headers=auth_headers)
     assert response.status_code == 200
     body = response.json()
 

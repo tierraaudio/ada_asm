@@ -100,9 +100,7 @@ class SqlAlchemyProjectRepository:
         joined_customer = False
         if filters.q is not None and filters.q.strip():
             needle = f"%{filters.q.strip().lower()}%"
-            stmt = stmt.outerjoin(
-                CustomerModel, CustomerModel.id == ProjectModel.customer_id
-            )
+            stmt = stmt.outerjoin(CustomerModel, CustomerModel.id == ProjectModel.customer_id)
             joined_customer = True
             stmt = stmt.where(
                 or_(
@@ -124,8 +122,10 @@ class SqlAlchemyProjectRepository:
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await self._session.execute(count_stmt)).scalar_one()
-        rows_stmt = stmt.order_by(ProjectModel.created_at.desc()).limit(page_size).offset(
-            (page - 1) * page_size
+        rows_stmt = (
+            stmt.order_by(ProjectModel.created_at.desc())
+            .limit(page_size)
+            .offset((page - 1) * page_size)
         )
         if joined_customer:
             # Avoid duplicate rows from the JOIN when the same project would
@@ -141,9 +141,7 @@ class SqlAlchemyProjectRepository:
 
     async def get_by_id(self, project_id: UUID) -> Project | None:
         row = (
-            await self._session.execute(
-                select(ProjectModel).where(ProjectModel.id == project_id)
-            )
+            await self._session.execute(select(ProjectModel).where(ProjectModel.id == project_id))
         ).scalar_one_or_none()
         return _to_entity(row) if row else None
 
@@ -188,9 +186,7 @@ class SqlAlchemyProjectRepository:
 
     async def update(self, project: Project) -> Project:
         row = (
-            await self._session.execute(
-                select(ProjectModel).where(ProjectModel.id == project.id)
-            )
+            await self._session.execute(select(ProjectModel).where(ProjectModel.id == project.id))
         ).scalar_one_or_none()
         if row is None:
             raise LookupError(f"project {project.id} disappeared mid-update")
@@ -222,9 +218,7 @@ class SqlAlchemyProjectRepository:
 
     async def soft_delete(self, project_id: UUID) -> bool:
         row = (
-            await self._session.execute(
-                select(ProjectModel).where(ProjectModel.id == project_id)
-            )
+            await self._session.execute(select(ProjectModel).where(ProjectModel.id == project_id))
         ).scalar_one_or_none()
         if row is None:
             return False

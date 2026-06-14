@@ -64,9 +64,7 @@ async def test_acquire_skips_html_interstitial_and_falls_back(tmp_path: Path) ->
     quotes = [_q("farnell", datasheet_url=bad), _q("digikey", datasheet_url=good)]
     with respx.mock() as mock:
         mock.get(bad).mock(
-            return_value=httpx.Response(
-                200, content=_HTML, headers={"content-type": "text/html"}
-            )
+            return_value=httpx.Response(200, content=_HTML, headers={"content-type": "text/html"})
         )
         mock.get(good).mock(
             return_value=httpx.Response(
@@ -90,9 +88,7 @@ async def test_acquire_retries_alternate_ua_on_403(tmp_path: Path) -> None:
         calls["n"] += 1
         if request.headers.get("user-agent", "").startswith("Mozilla"):
             return httpx.Response(403, content=_HTML)
-        return httpx.Response(
-            200, content=_PDF, headers={"content-type": "application/pdf"}
-        )
+        return httpx.Response(200, content=_PDF, headers={"content-type": "application/pdf"})
 
     with respx.mock() as mock:
         mock.get(url).mock(side_effect=handler)
@@ -108,9 +104,7 @@ async def test_acquire_link_only_when_no_pdf(tmp_path: Path) -> None:
     quotes = [_q("mouser", datasheet_url=url)]
     with respx.mock() as mock:
         mock.get(url).mock(
-            return_value=httpx.Response(
-                200, content=_HTML, headers={"content-type": "text/html"}
-            )
+            return_value=httpx.Response(200, content=_HTML, headers={"content-type": "text/html"})
         )
         result = await datasheet_service.acquire(quotes, mpn="LM358N", storage=storage)
 
@@ -121,9 +115,7 @@ async def test_acquire_link_only_when_no_pdf(tmp_path: Path) -> None:
 
 async def test_acquire_none_when_no_candidates(tmp_path: Path) -> None:
     storage = FilesystemDatasheetStorage(tmp_path)
-    result = await datasheet_service.acquire(
-        [_q("mouser")], mpn="LM358N", storage=storage
-    )
+    result = await datasheet_service.acquire([_q("mouser")], mpn="LM358N", storage=storage)
     assert result.outcome == "none"
 
 
@@ -151,8 +143,6 @@ async def test_acquire_storage_failure_degrades_to_link_only() -> None:
                 200, content=_PDF, headers={"content-type": "application/pdf"}
             )
         )
-        result = await datasheet_service.acquire(
-            quotes, mpn="LM358N", storage=_BrokenStorage()
-        )
+        result = await datasheet_service.acquire(quotes, mpn="LM358N", storage=_BrokenStorage())
     assert result.outcome == "link_only"
     assert result.url == url

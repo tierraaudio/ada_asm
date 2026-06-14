@@ -70,9 +70,7 @@ def _digikey_quote(mpn: str) -> SupplierQuote:
         parameters=(SupplierParameter(label="Voltage", value="16V", key="2074"),),
         compliance=(SupplierComplianceCode(code_type="ECCN", code_value="EAR99"),),
         price_breaks=(
-            SupplierPriceBreak(
-                quantity=1, price_original=Decimal("0.43"), currency_original="EUR"
-            ),
+            SupplierPriceBreak(quantity=1, price_original=Decimal("0.43"), currency_original="EUR"),
         ),
         supplier_sku="296-X-ND",
         country_of_origin="MX",
@@ -129,25 +127,29 @@ async def test_ingest_creates_component_with_blended_and_report(
         async with factory_session(session) as s:
             params = (
                 await s.execute(
-                    select(func.count()).select_from(ComponentParameterModel).where(
-                        ComponentParameterModel.component_id == component.id
-                    )
+                    select(func.count())
+                    .select_from(ComponentParameterModel)
+                    .where(ComponentParameterModel.component_id == component.id)
                 )
             ).scalar_one()
             compl = (
                 await s.execute(
-                    select(func.count()).select_from(ComponentComplianceModel).where(
-                        ComponentComplianceModel.component_id == component.id
-                    )
+                    select(func.count())
+                    .select_from(ComponentComplianceModel)
+                    .where(ComponentComplianceModel.component_id == component.id)
                 )
             ).scalar_one()
             docs = (
-                await s.execute(
-                    select(ComponentDocumentModel).where(
-                        ComponentDocumentModel.component_id == component.id
+                (
+                    await s.execute(
+                        select(ComponentDocumentModel).where(
+                            ComponentDocumentModel.component_id == component.id
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
         assert params == 1
         assert compl == 1
         assert len(docs) == 1 and docs[0].blob_path is not None

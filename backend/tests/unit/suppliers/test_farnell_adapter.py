@@ -26,13 +26,7 @@ from app.infrastructure.suppliers.farnell import (
 
 pytestmark = pytest.mark.asyncio
 
-_FIXTURES = (
-    Path(__file__).resolve().parents[2]
-    / "fixtures"
-    / "suppliers"
-    / "farnell"
-    / "by_mpn"
-)
+_FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "suppliers" / "farnell" / "by_mpn"
 
 _GBP_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-08-01"

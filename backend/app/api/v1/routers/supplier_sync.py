@@ -142,9 +142,7 @@ async def trigger_supplier_sync(
     from app.infrastructure.tasks.supplier_sync import sync_one_supplier
 
     run_id = uuid4()
-    session.add(
-        SupplierSyncRunModel(id=run_id, supplier=supplier, status="running")
-    )
+    session.add(SupplierSyncRunModel(id=run_id, supplier=supplier, status="running"))
     await session.flush()
     await session.commit()
 
@@ -171,8 +169,7 @@ async def trigger_supplier_sync(
         )
     except Exception as exc:
         _log.error(
-            "supplier_sync.enqueue.failed supplier=%s run_id=%s "
-            "duration_ms=%d err=%s.%s msg=%s",
+            "supplier_sync.enqueue.failed supplier=%s run_id=%s duration_ms=%d err=%s.%s msg=%s",
             supplier,
             run_id,
             (time.monotonic() - enqueue_started) * 1000,

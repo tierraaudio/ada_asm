@@ -85,9 +85,7 @@ class ComponentDocumentModel(Base, TimestampMixin):
     blob_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     content_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    fetched_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    fetched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ComponentCrossRefModel(Base, TimestampMixin):

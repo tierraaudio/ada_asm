@@ -111,6 +111,7 @@ def _quote_to_supplier_data(quote: SupplierQuote) -> SupplierData:
 
 def _merge_fields(quotes: list[SupplierQuote]) -> LookupFields:
     from app.api.v1.schemas.lookup import LookupFields
+
     """Progressive merge: for each scalar field, the FIRST non-null value
     encountered (priority order) wins. Later quotes only fill gaps."""
 
@@ -150,11 +151,7 @@ def _merge_fields(quotes: list[SupplierQuote]) -> LookupFields:
 
 
 def _missing_fields(fields: LookupFields) -> list[str]:
-    return [
-        name
-        for name, value in fields.model_dump().items()
-        if value is None
-    ]
+    return [name for name, value in fields.model_dump().items() if value is None]
 
 
 async def gather_quotes(mpn: str) -> tuple[list[SupplierQuote], list[str], list[str]]:
@@ -205,6 +202,7 @@ async def gather_quotes(mpn: str) -> tuple[list[SupplierQuote], list[str], list[
 
 async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupResponse:
     from app.api.v1.schemas.lookup import LookupResponse
+
     """Walk enabled suppliers in priority order and return a merged quote.
 
     Raises:
@@ -224,9 +222,7 @@ async def lookup_by_mpn(mpn: str, *, force_refresh: bool = False) -> LookupRespo
     # must degrade to a live fetch, never fail or stall the request.
     if not force_refresh:
         try:
-            cached = await asyncio.wait_for(
-                redis.get(cache_key), timeout=_CACHE_OP_TIMEOUT_SECONDS
-            )
+            cached = await asyncio.wait_for(redis.get(cache_key), timeout=_CACHE_OP_TIMEOUT_SECONDS)
         except Exception as exc:
             cache_state = "error"
             _log.warning(
