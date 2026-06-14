@@ -111,11 +111,12 @@ def init(app: FastAPI | None = None, *, settings: Settings | None = None) -> boo
     # path so all engines built after init are covered.
     SQLAlchemyInstrumentor().instrument()
     # CeleryInstrumentor ships no inline type info in some resolved
-    # environments; route the call through an Any-typed handle so mypy is
-    # consistent whether or not its stubs resolve (avoids a no-untyped-call
-    # error in one env and an unused-ignore in the other).
-    celery_instrumentor: Any = CeleryInstrumentor()
-    celery_instrumentor.instrument()
+    # environments. Route the *class* (a reference, not a call) through an
+    # Any-typed handle so both constructing it and calling .instrument() are
+    # consistent whether or not its stubs resolve — avoiding a no-untyped-call
+    # error in one env and an unused-ignore in the other.
+    celery_instrumentor_cls: Any = CeleryInstrumentor
+    celery_instrumentor_cls().instrument()
 
     _initialised = True
     _log.info(
