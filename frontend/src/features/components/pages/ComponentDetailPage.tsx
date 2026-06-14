@@ -119,7 +119,7 @@ export function ComponentDetailPage() {
         {showExistingBanner && ingestExistingMpn && (
           <div className="flex items-center justify-between gap-3 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
             <span>
-              Este componente ya estaba ingestado (buscaste el MPN{" "}
+              Este componente ya existe (MPN{" "}
               <span className="font-semibold">{ingestExistingMpn}</span>).
             </span>
             <button

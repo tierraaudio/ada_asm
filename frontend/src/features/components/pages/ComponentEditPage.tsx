@@ -113,7 +113,7 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
   const update = useUpdateComponent();
   const ingest = useIngestComponent();
 
-  // "Ingestar desde MPN": auto-populate a brand-new component from its
+  // "Importar desde MPN": auto-populate a brand-new component from its
   // manufacturer MPN by walking the supplier APIs (create mode only).
   const [ingestMpn, setIngestMpn] = useState("");
   const [ingestError, setIngestError] = useState<string | null>(null);
@@ -148,10 +148,10 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
         } else if (status === 502) {
           setIngestError("Los proveedores no responden ahora mismo. Inténtalo en un momento.");
         } else {
-          setIngestError("No se pudo ingestar el componente. Inténtalo de nuevo.");
+          setIngestError("No se pudo importar el componente. Inténtalo de nuevo.");
         }
       } else {
-        setIngestError("No se pudo ingestar el componente. Inténtalo de nuevo.");
+        setIngestError("No se pudo importar el componente. Inténtalo de nuevo.");
       }
     }
   };
@@ -310,7 +310,7 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
             <div className="flex items-center gap-2">
               <Sparkles className="size-4 text-brand" />
               <h2 className="text-sm font-semibold text-text-primary">
-                Ingestar desde MPN
+                Importar desde MPN
               </h2>
             </div>
             <p className="mt-1 text-sm text-text-secondary">
@@ -331,7 +331,7 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
                 disabled={ingest.isPending}
                 className={cn(inputCls, "sm:max-w-xs")}
                 placeholder="NE555P"
-                aria-label="MPN a ingestar"
+                aria-label="MPN a importar"
               />
               <Button
                 type="button"
@@ -347,7 +347,7 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
                 ) : (
                   <>
                     <Sparkles className="size-4" />
-                    Ingestar
+                    Importar
                   </>
                 )}
               </Button>
@@ -647,7 +647,7 @@ function IngestResultPanel({
       <div className="flex items-center gap-2">
         <Sparkles className="size-4 text-emerald-600" />
         <p className="text-sm font-semibold text-emerald-800">
-          Ingestado: {component.sku} · {report.mpn}
+          Importado: {component.sku} · {report.mpn}
         </p>
       </div>
 
@@ -712,7 +712,7 @@ function IngestResultPanel({
           Ver componente
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={onReset}>
-          Ingestar otro
+          Importar otro
         </Button>
       </div>
     </div>
