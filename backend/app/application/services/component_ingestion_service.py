@@ -45,6 +45,10 @@ from app.infrastructure.repositories.component_family_rule_repository import (
 from app.infrastructure.repositories.component_repository import (
     SqlAlchemyComponentRepository,
 )
+from app.infrastructure.supplier_snapshot import (
+    ensure_supplier_row,
+    upsert_prices_and_stock,
+)
 
 _log = logging.getLogger(__name__)
 
@@ -206,6 +210,11 @@ class ComponentIngestionService:
         counts = await self._persist_blended(saved.id, quotes, ds)
         await self._session.commit()
 
+        # 6b. Seed the first price + stock snapshot from the same quotes,
+        # reusing the daily-sync upsert, so the detail screen shows data
+        # immediately instead of waiting for the nightly sync.
+        await self._snapshot_prices_and_stock(saved.id, quotes)
+
         # 7. Assemble the report.
         report = self._build_report(
             component=saved,
@@ -233,6 +242,30 @@ class ComponentIngestionService:
         stmt = select(func.count()).where(ComponentModel.sku.like(f"{prefix}-%"))
         used = (await self._session.execute(stmt)).scalar_one()
         return f"{prefix}-{used + 1:03d}"
+
+    async def _snapshot_prices_and_stock(
+        self, component_id: UUID, quotes: list[SupplierQuote]
+    ) -> None:
+        """Write the first `supplier_prices` + `supplier_stocks` rows from the
+        ingest quotes, reusing the daily-sync upsert, so the detail screen has
+        data on day one. Best-effort: a failure here must not undo the
+        already-committed component."""
+
+        today = datetime.now(UTC).date()
+        try:
+            for quote in quotes:
+                supplier_id = await ensure_supplier_row(self._session, quote.supplier)
+                await upsert_prices_and_stock(
+                    self._session,
+                    component_id=component_id,
+                    supplier_id=supplier_id,
+                    quote=quote,
+                    today=today,
+                )
+            await self._session.commit()
+        except Exception:
+            await self._session.rollback()
+            _log.exception("ingest.snapshot_failed component_id=%s", component_id)
 
     async def _persist_blended(
         self,

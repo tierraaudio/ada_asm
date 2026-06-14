@@ -32,6 +32,8 @@ from app.infrastructure.db.models.component_blended import (
     ComponentDocumentModel,
     ComponentParameterModel,
 )
+from app.infrastructure.db.models.supplier_price import SupplierPriceModel
+from app.infrastructure.db.models.supplier_stock import SupplierStockModel
 from app.infrastructure.db.session import get_session_factory
 
 pytestmark = pytest.mark.asyncio
@@ -70,7 +72,12 @@ def _digikey_quote(mpn: str) -> SupplierQuote:
         parameters=(SupplierParameter(label="Voltage", value="16V", key="2074"),),
         compliance=(SupplierComplianceCode(code_type="ECCN", code_value="EAR99"),),
         price_breaks=(
-            SupplierPriceBreak(quantity=1, price_original=Decimal("0.43"), currency_original="EUR"),
+            SupplierPriceBreak(
+                quantity=1,
+                price_original=Decimal("0.43"),
+                currency_original="EUR",
+                price_eur=Decimal("0.43"),
+            ),
         ),
         supplier_sku="296-X-ND",
         country_of_origin="MX",
@@ -165,6 +172,54 @@ async def test_ingest_creates_component_with_blended_and_report(
         assert report.counts["documents"] == 1
         assert "location" in report.manual_overrides_applied
         assert "family" in report.fields_populated
+    finally:
+        await session.close()
+
+
+async def test_ingest_writes_initial_price_and_stock_snapshot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A freshly-ingested component already carries a first price + stock
+    snapshot (reusing the daily-sync upsert), so the detail screen is not
+    empty until the next nightly sync."""
+    mpn = f"SNP-{uuid4().hex[:8].upper()}"
+    _patch(monkeypatch, [_FakeAdapter("digikey", quote=_digikey_quote(mpn))])
+    service, session = await _service(FilesystemDatasheetStorage(tmp_path))
+    try:
+        with respx.mock() as mock:
+            mock.get(_DS_URL).mock(return_value=httpx.Response(404))
+            mock.route(host="www.ti.com").mock(return_value=httpx.Response(404))
+            component, _ = await service.ingest(mpn)
+
+        async with factory_session(session) as s:
+            prices = (
+                (
+                    await s.execute(
+                        select(SupplierPriceModel).where(
+                            SupplierPriceModel.component_id == component.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            stocks = (
+                (
+                    await s.execute(
+                        select(SupplierStockModel).where(
+                            SupplierStockModel.component_id == component.id
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        # One EUR break (qty 1 @ 0.43) resolves for every tier; stock 100
+        # produces exactly one snapshot row.
+        assert len(prices) >= 1
+        assert all(p.price == Decimal("0.43") for p in prices)
+        assert len(stocks) == 1
+        assert stocks[0].quantity == 100
     finally:
         await session.close()
 

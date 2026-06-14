@@ -11,7 +11,9 @@ from decimal import Decimal
 
 import pytest
 
-from app.infrastructure.tasks.supplier_sync import _pick_unit_price_for_tier
+from app.infrastructure.supplier_snapshot import (
+    pick_unit_price_for_tier as _pick_unit_price_for_tier,
+)
 
 
 def test_pick_unit_price_returns_largest_break_not_exceeding_tier() -> None:
