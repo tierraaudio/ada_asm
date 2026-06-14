@@ -22,6 +22,7 @@ import { HistoricoPreciosChart } from "@/features/shared/charts/HistoricoPrecios
 import { PreciosDeHoyTable } from "../components/PreciosDeHoyTable";
 import { StockDisponibleChart } from "../components/StockDisponibleChart";
 import { FAMILY_VALUES, TIPO_ALMACENAMIENTO_VALUES } from "../types";
+import type { IngestComponentResponse } from "../types";
 import { useComponentDetail } from "../hooks/use-component-detail";
 import {
   useCreateComponent,
@@ -116,14 +117,18 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
   // manufacturer MPN by walking the supplier APIs (create mode only).
   const [ingestMpn, setIngestMpn] = useState("");
   const [ingestError, setIngestError] = useState<string | null>(null);
+  const [ingestResult, setIngestResult] = useState<IngestComponentResponse | null>(null);
 
   const handleIngest = async () => {
     const mpn = ingestMpn.trim();
     if (!mpn) return;
     setIngestError(null);
+    setIngestResult(null);
     try {
-      const { component } = await ingest.mutateAsync({ mpn });
-      navigate(`/components/${component.id}`);
+      // Show the structured report instead of navigating away, so the
+      // operator sees what was auto-extracted before opening the detail.
+      const result = await ingest.mutateAsync({ mpn });
+      setIngestResult(result);
     } catch (err) {
       if (isAxiosError(err)) {
         const status = err.response?.status;
@@ -349,9 +354,20 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
                 {ingestError}
               </p>
             )}
-            <p className="mt-3 text-xs text-text-secondary">
-              ¿Prefieres introducirlo a mano? Usa el formulario de abajo.
-            </p>
+            {ingestResult ? (
+              <IngestResultPanel
+                result={ingestResult}
+                onView={() => navigate(`/components/${ingestResult.component.id}`)}
+                onReset={() => {
+                  setIngestResult(null);
+                  setIngestMpn("");
+                }}
+              />
+            ) : (
+              <p className="mt-3 text-xs text-text-secondary">
+                ¿Prefieres introducirlo a mano? Usa el formulario de abajo.
+              </p>
+            )}
           </section>
         )}
 
@@ -590,6 +606,118 @@ export function ComponentEditPage({ mode }: ComponentEditPageProps) {
 
 const inputCls =
   "h-10 w-full rounded-md border border-border bg-white px-3 text-sm text-text-primary placeholder:text-text-secondary/60 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/30";
+
+const DATASHEET_LABEL: Record<string, string> = {
+  archived: "Archivado (PDF)",
+  link_only: "Solo enlace",
+  none: "No encontrado",
+};
+const COUNT_LABEL: Record<string, string> = {
+  price_breaks: "tramos de precio",
+  supplier_stock_rows: "stocks de proveedor",
+  parameters: "paramétricos",
+  compliance_codes: "códigos compliance",
+  cross_refs: "referencias cruzadas",
+  documents: "documentos",
+};
+
+function IngestResultPanel({
+  result,
+  onView,
+  onReset,
+}: {
+  result: IngestComponentResponse;
+  onView: () => void;
+  onReset: () => void;
+}) {
+  const { component, report } = result;
+  const fam = report.family;
+  const counts = Object.entries(report.counts).filter(([, v]) => v > 0);
+  return (
+    <div className="mt-4 rounded-md border border-emerald-200 bg-emerald-50/60 p-4">
+      <div className="flex items-center gap-2">
+        <Sparkles className="size-4 text-emerald-600" />
+        <p className="text-sm font-semibold text-emerald-800">
+          Ingestado: {component.sku} · {report.mpn}
+        </p>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 sm:grid-cols-2">
+        <ResultRow label="Nombre" value={component.name} />
+        <ResultRow label="Fabricante" value={component.fabricante ?? "—"} />
+        <ResultRow
+          label="Familia inferida"
+          value={
+            fam.needs_review || !fam.inferred ? (
+              <span className="text-amber-700">Revisar (no inferida)</span>
+            ) : (
+              <>
+                {fam.inferred}
+                {fam.decided_by && (
+                  <span className="text-text-secondary">
+                    {" "}
+                    · por {fam.decided_by} ({fam.confidence})
+                  </span>
+                )}
+              </>
+            )
+          }
+        />
+        <ResultRow
+          label="Datasheet"
+          value={
+            <>
+              {DATASHEET_LABEL[report.datasheet.outcome] ?? report.datasheet.outcome}
+              {report.datasheet.source && (
+                <span className="text-text-secondary"> · {report.datasheet.source}</span>
+              )}
+            </>
+          }
+        />
+        <ResultRow
+          label="Proveedores que aportaron"
+          value={report.sources_contributed.join(", ") || "—"}
+        />
+        <ResultRow
+          label="Datos capturados"
+          value={
+            counts.length
+              ? counts
+                  .map(([k, v]) => `${v} ${COUNT_LABEL[k] ?? k}`)
+                  .join(" · ")
+              : "—"
+          }
+        />
+      </dl>
+
+      {report.warnings.length > 0 && (
+        <ul className="mt-3 list-inside list-disc text-xs text-amber-700">
+          {report.warnings.map((w) => (
+            <li key={w}>{w}</li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-4 flex gap-2">
+        <Button type="button" size="sm" onClick={onView}>
+          Ver componente
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={onReset}>
+          Ingestar otro
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ResultRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs uppercase tracking-wide text-text-secondary">{label}</dt>
+      <dd className="text-sm font-medium text-text-primary">{value}</dd>
+    </div>
+  );
+}
 
 interface FormFieldProps {
   label: string;
