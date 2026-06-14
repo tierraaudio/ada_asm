@@ -51,6 +51,37 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+def forget_engine() -> None:
+    """Drop the cached engine reference WITHOUT disposing it.
+
+    Celery prefork workers run each task on a fresh ``asyncio.run`` loop, but
+    the cached async engine is bound to the loop of the FIRST task that built
+    it. On a later task that loop is closed, so its pooled asyncpg
+    connections raise "got Future attached to a different loop" /
+    "Event loop is closed". A task calls this at the start to abandon any
+    stale engine so the next ``get_session_factory()`` rebuilds one on the
+    current loop. The stale engine is GC'd (its connections are already dead
+    with the closed loop, so there is nothing to await-dispose).
+    """
+    global _engine, _session_factory
+    _engine = None
+    _session_factory = None
+
+
+async def dispose_engine() -> None:
+    """Dispose the cached engine on the CURRENT loop and clear the cache.
+
+    Called at the end of a Celery task (inside the same ``asyncio.run`` loop
+    that built the engine) so connections are returned cleanly before the
+    loop closes — preventing the next task from inheriting a dead-loop pool.
+    """
+    global _engine, _session_factory
+    if _engine is not None:
+        await _engine.dispose()
+    _engine = None
+    _session_factory = None
+
+
 async def get_db_session() -> AsyncIterator[AsyncSession]:
     """FastAPI dependency that yields one session per request.
 

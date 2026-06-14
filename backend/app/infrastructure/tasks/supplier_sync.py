@@ -56,7 +56,11 @@ from app.infrastructure.db.models.supplier_price import SupplierPriceModel
 from app.infrastructure.db.models.supplier_stock import SupplierStockModel
 from app.infrastructure.db.models.supplier_sync_error import SupplierSyncErrorModel
 from app.infrastructure.db.models.supplier_sync_run import SupplierSyncRunModel
-from app.infrastructure.db.session import get_session_factory
+from app.infrastructure.db.session import (
+    dispose_engine,
+    forget_engine,
+    get_session_factory,
+)
 
 if TYPE_CHECKING:
     from app.domain.entities.supplier_quote import SupplierCode
@@ -400,10 +404,28 @@ def sync_one_supplier(
         return ""
 
     run_uuid = UUID(existing_run_id) if existing_run_id else None
-    run_id = asyncio.run(
-        _run_for_supplier(adapter, existing_run_id=run_uuid)
-    )
+    run_id = asyncio.run(_run_for_supplier_isolated(adapter, run_uuid))
     return str(run_id)
+
+
+async def _run_for_supplier_isolated(
+    adapter: SupplierAdapter, run_uuid: UUID | None
+) -> UUID:
+    """Run one supplier sync with a fresh DB engine bound to THIS loop.
+
+    Celery prefork reuses worker processes across tasks, each on a new
+    ``asyncio.run`` loop. `forget_engine()` abandons any engine left over
+    from a previous (now closed) loop so the work below builds a fresh one
+    on the current loop; `dispose_engine()` returns its connections before
+    the loop closes. Without this the second task on a process fails with
+    "got Future attached to a different loop" (see `db/session.py`).
+    """
+
+    forget_engine()
+    try:
+        return await _run_for_supplier(adapter, existing_run_id=run_uuid)
+    finally:
+        await dispose_engine()
 
 
 @celery_app.task(name="supplier_sync.run_daily_sync")  # type: ignore[untyped-decorator]
