@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -176,6 +177,9 @@ class ComponentIngestionService:
             datasheet_url=ds.url,
             location=location,
             holded_id=holded_id,
+            # Stamp the user-facing creation date at ingest (distinct from the
+            # created_at timestamp) so the detail page shows it immediately.
+            fecha_creacion=datetime.now(UTC).date(),
             stock=stock,
             image_url=_opt_str(_first_non_null(quotes, "image_url")),
             lifecycle_status=_opt_str(_first_non_null(quotes, "lifecycle_status")),

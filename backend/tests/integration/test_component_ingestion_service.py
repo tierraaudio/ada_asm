@@ -115,6 +115,10 @@ async def test_ingest_creates_component_with_blended_and_report(
         assert component.family == "Diodos"
         assert component.sku and component.sku.startswith("DIO-")
         assert component.location == "G-T-23"
+        # Creation date is stamped at ingest (was null before).
+        from datetime import UTC, datetime
+
+        assert component.fecha_creacion == datetime.now(UTC).date()
         assert component.stock == 50
         assert component.country_of_origin == "MX"
         assert component.lead_time_days == 42
