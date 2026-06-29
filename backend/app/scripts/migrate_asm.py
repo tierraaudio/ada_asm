@@ -38,7 +38,7 @@ from app.core.config import get_settings
 from app.core.exceptions import (
     ComponentMpnAlreadyRegisteredError,
     ComponentMpnNotFoundError,
-    SupplierLookupUnavailableError,
+    SupplierRateLimitedError,
 )
 from app.infrastructure.datasheet_storage import get_datasheet_storage
 from app.infrastructure.db.models.component import ComponentModel
@@ -50,6 +50,17 @@ _log = logging.getLogger("migrate_asm")
 _SOURCE = "asm-legacy"
 _BACKUP_CONTAINER = "legacy-asm-backup"
 _ITEMS_BLOB = "asm_items.json"
+
+# MPNs that are internal codes (PCBs, sub-assemblies, modules) or Aliexpress
+# never resolve at a distributor — lift-and-shift them directly instead of
+# burning a ~45s supplier round-trip (and quota) on a guaranteed 404.
+_INTERNAL_PREFIXES = ("PCB", "RM-", "TA-", "ASM-")
+
+
+def _is_distributor(item: dict[str, Any]) -> bool:
+    mpn = (item.get("mpn") or "").strip().upper()
+    manufacturer = (item.get("manufacturer") or "").lower()
+    return bool(mpn) and not mpn.startswith(_INTERNAL_PREFIXES) and "aliexpress" not in manufacturer
 
 
 async def _load_items() -> list[dict[str, Any]]:
@@ -140,40 +151,66 @@ async def _lift_shift(session: Any, item: dict[str, Any], now: datetime) -> None
     await session.commit()
 
 
-async def _process(item: dict[str, Any], *, dry_run: bool) -> str:
+class _QuotaExhausted(Exception):
+    """A supplier returned 429 — daily quota is spent; stop the run so it can
+    resume tomorrow (already-migrated items are skipped on the next pass)."""
+
+
+async def _process(item: dict[str, Any], *, dry_run: bool, retries: int = 3) -> str:
     mpn = (item.get("mpn") or "").strip()
     if not mpn:
         return "skipped_no_mpn"
 
     factory = get_session_factory()
-    now = datetime.now(UTC)
     async with factory() as session:
         if await _already_migrated(session, item.get("legacy_id", ""), mpn):
             return "skipped_done"
-        if dry_run:
-            return "would_process"
+    if dry_run:
+        return "would_distribute" if _is_distributor(item) else "would_lift"
 
-        service = ComponentIngestionService(session, storage=get_datasheet_storage())
-        try:
-            component, _ = await service.ingest(
-                mpn,
-                ubicacion=item.get("locator") or None,
-                stock_inicial=_opt_int(item.get("amount")),
-                holded_id=item.get("holded_id") or None,
-            )
-            await session.execute(
-                update(ComponentModel)
-                .where(ComponentModel.id == component.id)
-                .values(**_legacy_values(item, now))
-            )
-            await session.commit()
-            return "ingested"
-        except ComponentMpnAlreadyRegisteredError:
-            return "skipped_exists"
-        except (ComponentMpnNotFoundError, SupplierLookupUnavailableError):
-            await session.rollback()
+    now = datetime.now(UTC)
+
+    # Internal/PCB/Aliexpress → lift-and-shift directly (no supplier call).
+    if not _is_distributor(item):
+        async with factory() as session:
             await _lift_shift(session, item, now)
-            return "lifted"
+        return "lifted_internal"
+
+    last_err: Exception | None = None
+    for attempt in range(1, retries + 1):
+        async with factory() as session:
+            service = ComponentIngestionService(session, storage=get_datasheet_storage())
+            try:
+                component, _ = await service.ingest(
+                    mpn,
+                    ubicacion=item.get("locator") or None,
+                    stock_inicial=_opt_int(item.get("amount")),
+                    holded_id=item.get("holded_id") or None,
+                )
+                await session.execute(
+                    update(ComponentModel)
+                    .where(ComponentModel.id == component.id)
+                    .values(**_legacy_values(item, now))
+                )
+                await session.commit()
+                return "ingested"
+            except ComponentMpnAlreadyRegisteredError:
+                return "skipped_exists"
+            except ComponentMpnNotFoundError:
+                # Suppliers responded but none recognised it → lift-and-shift.
+                await session.rollback()
+                await _lift_shift(session, item, now)
+                return "lifted"
+            except SupplierRateLimitedError as exc:
+                raise _QuotaExhausted(str(exc)) from exc
+            except Exception as exc:
+                await session.rollback()
+                last_err = exc
+                if attempt < retries:
+                    await asyncio.sleep(2 * attempt)
+
+    _log.warning("migrate_asm: giving up after %d attempts mpn=%s: %s", retries, mpn, last_err)
+    return "error"
 
 
 async def _run(args: argparse.Namespace) -> int:
@@ -193,6 +230,9 @@ async def _run(args: argparse.Namespace) -> int:
     for n, item in enumerate(window, 1):
         try:
             outcome = await _process(item, dry_run=args.dry_run)
+        except _QuotaExhausted as exc:
+            _log.warning("migrate_asm: QUOTA EXHAUSTED, stopping (resume later): %s", exc)
+            break
         except Exception:
             _log.exception("migrate_asm: error on pn=%s mpn=%s", item.get("pn"), item.get("mpn"))
             outcome = "error"
