@@ -106,3 +106,10 @@ class ComponentModel(Base, TimestampMixin):
         default=False,
         server_default=text("false"),
     )
+
+    # --- ASM-legacy migration traceability (migrate-from-asm) ---
+    legacy_asm_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    legacy_pn: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    migration_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    migrated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 4), nullable=True)
