@@ -216,10 +216,15 @@ async def _process(item: dict[str, Any], *, dry_run: bool, retries: int = 3) -> 
 async def _run(args: argparse.Namespace) -> int:
     items = await _load_items()
     items = [i for i in items if (i.get("mpn") or "").strip()]  # need an MPN
+    if args.only == "distributor":
+        items = [i for i in items if _is_distributor(i)]
+    elif args.only == "internal":
+        items = [i for i in items if not _is_distributor(i)]
     window = items[args.offset : args.offset + args.limit] if args.limit else items[args.offset :]
     _log.info(
-        "migrate_asm: %d items with MPN; window offset=%d limit=%s -> %d to process%s",
+        "migrate_asm: %d items (only=%s); window offset=%d limit=%s -> %d to process%s",
         len(items),
+        args.only,
         args.offset,
         args.limit,
         len(window),
@@ -249,6 +254,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Migrate components from legacy ASM stock_items.")
     p.add_argument("--offset", type=int, default=0, help="Start index into the MPN item list.")
     p.add_argument("--limit", type=int, default=0, help="Max items to process (0 = all).")
+    p.add_argument(
+        "--only",
+        choices=["all", "distributor", "internal"],
+        default="all",
+        help="Process only distributor (real MPN, gets enriched) or internal "
+        "(PCB/assembly/Aliexpress, lift-shifted) items. Default all.",
+    )
     p.add_argument("--dry-run", action="store_true", help="Plan without writing.")
     return p
 
