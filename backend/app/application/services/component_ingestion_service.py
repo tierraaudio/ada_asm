@@ -99,15 +99,68 @@ def _first_non_null(quotes: list[SupplierQuote], attr: str) -> Any:
     return None
 
 
+# Common full/3-letter country forms suppliers return, mapped to ISO-2 so the
+# varchar(2) `country_of_origin` column accepts them. Anything else longer than
+# two letters is dropped (None) rather than overflowing the column.
+_COUNTRY_ISO2 = {
+    "USA": "US",
+    "UNITED STATES": "US",
+    "CHINA": "CN",
+    "CHN": "CN",
+    "TAIWAN": "TW",
+    "TWN": "TW",
+    "JAPAN": "JP",
+    "JPN": "JP",
+    "GERMANY": "DE",
+    "DEU": "DE",
+    "MEXICO": "MX",
+    "MEX": "MX",
+    "MALAYSIA": "MY",
+    "MYS": "MY",
+    "PHILIPPINES": "PH",
+    "PHL": "PH",
+    "THAILAND": "TH",
+    "THA": "TH",
+    "KOREA": "KR",
+    "SOUTH KOREA": "KR",
+    "KOR": "KR",
+    "SINGAPORE": "SG",
+    "SGP": "SG",
+    "VIETNAM": "VN",
+    "VNM": "VN",
+    "UNITED KINGDOM": "GB",
+    "GBR": "GB",
+    "FRANCE": "FR",
+    "FRA": "FR",
+    "INDONESIA": "ID",
+    "IDN": "ID",
+}
+
+
+def _norm_country(raw: Any) -> str | None:
+    """Normalise a supplier country value to an ISO-2 code (or None). Guards the
+    varchar(2) column: a 2-letter code passes through; known long forms map; any
+    other value is dropped rather than overflowing."""
+
+    if raw is None:
+        return None
+    value = str(raw).strip().upper()
+    if len(value) == 2 and value.isalpha():
+        return value
+    return _COUNTRY_ISO2.get(value)
+
+
 def _derive_country_of_origin(quotes: list[SupplierQuote]) -> str | None:
-    direct = _first_non_null(quotes, "country_of_origin")
+    direct = _norm_country(_first_non_null(quotes, "country_of_origin"))
     if direct is not None:
-        return str(direct)
+        return direct
     # Fall back to a country code carried in compliance (Mouser/DigiKey).
     for quote in quotes:
         for code in quote.compliance:
             if code.code_type in ("País de origen", "countryOfOrigin", "CountryOfOrigin"):
-                return code.code_value
+                norm = _norm_country(code.code_value)
+                if norm is not None:
+                    return norm
     return None
 
 
