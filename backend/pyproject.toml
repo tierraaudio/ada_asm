@@ -59,6 +59,11 @@ dev = [
     "respx>=0.21,<1.0",
 ]
 
+[project.scripts]
+# Dash-free console entry so the ASM migration runs as a Container App Job
+# via `--command "asm-migrate"` (config via ASM_* env vars).
+asm-migrate = "app.scripts.asm_migrate_entry:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
