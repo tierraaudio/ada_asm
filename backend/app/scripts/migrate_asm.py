@@ -142,7 +142,6 @@ async def _reclassify() -> int:
 
     factory = get_session_factory()
     counts: dict[str, int] = {}
-    updated = 0
     unmatched = 0
     async with factory() as session:
         rows = (
@@ -152,23 +151,23 @@ async def _reclassify() -> int:
                 )
             )
         ).all()
+        params: list[dict[str, Any]] = []
         for cid, pn in rows:
             family = _family_from_pn(pn)
             if not family:
                 unmatched += 1
                 continue
-            await session.execute(
-                update(ComponentModel)
-                .where(ComponentModel.id == cid)
-                .values(family=family, family_needs_review=False)
-            )
+            params.append({"id": cid, "family": family, "family_needs_review": False})
             counts[family] = counts.get(family, 0) + 1
-            updated += 1
-        await session.commit()
+        if params:
+            # One ORM bulk UPDATE-by-primary-key (executemany) — vastly faster
+            # than per-row awaited updates against a remote Postgres.
+            await session.execute(update(ComponentModel), params)
+            await session.commit()
     _log.info(
         "reclassify: candidates=%d updated=%d unmatched=%d by_family=%s",
         len(rows),
-        updated,
+        len(params),
         unmatched,
         json.dumps(counts, ensure_ascii=False, sort_keys=True),
     )
