@@ -27,6 +27,7 @@ import argparse
 import asyncio
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -61,6 +62,117 @@ def _is_distributor(item: dict[str, Any]) -> bool:
     mpn = (item.get("mpn") or "").strip().upper()
     manufacturer = (item.get("manufacturer") or "").lower()
     return bool(mpn) and not mpn.startswith(_INTERNAL_PREFIXES) and "aliexpress" not in manufacturer
+
+
+# --- Family reclassification from the ASM internal part number -----------------
+# The legacy ASM `pn` deterministically encodes the component type (segment 4 of
+# RM-COM-{SMD,THL}-XXX) or the category (RM-CON, TA-MOD, ...). This classifies
+# every component (including lift-shifted ones with no supplier category), far
+# more completely than supplier-category inference. See reclassify().
+_COM_TYPE_FAMILY = {
+    "RES": "Resistencias",
+    "CAP": "Condensadores",
+    "IC": "Circuitos Integrados",
+    "POT": "Potenciómetros",
+    "LED": "LEDs",
+    "TRA": "Transistores",
+    "REG": "Reguladores",
+    "SWT": "Interruptores",
+    "DIO": "Diodos",
+    "REC": "Diodos",
+    "IND": "Inductores",
+    "REL": "Relés",
+    "HEA": "Disipadores",
+    "PSU": "Fuentes de alimentación",
+    "VUM": "Instrumentación",
+}
+_CAT_FAMILY = {
+    "RM-CON": "Conectores",
+    "RM-HDW": "Hardware",
+    "PCB": "PCB",
+    "RM-PCB": "PCB",
+    "STENCIL": "PCB",
+    "RM-CHA": "Mecánica",
+    "RM-FIN": "Mecánica",
+    "RM-MON": "Mecánica",
+    "RM-ALU": "Mecánica",
+    "RM-MES": "Mecánica",
+    "RM-SPR": "Mecánica",
+    "RM-MAG": "Mecánica",
+    "TA-COV": "Mecánica",
+    "RM-PKG": "Embalaje",
+    "RM-TRF": "Transformadores",
+    "RM-WIR": "Cableado",
+    "TA-WIR": "Cableado",
+    "RM-BAT": "Baterías",
+    "RM-MIC": "Micrófonos",
+    "RM-DIS": "Displays",
+    "RM-COM": "Fusibles",
+    "TA-MOD": "Módulos",
+    "TA-DEV": "Módulos",
+    "TA-FLV": "Módulos",
+    "TA-BMB": "Módulos",
+    "TA-NEW": "Módulos",
+    "TA-BAS": "Módulos",
+    "TA-BRM": "Módulos",
+    "TA-DIY": "Módulos",
+    "TA-EUR": "Módulos",
+}
+_COM_RE = re.compile(r"^RM-COM-(?:SMD|THL)-([A-Z]+)")
+_CAT_RE = re.compile(r"^(RM-[A-Z]+|TA-[A-Z]+|PCB|STENCIL)")
+
+
+def _family_from_pn(pn: str | None) -> str | None:
+    if not pn:
+        return None
+    p = pn.strip().upper()
+    com = _COM_RE.match(p)
+    if com:
+        return _COM_TYPE_FAMILY.get(com.group(1))
+    cat = _CAT_RE.match(p)
+    if cat:
+        return _CAT_FAMILY.get(cat.group(1))
+    return None
+
+
+async def _reclassify() -> int:
+    """Assign a family (from legacy_pn) to every component still in review /
+    without one. Deterministic, no supplier calls. Leaves correctly-classified
+    components untouched."""
+
+    factory = get_session_factory()
+    counts: dict[str, int] = {}
+    updated = 0
+    unmatched = 0
+    async with factory() as session:
+        rows = (
+            await session.execute(
+                select(ComponentModel.id, ComponentModel.legacy_pn).where(
+                    (ComponentModel.family == "") | (ComponentModel.family_needs_review.is_(True))
+                )
+            )
+        ).all()
+        for cid, pn in rows:
+            family = _family_from_pn(pn)
+            if not family:
+                unmatched += 1
+                continue
+            await session.execute(
+                update(ComponentModel)
+                .where(ComponentModel.id == cid)
+                .values(family=family, family_needs_review=False)
+            )
+            counts[family] = counts.get(family, 0) + 1
+            updated += 1
+        await session.commit()
+    _log.info(
+        "reclassify: candidates=%d updated=%d unmatched=%d by_family=%s",
+        len(rows),
+        updated,
+        unmatched,
+        json.dumps(counts, ensure_ascii=False, sort_keys=True),
+    )
+    return 0
 
 
 async def _load_items() -> list[dict[str, Any]]:

@@ -19,7 +19,7 @@ import argparse
 import asyncio
 import os
 
-from app.scripts.migrate_asm import _run
+from app.scripts.migrate_asm import _reclassify, _run
 from app.scripts.purge_components import _purge
 
 
@@ -30,6 +30,8 @@ def main() -> int:
             print("purge requires ASM_PURGE_YES=1")
             return 1
         return asyncio.run(_purge())
+    if mode == "reclassify":
+        return asyncio.run(_reclassify())
 
     ns = argparse.Namespace(
         offset=int(os.environ.get("ASM_OFFSET") or "0"),
