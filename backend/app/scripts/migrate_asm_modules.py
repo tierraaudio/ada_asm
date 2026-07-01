@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -29,13 +30,44 @@ from app.infrastructure.db.models.component import ComponentModel
 from app.infrastructure.db.models.module import ModuleModel
 from app.infrastructure.db.models.module_child import ModuleChildModel
 from app.infrastructure.db.session import get_session_factory
-from app.scripts.migrate_asm import _family_from_pn, _load_items
+from app.scripts.migrate_asm import _load_items
 
 _log = logging.getLogger("migrate_asm_modules")
 
 _SOURCE = "asm-legacy"
 _BACKUP_CONTAINER = "legacy-asm-backup"
 _EDGES_BLOB = "asm_edges.json"
+
+# ada `modules.family` is a fixed 4-value taxonomy (CHECK constraint):
+# Board / Device / Bundle / Case. Map the ASM assembly pn prefix onto it.
+_MODULE_FAMILY = {
+    "TA-DEV": "Device",
+    "TA-BMB": "Device",
+    "TA-NEW": "Device",
+    "TA-EUR": "Device",
+    "TA-BRM": "Device",
+    "TA-MOD": "Board",
+    "TA-WIR": "Board",
+    "RM-PCB": "Board",
+    "PCB": "Board",
+    "TA-FLV": "Bundle",
+    "TA-PKG": "Bundle",
+    "TA-BAS": "Bundle",
+    "TA-DIY": "Bundle",
+    "RM-CHA": "Case",
+    "TA-COV": "Case",
+    "TA-FRO": "Case",
+    "RM-FIN": "Case",
+    "RM-MON": "Case",
+}
+_MODULE_PFX_RE = re.compile(r"^(RM-[A-Z]+|TA-[A-Z]+|ST-[A-Z]+|PCB)")
+
+
+def _module_family(pn: str) -> str:
+    match = _MODULE_PFX_RE.match(pn.strip().upper())
+    if match:
+        return _MODULE_FAMILY.get(match.group(1), "Board")
+    return "Board"
 
 
 async def _load_edges() -> list[dict[str, Any]]:
@@ -113,7 +145,7 @@ async def _create_modules() -> int:
                     "sku": item["pn"],
                     "name": name[:200],
                     "description": item.get("description") or None,
-                    "family": _family_from_pn(item["pn"]) or "",
+                    "family": _module_family(item["pn"]),
                     "fabricante": (item.get("manufacturer") or None),
                     "location": item.get("locator") or None,
                     "stock": _stock(item.get("amount")),
