@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
+    DateTime,
     Integer,
     String,
     text,
@@ -56,3 +58,10 @@ class ModuleModel(Base, TimestampMixin):
     )
     notas: Mapped[str | None] = mapped_column(nullable=True)
     fecha_creacion: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+    # --- ASM-legacy migration traceability (migrate-from-asm, modules phase) ---
+    legacy_asm_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    legacy_pn: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    migration_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    migrated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    obsolete: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))

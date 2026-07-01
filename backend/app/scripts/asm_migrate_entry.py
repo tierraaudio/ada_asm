@@ -32,6 +32,14 @@ def main() -> int:
         return asyncio.run(_purge())
     if mode == "reclassify":
         return asyncio.run(_reclassify())
+    if mode == "modules_create":
+        from app.scripts.migrate_asm_modules import _create_modules
+
+        return asyncio.run(_create_modules())
+    if mode == "bom_rebuild":
+        from app.scripts.migrate_asm_modules import _rebuild_bom
+
+        return asyncio.run(_rebuild_bom())
 
     ns = argparse.Namespace(
         offset=int(os.environ.get("ASM_OFFSET") or "0"),
