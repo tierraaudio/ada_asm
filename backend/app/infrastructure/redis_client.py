@@ -43,9 +43,13 @@ def create_resilient_client() -> Redis[bytes]:
         settings.redis_cache_url or settings.celery_broker_url,
         decode_responses=True,
         socket_keepalive=True,
-        socket_connect_timeout=10,
-        socket_timeout=10,
+        # Short timeouts: when the internal ingress to Redis is down (a known
+        # CAE issue) every call must fail fast so the rate limiter falls back
+        # to its in-process bucket instead of stalling ~10s per component (which
+        # turned the nightly sync into a 6-hour job).
+        socket_connect_timeout=1,
+        socket_timeout=1,
         health_check_interval=30,
-        retry=Retry(ExponentialBackoff(cap=1.0, base=0.1), retries=3),
+        retry=Retry(ExponentialBackoff(cap=0.2, base=0.05), retries=1),
         retry_on_error=[RedisConnectionError, RedisTimeoutError],
     )

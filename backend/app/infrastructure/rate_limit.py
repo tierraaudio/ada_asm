@@ -96,6 +96,27 @@ def _set_client(client: Redis[bytes] | None) -> None:
     _client = client
 
 
+# In-process token buckets — the fallback used when the shared Redis limiter is
+# unreachable (dead internal ingress). Per worker process, so it does not
+# coordinate across processes, but it keeps a single busy worker under the
+# supplier's per-minute limit instead of hammering unthrottled.
+_local_buckets: dict[str, list[float]] = {}
+
+
+async def _local_throttle(bucket: str, limit_per_minute: int) -> None:
+    refill_per_s = limit_per_minute / 60.0
+    state = _local_buckets.setdefault(bucket, [float(limit_per_minute), time.monotonic()])
+    now = time.monotonic()
+    state[0] = min(float(limit_per_minute), state[0] + (now - state[1]) * refill_per_s)
+    state[1] = now
+    if state[0] >= 1.0:
+        state[0] -= 1.0
+        return
+    wait = min((1.0 - state[0]) / refill_per_s, _MAX_WAIT_MS / 1000.0)
+    await asyncio.sleep(wait)
+    state[0] = 0.0
+
+
 async def acquire(bucket: str, limit_per_minute: int) -> None:
     """Block until 1 token can be consumed from `bucket`.
 
@@ -125,16 +146,17 @@ async def acquire(bucket: str, limit_per_minute: int) -> None:
                 )
             )
         except (RedisConnectionError, RedisTimeoutError, OSError) as exc:
-            # Fail-open: the limiter protects supplier quotas, it is not a
-            # hard dependency. With Redis unreachable the caller proceeds
-            # unthrottled rather than turning every lookup into a 500.
+            # Redis unreachable → fall back to the in-process bucket. This still
+            # protects supplier per-minute quotas (unlike a full fail-open) and,
+            # with the short client timeouts, returns fast instead of stalling
+            # ~10s per call — which is what made the nightly sync a 6h job.
             _log.warning(
-                "rate_limit.fail_open bucket=%s err=%s.%s msg=%s",
+                "rate_limit.local_fallback bucket=%s err=%s.%s",
                 bucket,
                 type(exc).__module__,
                 type(exc).__name__,
-                exc,
             )
+            await _local_throttle(bucket, limit_per_minute)
             return
         if wait_ms == 0:
             return
