@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
@@ -71,6 +72,28 @@ if TYPE_CHECKING:
     from app.domain.entities.supplier_quote import SupplierCode
 
 _log = logging.getLogger(__name__)
+
+
+def select_daily_window[T](targets: list[T], budget: int, day_ordinal: int) -> list[T]:
+    """Pick today's rotating slice of the catalogue for a quota-limited supplier.
+
+    DigiKey and Farnell cap the standard tier at 1000 requests/day and each
+    component costs one request, so the full ~1840-component catalogue cannot
+    be synced in a single day. We split the catalogue into
+    ``ceil(len / budget)`` consecutive packages and advance one package per
+    calendar day (``day_ordinal % num_windows``). The rotation is stateless —
+    the day ordinal alone decides the window, so restarts and re-triggers on
+    the same day always cover the same package.
+
+    ``budget <= 0`` (unlimited, e.g. TME) or a catalogue that already fits in
+    one package returns every target unchanged.
+    """
+
+    if budget <= 0 or len(targets) <= budget:
+        return targets
+    num_windows = math.ceil(len(targets) / budget)
+    index = day_ordinal % num_windows
+    return targets[index * budget : (index + 1) * budget]
 
 
 async def _record_error(
@@ -178,6 +201,28 @@ async def _run_for_supplier(
             )
             result = await session.execute(stmt)
             targets: list[tuple[UUID, str]] = [(row.id, row.mpn) for row in result.all()]
+            # Rotating daily package: quota-limited suppliers (DigiKey/Farnell/
+            # Mouser) can't cover the whole catalogue within their 1000/day cap,
+            # so each day walks one consecutive slice, advancing per calendar day.
+            settings = get_settings()
+            budget = settings.supplier_sync_daily_component_budget
+            if adapter.code in settings.supplier_sync_rotation_suppliers and 0 < budget < len(
+                targets
+            ):
+                total = len(targets)
+                num_windows = math.ceil(total / budget)
+                package = today.toordinal() % num_windows
+                targets = select_daily_window(targets, budget, today.toordinal())
+                _log.info(
+                    "supplier_sync.rotation supplier=%s package=%d/%d budget=%d "
+                    "total=%d selected=%d",
+                    adapter.code,
+                    package + 1,
+                    num_windows,
+                    budget,
+                    total,
+                    len(targets),
+                )
         else:
             stmt = select(ComponentModel.id, ComponentModel.mpn).where(
                 ComponentModel.id.in_(component_ids)

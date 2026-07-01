@@ -14,6 +14,7 @@ import pytest
 from app.infrastructure.supplier_snapshot import (
     pick_unit_price_for_tier as _pick_unit_price_for_tier,
 )
+from app.infrastructure.tasks.supplier_sync import select_daily_window
 
 
 def test_pick_unit_price_returns_largest_break_not_exceeding_tier() -> None:
@@ -60,6 +61,39 @@ def test_pick_unit_price_picks_largest_applicable_break() -> None:
 
 def test_pick_unit_price_empty_breaks_returns_none() -> None:
     assert _pick_unit_price_for_tier([], 100) is None
+
+
+def test_select_daily_window_unlimited_budget_returns_all() -> None:
+    targets = list(range(100))
+    assert select_daily_window(targets, 0, day_ordinal=5) == targets
+    assert select_daily_window(targets, -1, day_ordinal=5) == targets
+
+
+def test_select_daily_window_catalogue_fits_in_one_package() -> None:
+    targets = list(range(50))
+    assert select_daily_window(targets, budget=900, day_ordinal=12345) == targets
+
+
+def test_select_daily_window_rotates_consecutive_packages() -> None:
+    # 1840 components, budget 900 -> 3 packages: [0:900], [900:1800], [1800:1840].
+    targets = list(range(1840))
+    num_windows = 3
+    assert select_daily_window(targets, budget=900, day_ordinal=0) == targets[0:900]
+    assert select_daily_window(targets, budget=900, day_ordinal=1) == targets[900:1800]
+    assert select_daily_window(targets, budget=900, day_ordinal=2) == targets[1800:1840]
+    # Wraps back to the first package on the next cycle.
+    assert select_daily_window(targets, budget=900, day_ordinal=num_windows) == targets[0:900]
+    assert (
+        select_daily_window(targets, budget=900, day_ordinal=num_windows + 1) == targets[900:1800]
+    )
+
+
+def test_select_daily_window_covers_every_component_across_a_cycle() -> None:
+    targets = list(range(1840))
+    covered: set[int] = set()
+    for day in range(3):  # one full cycle
+        covered.update(select_daily_window(targets, budget=900, day_ordinal=day))
+    assert covered == set(targets)
 
 
 @pytest.mark.parametrize(

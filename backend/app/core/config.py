@@ -148,6 +148,24 @@ class Settings(BaseSettings):
     )
     supplier_lookup_cache_ttl_seconds: int = Field(default=900)
     supplier_sync_daily_hour_utc: int = Field(default=3, ge=0, le=23)
+    supplier_sync_daily_component_budget: int = Field(
+        default=900,
+        ge=0,
+        description=(
+            "Max components a quota-limited supplier syncs per day. DigiKey and "
+            "Farnell cap the standard tier at 1000 requests/day (1 request per "
+            "component), so the ~1840-component catalogue is split into "
+            "ceil(total / budget) rotating packages, one advanced per calendar "
+            "day. 0 disables rotation (sync the whole catalogue every day)."
+        ),
+    )
+    supplier_sync_rotation_suppliers: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["mouser", "digikey", "farnell"],
+        description=(
+            "Supplier codes subject to the daily rotation budget. TME is "
+            "excluded because it has no daily quota (per-minute limit only)."
+        ),
+    )
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -159,6 +177,7 @@ class Settings(BaseSettings):
     @field_validator(
         "supplier_sync_enabled_suppliers",
         "supplier_lookup_priority",
+        "supplier_sync_rotation_suppliers",
         mode="before",
     )
     @classmethod
