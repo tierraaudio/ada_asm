@@ -60,22 +60,22 @@ TDD throughout: write the failing test first, then the implementation. Reuse the
 
 ## 8. Infra (Azure)
 
-- [ ] 8.1 Bicep: storage module (private `datasheets` container) — reuse broker SA or dedicated; output account/container.
-- [ ] 8.2 Bicep: `Storage Blob Data Contributor` role for the backend Container App managed identity; env vars `DATASHEET_STORAGE_ACCOUNT`/`DATASHEET_CONTAINER`.
-- [ ] 8.3 Document/wire a prod one-off Container App Job for `ingest_component` (manual trigger).
+- [x] 8.1 Bicep: storage module (private `datasheets` container) — reuse broker SA or dedicated; output account/container.
+- [x] 8.2 Bicep: `Storage Blob Data Contributor` role for the backend Container App managed identity; env vars `DATASHEET_STORAGE_ACCOUNT`/`DATASHEET_CONTAINER`.
+- [x] 8.3 Document/wire a prod one-off Container App Job for `ingest_component` (manual trigger).
 
 ## 9. Frontend (integrated from the start)
 
-- [ ] 9.1 `useIngestComponent` TanStack mutation hook + API client method. Tests.
-- [ ] 9.2 `ComponentEditPage` create mode: MPN field + "Ingestar" action → POST → navigate/prefill with what was auto-populated. Component tests (success, 404 not-found, 409 duplicate).
-- [ ] 9.3 Component detail: render `image_url`, `lifecycle_status` badge, archived datasheet link (protected endpoint), `family_needs_review` badge + inline family picker. Tests.
+- [x] 9.1 `useIngestComponent` TanStack mutation hook + API client method. Tests.
+- [x] 9.2 `ComponentEditPage` create mode: MPN field + "Ingestar" action → POST → navigate/prefill with what was auto-populated. Component tests (success, 404 not-found, 409 duplicate).
+- [x] 9.3 Component detail: render `image_url`, `lifecycle_status` badge, archived datasheet link (protected endpoint), `family_needs_review` badge + inline family picker. Tests.
 
 ## 10. Documentation
 
-- [ ] 10.1 `api-spec.yml`: add `/components/ingest` (with `IngestComponentResponse{component, report}` + `IngestionReport` schema), `/components/{id}/datasheet`, new component fields, new schemas.
-- [ ] 10.2 `data-model.md`: document new columns + the 5 new tables + family-inference model.
-- [ ] 10.3 `development_guide.md`: ingest CLI usage (local docker exec + prod job), datasheet storage env vars, family-rules seeding/growing.
+- [x] 10.1 `api-spec.yml`: add `/components/ingest` (with `IngestComponentResponse{component, report}` + `IngestionReport` schema), `/components/{id}/datasheet`, new component fields, new schemas.
+- [x] 10.2 `data-model.md`: document new columns + the 5 new tables + family-inference model.
+- [x] 10.3 `development_guide.md`: ingest CLI usage (local docker exec + prod job), datasheet storage env vars, family-rules seeding/growing.
 
 ## 11. Integration validation
 
-- [ ] 11.1 Rebuild local stack; ingest a real MPN end-to-end (e.g. `LM358N` — has a Farnell datasheet); verify component created, family inferred, datasheet archived+served, blended fields populated, and it appears in a subsequent sync.
+- [x] 11.1 Rebuild local stack; ingest a real MPN end-to-end (e.g. `LM358N` — has a Farnell datasheet); verify component created, family inferred, datasheet archived+served, blended fields populated, and it appears in a subsequent sync.
