@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text, update
 
 from app.application.services.component_ingestion_service import ComponentIngestionService
 from app.core.config import get_settings
@@ -171,6 +171,40 @@ async def _reclassify() -> int:
         unmatched,
         json.dumps(counts, ensure_ascii=False, sort_keys=True),
     )
+    return 0
+
+
+_CHEAPEST_TIER100_SQL = text(
+    """
+    SELECT DISTINCT ON (component_id) component_id, supplier_id
+    FROM (
+        SELECT component_id, supplier_id, price,
+               row_number() OVER (
+                   PARTITION BY component_id, supplier_id ORDER BY valid_from DESC
+               ) AS rn
+        FROM supplier_prices
+        WHERE qty_tier = 100
+    ) latest
+    WHERE rn = 1
+    ORDER BY component_id, price ASC
+    """
+)
+
+
+async def _set_preferred_suppliers() -> int:
+    """Set each component's proveedor_preferente_id to the supplier with the
+    cheapest latest tier-100 price, so current_price_per_100_eur (and module
+    aggregates) resolve. Uses the prices already stored at ingest; no supplier
+    calls. Bulk update by primary key."""
+
+    factory = get_session_factory()
+    async with factory() as session:
+        rows = (await session.execute(_CHEAPEST_TIER100_SQL)).all()
+        params = [{"id": r.component_id, "proveedor_preferente_id": r.supplier_id} for r in rows]
+        if params:
+            await session.execute(update(ComponentModel), params)
+            await session.commit()
+    _log.info("pricing: preferred supplier set for %d components", len(params))
     return 0
 
 

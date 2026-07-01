@@ -19,7 +19,7 @@ import argparse
 import asyncio
 import os
 
-from app.scripts.migrate_asm import _reclassify, _run
+from app.scripts.migrate_asm import _reclassify, _run, _set_preferred_suppliers
 from app.scripts.purge_components import _purge
 
 
@@ -32,6 +32,8 @@ def main() -> int:
         return asyncio.run(_purge())
     if mode == "reclassify":
         return asyncio.run(_reclassify())
+    if mode == "pricing":
+        return asyncio.run(_set_preferred_suppliers())
     if mode == "modules_create":
         from app.scripts.migrate_asm_modules import _create_modules
 
